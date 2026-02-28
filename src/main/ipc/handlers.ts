@@ -4,9 +4,11 @@ import { extractAndCacheIcon, saveCustomImage, clearCustomImage, readFileAsDataU
 import { reanalyzeGroups, invalidateGroupCache } from '../grouping/groupEngine'
 import { exportData, importData } from '../importExport/dataTransfer'
 import { importFromSteam } from '../importExport/steamImport'
+import { searchSteamGridDB } from '../artwork/artworkProvider'
 import { CHANNELS } from '@shared/channels'
 import type {
-  AppRecord, AppGroup, SessionSummary, RangeSummary, ChartDataPoint, WindowControlAction
+  AppRecord, AppGroup, SessionSummary, RangeSummary, ChartDataPoint, WindowControlAction,
+  ArtworkSearchResponse
 } from '@shared/types'
 import { getMainWindow } from '../window'
 import { startTracker, stopTracker } from '../tracking/tracker'
@@ -334,6 +336,26 @@ export function registerIpcHandlers(): void {
       db.prepare<[number]>('UPDATE apps SET custom_image_path = NULL WHERE id = ?').run(id)
     }
   })
+
+  // ── Artwork search ────────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    CHANNELS.ARTWORK_SEARCH,
+    async (_e, query: string, type?: string): Promise<ArtworkSearchResponse> => {
+      const apiKey = getSetting('steamgriddb_api_key') as string | null
+      if (!apiKey) return { results: [], error: 'no_key' }
+      try {
+        const results = await searchSteamGridDB(
+          query,
+          apiKey,
+          (type as 'grids' | 'heroes' | 'logos' | 'icons') ?? 'grids'
+        )
+        return { results }
+      } catch (err) {
+        return { results: [], error: (err as Error).message }
+      }
+    }
+  )
 
   // ── Data transfer ─────────────────────────────────────────────────────────
 

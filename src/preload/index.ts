@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNELS } from '@shared/channels'
 import type {
   AppRecord, AppGroup, RangeSummary, ImportResult, SteamImportResult,
-  WindowControlAction, TickPayload, UpdateInfo, UpdateProgressInfo
+  WindowControlAction, TickPayload, UpdateInfo, UpdateProgressInfo,
+  ArtworkSearchResponse
 } from '@shared/types'
 
 // Typed API exposed to the renderer via contextBridge
@@ -69,6 +70,10 @@ const api = {
 
   fetchIconFromUrl: (id: number, url: string, isGroup?: boolean): Promise<string | null> =>
     ipcRenderer.invoke(CHANNELS.ICONS_FETCH_URL, id, url, isGroup),
+
+  // Artwork search
+  searchArtwork: (query: string, type?: string): Promise<ArtworkSearchResponse> =>
+    ipcRenderer.invoke(CHANNELS.ARTWORK_SEARCH, query, type),
 
   // Data transfer
   exportData: (): Promise<{ success: boolean; filePath?: string; error?: string }> =>

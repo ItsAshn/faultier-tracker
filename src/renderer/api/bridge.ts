@@ -61,6 +61,7 @@ const stub: ApiType = {
   exportData: () => Promise.resolve({ success: false }),
   importData: () => Promise.resolve({ appsAdded: 0, appsUpdated: 0, sessionsAdded: 0, duplicates: 0, errors: [] } as any),
   importSteamData: () => Promise.resolve({ gamesImported: 0, sessionsAdded: 0, duplicates: 0, errors: [] }),
+  searchArtwork: () => Promise.resolve({ results: [] }),
   windowControl: () => {},
   onTick: () => () => {},
   onAppSeen: () => () => {},

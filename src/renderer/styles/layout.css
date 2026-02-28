@@ -39,28 +39,6 @@
   flex: 1;
 }
 
-.titlebar__status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  -webkit-app-region: no-drag;
-}
-
-.titlebar__status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-success);
-  box-shadow: 0 0 6px var(--color-success);
-}
-
-.titlebar__status-dot--idle {
-  background: var(--color-text-dim);
-  box-shadow: none;
-}
-
 .titlebar__controls {
   display: flex;
   gap: var(--space-1);
@@ -89,6 +67,24 @@
 .titlebar__control--close:hover {
   background: var(--color-danger);
   color: #fff;
+}
+
+.titlebar__control--update {
+  color: var(--color-accent);
+}
+
+.titlebar__control--update:hover {
+  background: var(--color-accent-glow);
+  color: var(--color-accent);
+}
+
+.titlebar__control--update-ready {
+  color: var(--color-success);
+}
+
+.titlebar__control--update-ready:hover {
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+  color: var(--color-success);
 }
 
 /* ── Main layout ──────────────────────────────────────────────────────────── */

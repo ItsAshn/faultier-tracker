@@ -29,6 +29,9 @@ export const CHANNELS = {
   ICONS_CLEAR_CUSTOM: 'icons:clearCustom',
   ICONS_FETCH_URL: 'icons:fetchUrl',
 
+  // Artwork search
+  ARTWORK_SEARCH: 'artwork:search',
+
   // Data transfer
   DATA_EXPORT: 'data:export',
   DATA_IMPORT: 'data:import',

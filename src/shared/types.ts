@@ -138,3 +138,18 @@ export type UpdateStatus =
   | 'downloading'
   | 'downloaded'
   | 'error'
+
+export interface ArtworkResult {
+  id: number
+  url: string
+  thumb: string
+  width: number
+  height: number
+  style?: string
+  mime?: string
+}
+
+export interface ArtworkSearchResponse {
+  results: ArtworkResult[]
+  error?: string
+}

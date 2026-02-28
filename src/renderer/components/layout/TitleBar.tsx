@@ -1,23 +1,24 @@
-import { Minus, Square, X } from 'lucide-react'
-import { useSessionStore } from '../../store/sessionStore'
-import { useAppStore } from '../../store/appStore'
+import { Download, Minus, RefreshCw, Square, X } from 'lucide-react'
+import { useUpdateStore } from '../../store/updateStore'
 import { api } from '../../api/bridge'
 
-function formatDuration(ms: number): string {
-  const h = Math.floor(ms / 3_600_000)
-  const m = Math.floor((ms % 3_600_000) / 60_000)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
-}
-
 export default function TitleBar(): JSX.Element {
-  const activeAppId = useSessionStore((s) => s.activeAppId)
-  const activeExeName = useSessionStore((s) => s.activeExeName)
-  const apps = useAppStore((s) => s.apps)
-  const summary = useSessionStore((s) => s.summary)
+  const status = useUpdateStore((s) => s.status)
+  const info = useUpdateStore((s) => s.info)
+  const downloadUpdate = useUpdateStore((s) => s.downloadUpdate)
+  const quitAndInstall = useUpdateStore((s) => s.quitAndInstall)
 
-  const activeApp = apps.find((a) => a.id === activeAppId)
-  const todayActive = summary?.total_active_ms ?? 0
+  const showUpdate = status === 'available' || status === 'downloading' || status === 'downloaded'
+  const updateTitle =
+    status === 'available' && info ? `Download v${info.version}`
+    : status === 'downloading' ? 'Downloading update…'
+    : status === 'downloaded' && info ? `Restart to install v${info.version}`
+    : undefined
+
+  const handleUpdateClick = () => {
+    if (status === 'available') downloadUpdate()
+    else if (status === 'downloaded') quitAndInstall()
+  }
 
   return (
     <header className="titlebar">
@@ -28,16 +29,17 @@ export default function TitleBar(): JSX.Element {
 
       <div className="titlebar__spacer" />
 
-      <div className="titlebar__status">
-        <span className={`titlebar__status-dot${activeAppId ? '' : ' titlebar__status-dot--idle'}`} />
-        {activeApp
-          ? `${activeApp.display_name} — ${formatDuration(todayActive)} today`
-          : activeExeName
-          ? activeExeName
-          : 'Idle'}
-      </div>
-
       <div className="titlebar__controls">
+        {showUpdate && (
+          <button
+            className={`titlebar__control titlebar__control--update${status === 'downloaded' ? ' titlebar__control--update-ready' : ''}`}
+            onClick={handleUpdateClick}
+            title={updateTitle}
+            disabled={status === 'downloading'}
+          >
+            {status === 'downloaded' ? <RefreshCw size={14} /> : <Download size={14} />}
+          </button>
+        )}
         <button
           className="titlebar__control"
           onClick={() => api.windowControl('minimize')}

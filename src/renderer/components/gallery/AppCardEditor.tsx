@@ -1,8 +1,9 @@
 import { useState, useEffect, KeyboardEvent } from 'react'
-import { X } from 'lucide-react'
+import { X, Globe } from 'lucide-react'
 import type { AppRecord, AppGroup } from '@shared/types'
 import { useAppStore } from '../../store/appStore'
 import ImageUploader from './ImageUploader'
+import ArtworkSearchModal from './ArtworkSearchModal'
 import { api } from '../../api/bridge'
 
 interface Props {
@@ -22,6 +23,7 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
   const [tags, setTags] = useState<string[]>(item.tags)
   const [tagInput, setTagInput] = useState('')
   const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
+  const [artworkModalOpen, setArtworkModalOpen] = useState(false)
 
   useEffect(() => {
     if (!item.custom_image_path) {
@@ -70,6 +72,7 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
           isGroup={isGroup}
           currentSrc={iconSrc}
           onUpdated={(url) => setIconSrc(url)}
+          onSearchOnline={() => setArtworkModalOpen(true)}
         />
 
         <div className="field">
@@ -128,6 +131,16 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
           <button className="btn btn--primary" onClick={handleSave}>Save</button>
         </div>
       </div>
+
+      {artworkModalOpen && (
+        <ArtworkSearchModal
+          appId={item.id}
+          displayName={isGroup ? (item as AppGroup).name : (item as AppRecord).display_name}
+          isGroup={isGroup}
+          onClose={() => setArtworkModalOpen(false)}
+          onApply={(url) => setIconSrc(url)}
+        />
+      )}
     </div>
   )
 }

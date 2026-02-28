@@ -58,7 +58,13 @@
       "Bash(gh api repos/ItsAshn/faultier-tracker/contents/.github)",
       "Bash(git init)",
       "Bash(git add .)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git remote add origin https://github.com/ItsAshn/faultier-tracker.git)",
+      "Bash(git branch -M main)",
+      "Bash(git push -u origin main)",
+      "Bash(git add CLAUDE.md README.md)",
+      "Bash(git push)",
+      "Bash(git add src/main/ipc/handlers.ts src/preload/index.ts src/renderer/api/bridge.ts src/renderer/components/gallery/AppCardEditor.tsx src/renderer/components/gallery/ImageUploader.tsx src/renderer/components/layout/TitleBar.tsx src/renderer/pages/Settings.tsx src/renderer/styles/layout.css src/shared/channels.ts src/shared/types.ts src/main/artwork/ src/renderer/components/gallery/ArtworkSearchModal.tsx .claude/settings.local.json)"
     ]
   }
 }

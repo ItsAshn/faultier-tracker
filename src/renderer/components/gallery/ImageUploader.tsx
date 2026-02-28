@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Upload, Link, X, Loader } from 'lucide-react'
+import { Upload, Link, X, Loader, Globe } from 'lucide-react'
 import { api } from '../../api/bridge'
 
 interface Props {
@@ -7,9 +7,10 @@ interface Props {
   isGroup?: boolean
   currentSrc: string | null
   onUpdated: (url: string | null) => void
+  onSearchOnline?: () => void
 }
 
-export default function ImageUploader({ id, isGroup, currentSrc, onUpdated }: Props): JSX.Element {
+export default function ImageUploader({ id, isGroup, currentSrc, onUpdated, onSearchOnline }: Props): JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
   const [urlMode, setUrlMode] = useState(false)
   const [urlValue, setUrlValue] = useState('')
@@ -91,6 +92,11 @@ export default function ImageUploader({ id, isGroup, currentSrc, onUpdated }: Pr
             <button className="btn btn--ghost" onClick={() => { setUrlMode(true); setUrlError(null) }}>
               <Link size={14} /> Paste image URL
             </button>
+            {onSearchOnline && (
+              <button className="btn btn--ghost" onClick={onSearchOnline}>
+                <Globe size={14} /> Search online
+              </button>
+            )}
             {currentSrc && (
               <button className="btn btn--ghost" onClick={handleClear}>
                 <X size={14} /> Reset to EXE icon

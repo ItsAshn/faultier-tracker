@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import Fuse from 'fuse.js'
-import { Search } from 'lucide-react'
+import { Search, ExternalLink } from 'lucide-react'
 import '../styles/settings.css'
 import { useAppStore } from '../store/appStore'
 import AppFilterRow from '../components/settings/AppFilterRow'
@@ -8,11 +8,13 @@ import GroupEditor from '../components/settings/GroupEditor'
 import ImportExport from '../components/settings/ImportExport'
 import AboutUpdates from '../components/settings/AboutUpdates'
 
-type Tab = 'tracking' | 'groups' | 'data' | 'about'
+type Tab = 'tracking' | 'groups' | 'data' | 'artwork' | 'about'
 
 export default function Settings(): JSX.Element {
   const [tab, setTab] = useState<Tab>('tracking')
   const [filterSearch, setFilterSearch] = useState('')
+  const [sgdbKey, setSgdbKey] = useState<string | null>(null)
+  const [sgdbKeySaved, setSgdbKeySaved] = useState(false)
 
   const apps = useAppStore((s) => s.apps)
   const settings = useAppStore((s) => s.settings)
@@ -20,6 +22,14 @@ export default function Settings(): JSX.Element {
 
   const pollInterval = Number(settings['poll_interval_ms'] ?? 5000)
   const trackingMode = (settings['tracking_mode'] as string) ?? 'blacklist'
+  const storedSgdbKey = (settings['steamgriddb_api_key'] as string) ?? ''
+
+  async function saveSgdbKey(): Promise<void> {
+    const key = sgdbKey ?? storedSgdbKey
+    await setSetting('steamgriddb_api_key', key)
+    setSgdbKeySaved(true)
+    setTimeout(() => setSgdbKeySaved(false), 2500)
+  }
 
   const fuse = useMemo(
     () => new Fuse(apps, { keys: ['display_name', 'exe_name'], threshold: 0.35 }),
@@ -41,6 +51,7 @@ export default function Settings(): JSX.Element {
           ['tracking', 'Tracking'],
           ['groups',   'Groups'],
           ['data',     'Data'],
+          ['artwork',  'Artwork'],
           ['about',    'About']
         ] as [Tab, string][]).map(([key, label]) => (
           <button
@@ -133,6 +144,53 @@ export default function Settings(): JSX.Element {
           <div className="settings-card">
             <div className="settings-card__title">Import & Export</div>
             <ImportExport />
+          </div>
+        </div>
+      )}
+
+      {tab === 'artwork' && (
+        <div className="settings-section">
+          <div className="settings-card">
+            <div className="settings-card__title">SteamGridDB Integration</div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
+              Connect to <b>SteamGridDB</b> to search and import community artwork for any game or app.
+              It's free — just create an account and generate an API key.
+            </p>
+            <a
+              href="https://www.steamgriddb.com/profile/preferences/api"
+              target="_blank"
+              rel="noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginBottom: 'var(--space-4)', textDecoration: 'none' }}
+            >
+              <ExternalLink size={13} /> Get your free API key
+            </a>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+              <input
+                className="input"
+                type="password"
+                placeholder={storedSgdbKey ? '••••••••••••••••' : 'Paste your API key here'}
+                value={sgdbKey ?? ''}
+                onChange={(e) => { setSgdbKey(e.target.value); setSgdbKeySaved(false) }}
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn btn--primary"
+                onClick={saveSgdbKey}
+                disabled={sgdbKey === null || sgdbKey.trim() === ''}
+              >
+                Save
+              </button>
+            </div>
+            {sgdbKeySaved && (
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginTop: 'var(--space-2)' }}>
+                API key saved.
+              </p>
+            )}
+            {storedSgdbKey && !sgdbKeySaved && (
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', marginTop: 'var(--space-2)' }}>
+                A key is already configured. Paste a new one above to replace it.
+              </p>
+            )}
           </div>
         </div>
       )}
