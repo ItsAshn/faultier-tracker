@@ -1,14 +1,16 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Fuse from 'fuse.js'
 import { Search, Images } from 'lucide-react'
 import '../styles/gallery.css'
 import { useAppStore } from '../store/appStore'
-import { useSessionStore } from '../store/sessionStore'
 import AppCard from '../components/gallery/AppCard'
-import type { AppRecord, AppGroup } from '@shared/types'
+import { api } from '../api/bridge'
+import type { AppRecord, AppGroup, RangeSummary } from '@shared/types'
 
-type FilterMode = 'all' | 'tracked' | 'ignored'
+type FilterMode = 'tracked' | 'ignored'
+
+const SCROLL_KEY = 'gallery-scroll'
 
 interface GalleryItem {
   id: number
@@ -20,11 +22,27 @@ interface GalleryItem {
 export default function Gallery(): JSX.Element {
   const apps = useAppStore((s) => s.apps)
   const groups = useAppStore((s) => s.groups)
-  const summary = useSessionStore((s) => s.summary)
+  const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(null)
+
+  useEffect(() => {
+    api.getSessionRange(0, Date.now()).then(setAllTimeSummary)
+  }, [])
 
   const navigate = useNavigate()
+  const mainRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<FilterMode>('all')
+  const [filter, setFilter] = useState<FilterMode>('tracked')
+
+  // Restore scroll position when returning from a detail page
+  useEffect(() => {
+    const saved = sessionStorage.getItem(SCROLL_KEY)
+    if (!saved) return
+    sessionStorage.removeItem(SCROLL_KEY)
+    const y = parseInt(saved, 10)
+    requestAnimationFrame(() => {
+      if (mainRef.current) mainRef.current.scrollTop = y
+    })
+  }, [])
 
   // Build gallery items: one per group + ungrouped apps
   const allItems: GalleryItem[] = useMemo(() => {
@@ -46,7 +64,6 @@ export default function Gallery(): JSX.Element {
 
   // Filter by tracked status
   const filtered = useMemo(() => {
-    if (filter === 'all') return allItems
     if (filter === 'tracked') {
       return allItems.filter((item) => {
         if (item.isGroup) return true
@@ -74,11 +91,11 @@ export default function Gallery(): JSX.Element {
     ? fuse.search(search).map((r) => r.item)
     : filtered
 
-  function getTodaySummary(item: GalleryItem) {
-    if (!summary) return null
+  function getAllTimeSummary(item: GalleryItem) {
+    if (!allTimeSummary) return null
     if (item.isGroup) {
       const memberIds = apps.filter((a) => a.group_id === item.id).map((a) => a.id)
-      const sums = summary.apps.filter((s) => memberIds.includes(s.app_id))
+      const sums = allTimeSummary.apps.filter((s) => memberIds.includes(s.app_id))
       if (!sums.length) return null
       return {
         app_id: item.id,
@@ -89,11 +106,16 @@ export default function Gallery(): JSX.Element {
         running_ms: sums.reduce((acc, s) => acc + s.running_ms, 0)
       }
     }
-    return summary.apps.find((s) => s.app_id === item.id) ?? null
+    return allTimeSummary.apps.find((s) => s.app_id === item.id) ?? null
+  }
+
+  function handleCardClick(item: GalleryItem): void {
+    if (mainRef.current) sessionStorage.setItem(SCROLL_KEY, String(mainRef.current.scrollTop))
+    navigate(item.isGroup ? `/group/${item.id}` : `/app/${item.id}`)
   }
 
   return (
-    <main className="page-content">
+    <main ref={mainRef} className="page-content">
       <div className="page-header">
         <h1 className="page-title">Gallery</h1>
       </div>
@@ -110,15 +132,18 @@ export default function Gallery(): JSX.Element {
         </div>
 
         <div className="gallery-filter">
-          {(['all', 'tracked', 'ignored'] as FilterMode[]).map((f) => (
-            <button
-              key={f}
-              className={`gallery-filter__btn${filter === f ? ' gallery-filter__btn--active' : ''}`}
-              onClick={() => setFilter(f)}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+          <button
+            className={`gallery-filter__btn${filter === 'tracked' ? ' gallery-filter__btn--active' : ''}`}
+            onClick={() => setFilter('tracked')}
+          >
+            Tracked
+          </button>
+          <button
+            className={`gallery-filter__btn${filter === 'ignored' ? ' gallery-filter__btn--active' : ''}`}
+            onClick={() => setFilter('ignored')}
+          >
+            Ignored
+          </button>
         </div>
       </div>
 
@@ -135,8 +160,8 @@ export default function Gallery(): JSX.Element {
               item={item.item}
               isGroup={item.isGroup}
               memberCount={item.memberCount}
-              todaySummary={getTodaySummary(item)}
-              onClick={() => navigate(item.isGroup ? `/group/${item.id}` : `/app/${item.id}`)}
+              summary={getAllTimeSummary(item)}
+              onClick={() => handleCardClick(item)}
             />
           ))
         )}

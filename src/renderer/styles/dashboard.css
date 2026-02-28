@@ -36,7 +36,7 @@
 
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-4);
 }
 
@@ -74,8 +74,8 @@
 }
 
 .summary-card__icon {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: var(--color-accent-glow);
   display: flex;
@@ -152,7 +152,7 @@
 
 .time-table__head {
   display: grid;
-  grid-template-columns: 1fr 120px 120px 80px;
+  grid-template-columns: 1fr 80px 80px 64px;
   padding: var(--space-3) var(--space-5);
   border-bottom: 1px solid var(--color-border);
   font-size: var(--text-xs);
@@ -170,7 +170,7 @@
 
 .time-row {
   display: grid;
-  grid-template-columns: 1fr 120px 120px 80px;
+  grid-template-columns: 1fr 80px 80px 64px;
   align-items: center;
   padding: var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--color-border);
@@ -305,7 +305,7 @@
 
 .chart-breakdown__row {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr) minmax(80px, 2fr) 52px 36px;
+  grid-template-columns: 10px 20px minmax(0, 1fr) minmax(80px, 2fr) 52px 36px;
   align-items: center;
   gap: var(--space-3);
 }

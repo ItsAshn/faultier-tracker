@@ -16,11 +16,11 @@ interface AppCardProps {
   item: AppRecord | AppGroup
   isGroup: boolean
   memberCount?: number
-  todaySummary: SessionSummary | null
+  summary: SessionSummary | null
   onClick: () => void
 }
 
-export default function AppCard({ item, isGroup, memberCount, todaySummary, onClick }: AppCardProps): JSX.Element {
+export default function AppCard({ item, isGroup, memberCount, summary, onClick }: AppCardProps): JSX.Element {
   const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
   const setAppTracked = useAppStore((s) => s.setAppTracked)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -59,8 +59,8 @@ export default function AppCard({ item, isGroup, memberCount, todaySummary, onCl
   }
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
-  const activeMs = todaySummary?.active_ms ?? 0
-  const runningMs = todaySummary?.running_ms ?? 0
+  const activeMs = summary?.active_ms ?? 0
+  const runningMs = summary?.running_ms ?? 0
   const hasTime = activeMs > 0 || runningMs > 0
 
   return (

@@ -1,8 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
 import type { ChartDataPoint, SessionSummary } from '@shared/types'
+import { api } from '../../api/bridge'
+
+function AppIcon({ appId }: { appId: number }): JSX.Element {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => { api.getIconForApp(appId).then(setSrc) }, [appId])
+  if (src) return <img src={src} alt="" width={20} height={20} style={{ borderRadius: 3, objectFit: 'contain', flexShrink: 0 }} />
+  return <div style={{ width: 20, height: 20, borderRadius: 3, background: 'var(--color-surface-3)', flexShrink: 0 }} />
+}
 
 const APP_COLORS = [
   '#4fc3f7', '#81c784', '#ffb74d', '#f06292',
@@ -71,6 +79,7 @@ function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
       {topApps.map((app, i) => (
         <div key={app.app_id} className="chart-breakdown__row">
           <span className="chart-breakdown__dot" style={{ background: APP_COLORS[i] }} />
+          <AppIcon appId={app.app_id} />
           <span className="chart-breakdown__name" title={app.display_name}>{app.display_name}</span>
           <div className="chart-breakdown__bar-wrap">
             <div
@@ -85,6 +94,7 @@ function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
       {otherMs > 0 && (
         <div className="chart-breakdown__row chart-breakdown__row--other">
           <span className="chart-breakdown__dot" style={{ background: 'var(--color-text-dim)' }} />
+          <div style={{ width: 20, height: 20 }} />
           <span className="chart-breakdown__name">Other</span>
           <div className="chart-breakdown__bar-wrap">
             <div

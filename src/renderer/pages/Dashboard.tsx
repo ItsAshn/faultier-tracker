@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Activity, Clock, Trophy } from 'lucide-react'
 import '../styles/dashboard.css'
 import { useSessionStore } from '../store/sessionStore'
 import { useAppStore } from '../store/appStore'
+import { api } from '../api/bridge'
 import DateRangePicker from '../components/dashboard/DateRangePicker'
 import SummaryCard from '../components/dashboard/SummaryCard'
 import TimeBarChart from '../components/dashboard/TimeBarChart'
@@ -27,6 +28,14 @@ export default function Dashboard(): JSX.Element {
     const timer = setInterval(() => loadRange(), 30_000)
     return () => clearInterval(timer)
   }, [])
+
+  const topAppId = summary?.top_app?.app_id ?? null
+  const [topAppIcon, setTopAppIcon] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (topAppId === null) { setTopAppIcon(null); return }
+    api.getIconForApp(topAppId).then(setTopAppIcon)
+  }, [topAppId])
 
   const appSummaries = summary?.apps ?? []
   const chartData = summary?.chart_points ?? []
@@ -66,9 +75,13 @@ export default function Dashboard(): JSX.Element {
         />
         <SummaryCard
           label="Top App"
-          value={summary?.top_app?.display_name ?? '—'}
-          sub={summary?.top_app ? fmtMs(summary.top_app.active_ms) : undefined}
-          icon={<Trophy size={16} />}
+          value={summary?.top_app ? fmtMs(summary.top_app.active_ms) : '—'}
+          sub={summary?.top_app?.display_name}
+          icon={
+            topAppIcon
+              ? <img src={topAppIcon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+              : <Trophy size={16} />
+          }
         />
       </div>
 
