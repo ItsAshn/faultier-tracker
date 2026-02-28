@@ -123,7 +123,7 @@ export type WindowControlAction = 'minimize' | 'maximize' | 'close'
 
 export type TrackingMode = 'whitelist' | 'blacklist'
 
-export type DateRangePreset = 'today' | 'week' | 'month' | 'custom'
+export type DateRangePreset = 'today' | 'week' | 'month' | 'all' | 'custom'
 
 export interface UpdateInfo {
   version: string

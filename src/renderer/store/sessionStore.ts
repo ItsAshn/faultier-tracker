@@ -27,6 +27,8 @@ function getPresetRange(preset: DateRangePreset): { from: number; to: number } {
       return { from: startOfWeek(now, { weekStartsOn: 1 }).getTime(), to: endOfWeek(now, { weekStartsOn: 1 }).getTime() }
     case 'month':
       return { from: startOfMonth(now).getTime(), to: endOfMonth(now).getTime() }
+    case 'all':
+      return { from: 0, to: endOfDay(now).getTime() }
     default:
       return { from: startOfDay(now).getTime(), to: endOfDay(now).getTime() }
   }

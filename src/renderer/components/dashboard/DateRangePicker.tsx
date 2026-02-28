@@ -4,7 +4,8 @@ import { useSessionStore } from '../../store/sessionStore'
 const PRESETS: { key: DateRangePreset; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'week',  label: 'This Week' },
-  { key: 'month', label: 'This Month' }
+  { key: 'month', label: 'This Month' },
+  { key: 'all',   label: 'All Time' }
 ]
 
 export default function DateRangePicker(): JSX.Element {
