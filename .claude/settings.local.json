@@ -64,7 +64,25 @@
       "Bash(git push -u origin main)",
       "Bash(git add CLAUDE.md README.md)",
       "Bash(git push)",
-      "Bash(git add src/main/ipc/handlers.ts src/preload/index.ts src/renderer/api/bridge.ts src/renderer/components/gallery/AppCardEditor.tsx src/renderer/components/gallery/ImageUploader.tsx src/renderer/components/layout/TitleBar.tsx src/renderer/pages/Settings.tsx src/renderer/styles/layout.css src/shared/channels.ts src/shared/types.ts src/main/artwork/ src/renderer/components/gallery/ArtworkSearchModal.tsx .claude/settings.local.json)"
+      "Bash(git add src/main/ipc/handlers.ts src/preload/index.ts src/renderer/api/bridge.ts src/renderer/components/gallery/AppCardEditor.tsx src/renderer/components/gallery/ImageUploader.tsx src/renderer/components/layout/TitleBar.tsx src/renderer/pages/Settings.tsx src/renderer/styles/layout.css src/shared/channels.ts src/shared/types.ts src/main/artwork/ src/renderer/components/gallery/ArtworkSearchModal.tsx .claude/settings.local.json)",
+      "Bash(git add NOTICE THIRD_PARTY_NOTICES.md README.md package.json)",
+      "Bash(git push origin main)",
+      "Bash(git add .github/workflows/release.yml)",
+      "Bash(gh release list --limit 5)",
+      "Bash(gh release view v0.1.1 --json assets,isDraft,isPrerelease)",
+      "Bash(gh run list --workflow=release.yml --limit 5)",
+      "Bash(gh run view 22519790053 --log)",
+      "Bash(gh release view v0.1.0 --json assets,isDraft,isPrerelease)",
+      "Bash(git add package.json)",
+      "Bash(gh release delete v0.1.1 --yes)",
+      "Bash(git push origin :refs/tags/v0.1.1)",
+      "Bash(gh run list --workflow=release.yml --limit 3)",
+      "Bash(git add .claude/commands/ship.md)",
+      "Bash(ss -tlnp)",
+      "Bash(git push origin v0.2.0)",
+      "Bash(node -e \"const p = require\\(''./package.json''\\); console.log\\(''vite:'', p.devDependencies.vite, ''type:'', p.type\\)\")",
+      "Bash(git push origin v0.2.1)",
+      "Bash(git push origin v0.2.2)"
     ]
   }
 }

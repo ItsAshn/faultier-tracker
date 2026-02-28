@@ -43,6 +43,7 @@ export const CHANNELS = {
   // Push from main → renderer (one-way via webContents.send)
   TRACKING_APP_SEEN: 'tracking:appSeen',
   TRACKING_TICK: 'tracking:tick',
+  APPS_ARTWORK_UPDATED: 'apps:artworkUpdated',
 
   // Updater — invoke (renderer → main)
   UPDATE_CHECK:            'update:check',

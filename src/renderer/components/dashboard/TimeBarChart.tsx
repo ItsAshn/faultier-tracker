@@ -2,7 +2,12 @@ import { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
 } from 'recharts'
-import type { ChartDataPoint } from '@shared/types'
+import type { ChartDataPoint, SessionSummary } from '@shared/types'
+
+const APP_COLORS = [
+  '#4fc3f7', '#81c784', '#ffb74d', '#f06292',
+  '#4db6ac', '#ff8a65', '#ba68c8', '#90a4ae'
+]
 
 function fmtMs(ms: number): string {
   const h = Math.floor(ms / 3_600_000)
@@ -45,11 +50,62 @@ function CustomTooltip({ active, payload, label }: TooltipProps): JSX.Element | 
   )
 }
 
-interface Props {
-  data: ChartDataPoint[]
+const TOP_N = 7
+
+interface BreakdownProps {
+  appSummaries: SessionSummary[]
 }
 
-export default function TimeBarChart({ data }: Props): JSX.Element {
+function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
+  const totalActive = appSummaries.reduce((acc, a) => acc + a.active_ms, 0)
+  if (totalActive === 0) return null
+
+  const topApps = appSummaries.slice(0, TOP_N)
+  const otherMs = appSummaries.slice(TOP_N).reduce((acc, a) => acc + a.active_ms, 0)
+  const maxMs = topApps[0]?.active_ms ?? 0
+  if (maxMs === 0) return null
+
+  return (
+    <div className="chart-breakdown">
+      <div className="chart-breakdown__title">Top Apps · Active Time</div>
+      {topApps.map((app, i) => (
+        <div key={app.app_id} className="chart-breakdown__row">
+          <span className="chart-breakdown__dot" style={{ background: APP_COLORS[i] }} />
+          <span className="chart-breakdown__name" title={app.display_name}>{app.display_name}</span>
+          <div className="chart-breakdown__bar-wrap">
+            <div
+              className="chart-breakdown__bar"
+              style={{ width: `${(app.active_ms / maxMs) * 100}%`, background: APP_COLORS[i] }}
+            />
+          </div>
+          <span className="chart-breakdown__time">{fmtMs(app.active_ms)}</span>
+          <span className="chart-breakdown__pct">{Math.round((app.active_ms / totalActive) * 100)}%</span>
+        </div>
+      ))}
+      {otherMs > 0 && (
+        <div className="chart-breakdown__row chart-breakdown__row--other">
+          <span className="chart-breakdown__dot" style={{ background: 'var(--color-text-dim)' }} />
+          <span className="chart-breakdown__name">Other</span>
+          <div className="chart-breakdown__bar-wrap">
+            <div
+              className="chart-breakdown__bar"
+              style={{ width: `${(otherMs / maxMs) * 100}%`, background: 'var(--color-text-dim)' }}
+            />
+          </div>
+          <span className="chart-breakdown__time">{fmtMs(otherMs)}</span>
+          <span className="chart-breakdown__pct">{Math.round((otherMs / totalActive) * 100)}%</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface Props {
+  data: ChartDataPoint[]
+  appSummaries?: SessionSummary[]
+}
+
+export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.Element {
   const [showActive, setShowActive] = useState(true)
   const [showRunning, setShowRunning] = useState(true)
 
@@ -101,6 +157,8 @@ export default function TimeBarChart({ data }: Props): JSX.Element {
           )}
         </BarChart>
       </ResponsiveContainer>
+
+      {appSummaries.length > 0 && <AppBreakdown appSummaries={appSummaries} />}
     </div>
   )
 }

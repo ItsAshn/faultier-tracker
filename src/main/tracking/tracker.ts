@@ -5,7 +5,7 @@ import { getRunningProcesses, initPsList } from './processScanner'
 import { tickActive, tickRunning, endRunningSession, initSessionManager } from './sessionManager'
 import { resolveGroup } from '../grouping/groupEngine'
 import { CHANNELS } from '@shared/channels'
-import type { TickPayload } from '@shared/types'
+import type { AppRecord, TickPayload } from '@shared/types'
 
 let pollTimer: NodeJS.Timeout | null = null
 let isRunning = false
@@ -88,6 +88,15 @@ async function pollTick(): Promise<void> {
             )
           }
         })
+        // Notify renderer of the newly discovered app
+        const newApp = db
+          .prepare<[number], AppRecord>('SELECT * FROM apps WHERE id = ?')
+          .get(appId)
+        if (newApp) {
+          BrowserWindow.getAllWindows().forEach((win) => {
+            if (!win.isDestroyed()) win.webContents.send(CHANNELS.TRACKING_APP_SEEN, newApp)
+          })
+        }
         currentRunningIds.add(appId)
         tickRunning(appId, now)
       }
@@ -122,6 +131,17 @@ async function pollTick(): Promise<void> {
             )
           }
         })
+        // Notify renderer of the newly discovered app (if not already sent from process scan)
+        if (!currentRunningIds.has(appId)) {
+          const newApp = db
+            .prepare<[number], AppRecord>('SELECT * FROM apps WHERE id = ?')
+            .get(appId)
+          if (newApp) {
+            BrowserWindow.getAllWindows().forEach((win) => {
+              if (!win.isDestroyed()) win.webContents.send(CHANNELS.TRACKING_APP_SEEN, newApp)
+            })
+          }
+        }
       }
 
       const appRecord = db
@@ -130,8 +150,16 @@ async function pollTick(): Promise<void> {
         )
         .get(appId)
 
-      if (appRecord && (trackedMode === 'blacklist' || appRecord.is_tracked === 1)) {
+      if (appRecord && appRecord.is_tracked === 1) {
         tickActive(appId, activeApp.windowTitle, now)
+        // If the focused app wasn't detected in the process scan (e.g. UWP/system
+        // processes), still record it as running so focused ≤ running always holds.
+        if (!currentRunningIds.has(appId)) {
+          tickRunning(appId, now)
+          // Track it in prevRunningAppIds so endRunningSession fires next tick
+          // if it's still not in the process list, rather than waiting for gap detection.
+          prevRunningAppIds.add(appId)
+        }
         activeAppId = appId
         activeDisplayName = appRecord.display_name
 

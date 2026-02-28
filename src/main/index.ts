@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { startTracker, stopTracker } from './tracking/tracker'
 import { closeAllSessions } from './tracking/sessionManager'
 import { initUpdater } from './updater'
+import { autoFetchSteamArtwork } from './artwork/autoFetch'
 
 // Prevent multiple instances
 const gotLock = app.requestSingleInstanceLock()
@@ -37,6 +38,8 @@ app.whenReady().then(async () => {
   // Show window after everything is ready
   win.once('ready-to-show', () => {
     win.show()
+    // Background artwork fetch — starts 5s after window appears to avoid blocking startup
+    setTimeout(() => autoFetchSteamArtwork().catch(console.error), 5000)
   })
 })
 

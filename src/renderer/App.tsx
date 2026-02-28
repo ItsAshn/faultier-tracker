@@ -28,6 +28,12 @@ export default function App(): JSX.Element {
     const unsubTick = api.onTick((payload) => {
       onTick(payload)
     })
+    const unsubAppSeen = api.onAppSeen((app) => {
+      useAppStore.getState().upsertApp(app)
+    })
+    const unsubArtwork = api.onArtworkUpdated(() => {
+      useAppStore.getState().loadAll()
+    })
     const unsubAvailable = api.onUpdateAvailable(setAvailable)
     const unsubNotAvailable = api.onUpdateNotAvailable(setNotAvailable)
     const unsubProgress = api.onUpdateDownloadProgress(setProgress)
@@ -36,6 +42,8 @@ export default function App(): JSX.Element {
 
     return () => {
       unsubTick()
+      unsubAppSeen()
+      unsubArtwork()
       unsubAvailable()
       unsubNotAvailable()
       unsubProgress()

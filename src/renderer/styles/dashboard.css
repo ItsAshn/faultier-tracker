@@ -36,7 +36,7 @@
 
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-4);
 }
 
@@ -145,6 +145,9 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
 }
 
 .time-table__head {
@@ -160,9 +163,9 @@
 }
 
 .time-table__body {
+  flex: 1;
   overflow-y: auto;
-  max-height: calc(100vh - 450px);
-  min-height: 160px;
+  min-height: 80px;
 }
 
 .time-row {
@@ -276,4 +279,79 @@
   color: var(--color-text-muted);
   gap: var(--space-3);
   font-size: var(--text-sm);
+}
+
+/* ── Chart app breakdown ──────────────────────────────────────────────────── */
+
+.chart-breakdown {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.chart-breakdown__title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+.chart-breakdown__row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) minmax(80px, 2fr) 52px 36px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.chart-breakdown__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.chart-breakdown__name {
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chart-breakdown__row--other .chart-breakdown__name {
+  color: var(--color-text-muted);
+}
+
+.chart-breakdown__bar-wrap {
+  height: 6px;
+  background: var(--color-surface-3);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.chart-breakdown__bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 300ms ease;
+}
+
+.chart-breakdown__time {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.chart-breakdown__pct {
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-dim);
+  text-align: right;
 }

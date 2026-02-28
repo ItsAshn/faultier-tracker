@@ -72,7 +72,7 @@ export default function Dashboard(): JSX.Element {
         />
       </div>
 
-      <TimeBarChart data={chartData} />
+      <TimeBarChart data={chartData} appSummaries={appSummaries} />
 
       <div className="time-table">
         <div className="time-table__head">

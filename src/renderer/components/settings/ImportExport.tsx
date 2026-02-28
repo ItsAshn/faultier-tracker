@@ -3,6 +3,7 @@ import { Download, Upload, Trash2, Gamepad2, ChevronDown, ChevronUp } from 'luci
 import { api } from '../../api/bridge'
 import type { ImportResult, SteamImportResult } from '@shared/types'
 import { useSessionStore } from '../../store/sessionStore'
+import { useAppStore } from '../../store/appStore'
 
 export default function ImportExport(): JSX.Element {
   const [exporting, setExporting] = useState(false)
@@ -19,6 +20,7 @@ export default function ImportExport(): JSX.Element {
   const [steamResult, setSteamResult] = useState<SteamImportResult | null>(null)
 
   const loadRange = useSessionStore((s) => s.loadRange)
+  const loadAll = useAppStore((s) => s.loadAll)
 
   async function handleExport(): Promise<void> {
     setExporting(true)
@@ -54,7 +56,10 @@ export default function ImportExport(): JSX.Element {
     const result = await api.importSteamData(steamApiKey.trim(), steamId.trim())
     setSteamImporting(false)
     setSteamResult(result)
-    if (result.sessionsAdded > 0) loadRange()
+    if (result.gamesImported > 0 || result.sessionsAdded > 0) {
+      await loadAll()
+      loadRange()
+    }
   }
 
   return (

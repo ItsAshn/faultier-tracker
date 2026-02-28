@@ -32,7 +32,19 @@ const MOCK_RANGE = {
     { app_id: 3, exe_name: 'chrome.exe', display_name: 'Chrome', group_id: null, active_ms: 1_800_000, running_ms: 2_700_000 },
     { app_id: 6, exe_name: 'obs64.exe', display_name: 'OBS Studio', group_id: null, active_ms: 600_000, running_ms: 1_200_000 },
   ],
-  chart_points: [],
+  chart_points: (() => {
+    const now = new Date()
+    const d = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    return [
+      { date: `${d} 09:00`, active_ms: 1_800_000, running_ms: 2_700_000 },
+      { date: `${d} 10:00`, active_ms: 3_600_000, running_ms: 4_500_000 },
+      { date: `${d} 11:00`, active_ms: 2_700_000, running_ms: 3_600_000 },
+      { date: `${d} 12:00`, active_ms: 600_000, running_ms: 900_000 },
+      { date: `${d} 13:00`, active_ms: 900_000, running_ms: 1_500_000 },
+      { date: `${d} 14:00`, active_ms: 2_520_000, running_ms: 3_600_000 },
+      { date: `${d} 15:00`, active_ms: 1_200_000, running_ms: 1_500_000 },
+    ]
+  })(),
   total_active_ms: 13_320_000,
   total_running_ms: 18_300_000,
   top_app: { app_id: 1, exe_name: 'blender.exe', display_name: 'Blender', group_id: 1, active_ms: 7_320_000, running_ms: 9_000_000 },
@@ -65,6 +77,7 @@ const stub: ApiType = {
   windowControl: () => {},
   onTick: () => () => {},
   onAppSeen: () => () => {},
+  onArtworkUpdated: () => () => {},
   checkForUpdates: () => Promise.resolve(),
   downloadUpdate: () => Promise.resolve(),
   quitAndInstall: () => {},

@@ -37,7 +37,9 @@ export function initUpdater(): void {
   })
 
   autoUpdater.on('error', (err) => {
-    getMainWindow()?.webContents.send(CHANNELS.UPDATE_ERROR, err.message)
+    // electron-updater error messages can include full HTTP headers — take only the first line
+    const clean = err.message.split('\n')[0].trim()
+    getMainWindow()?.webContents.send(CHANNELS.UPDATE_ERROR, clean)
   })
 
   ipcMain.handle(CHANNELS.UPDATE_CHECK, () => autoUpdater.checkForUpdates())

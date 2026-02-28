@@ -4,6 +4,7 @@ import { extractAndCacheIcon, saveCustomImage, clearCustomImage, readFileAsDataU
 import { reanalyzeGroups, invalidateGroupCache } from '../grouping/groupEngine'
 import { exportData, importData } from '../importExport/dataTransfer'
 import { importFromSteam } from '../importExport/steamImport'
+import { autoFetchSteamArtwork } from '../artwork/autoFetch'
 import { searchSteamGridDB } from '../artwork/artworkProvider'
 import { CHANNELS } from '@shared/channels'
 import type {
@@ -361,9 +362,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(CHANNELS.DATA_EXPORT, () => exportData())
   ipcMain.handle(CHANNELS.DATA_IMPORT, () => importData())
-  ipcMain.handle(CHANNELS.DATA_STEAM_IMPORT, (_e, apiKey: string, steamId: string) =>
-    importFromSteam(apiKey, steamId)
-  )
+  ipcMain.handle(CHANNELS.DATA_STEAM_IMPORT, async (_e, apiKey: string, steamId: string) => {
+    const result = await importFromSteam(apiKey, steamId)
+    if (result.gamesImported > 0) {
+      // Fire-and-forget background artwork fetch for newly imported games
+      autoFetchSteamArtwork().catch(console.error)
+    }
+    return result
+  })
 
   // ── Window control ────────────────────────────────────────────────────────
 

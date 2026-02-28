@@ -77,7 +77,9 @@ export default function AboutUpdates(): JSX.Element {
 
       {status === 'error' && error && (
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
-          Update check failed: {error}
+          {error.startsWith('404')
+            ? 'No releases have been published yet.'
+            : `Update check failed: ${error}`}
         </div>
       )}
     </div>

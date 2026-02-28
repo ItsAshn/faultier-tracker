@@ -102,6 +102,12 @@ const api = {
     return () => ipcRenderer.removeListener(CHANNELS.TRACKING_APP_SEEN, handler)
   },
 
+  onArtworkUpdated: (cb: () => void): (() => void) => {
+    const handler = (): void => cb()
+    ipcRenderer.on(CHANNELS.APPS_ARTWORK_UPDATED, handler)
+    return () => ipcRenderer.removeListener(CHANNELS.APPS_ARTWORK_UPDATED, handler)
+  },
+
   // Auto-updater — invoke commands
   checkForUpdates: (): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.UPDATE_CHECK),
