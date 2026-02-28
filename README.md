@@ -45,6 +45,15 @@ The app installs per-user (no admin required) and starts tracking immediately. I
 
 **Data location**: `%APPDATA%\Faultier Tracker\`
 
+### Windows SmartScreen Warning
+
+Because the installer is currently unsigned, Windows SmartScreen may show a *"Windows protected your PC"* dialog. This is expected. To proceed:
+
+1. Click **More info**
+2. Click **Run anyway**
+
+The application is safe. This warning appears for any installer without a paid code-signing certificate.
+
 ---
 
 ## Development
@@ -124,6 +133,19 @@ src/
 
 ---
 
+## Privacy
+
+Faultier Tracker reads the names and executable paths of running processes, and the title of your active window, every 5 seconds. This data is used solely to build your local usage history.
+
+- **All data is stored locally** in `%APPDATA%\Faultier Tracker\data.db`.
+- **No data is transmitted** to any external server except automatic update checks against GitHub Releases.
+- The app does **not** record keystrokes, clipboard content, screenshots, or any other personal data.
+
+---
+
 ## License
 
-MIT
+Copyright (c) 2025 ItsAshn. All Rights Reserved.
+
+This software is proprietary. See [NOTICE](NOTICE) for details.
+Third-party open-source component licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

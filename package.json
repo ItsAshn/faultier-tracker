@@ -2,6 +2,8 @@
   "name": "faultier-tracker",
   "version": "0.1.0",
   "description": "Application time tracker — know where your hours go",
+  "license": "UNLICENSED",
+  "private": true,
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
