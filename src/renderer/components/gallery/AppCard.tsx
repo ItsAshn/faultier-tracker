@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AppWindow } from 'lucide-react'
 import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
 import { api } from '../../api/bridge'
@@ -23,18 +23,33 @@ interface AppCardProps {
 export default function AppCard({ item, isGroup, memberCount, todaySummary, onClick }: AppCardProps): JSX.Element {
   const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
   const setAppTracked = useAppStore((s) => s.setAppTracked)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   const isTracked = isGroup ? true : (item as AppRecord).is_tracked
 
   useEffect(() => {
-    if (!item.custom_image_path) {
-      if (isGroup) {
-        api.getIconForGroup(item.id).then(setIconSrc)
-      } else {
-        api.getIconForApp(item.id).then(setIconSrc)
-      }
-    }
-  }, [item.id, item.custom_image_path])
+    if (item.custom_image_path) return
+
+    const el = cardRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          observer.disconnect()
+          if (isGroup) {
+            api.getIconForGroup(item.id).then(setIconSrc)
+          } else {
+            api.getIconForApp(item.id).then(setIconSrc)
+          }
+        }
+      },
+      { rootMargin: '200px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [item.id, item.custom_image_path, isGroup])
 
   function handleTrackedToggle(e: React.MouseEvent): void {
     e.stopPropagation()
@@ -50,6 +65,7 @@ export default function AppCard({ item, isGroup, memberCount, todaySummary, onCl
 
   return (
     <div
+      ref={cardRef}
       className={`app-card${!isTracked ? ' app-card--ignored' : ''}`}
       onClick={onClick}
     >
