@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+out/
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Electron builder cache
+.electron-builder-cache/

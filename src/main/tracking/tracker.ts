@@ -1,0 +1,176 @@
+import { BrowserWindow } from 'electron'
+import { getDb, getSetting, upsertApp } from '../db/client'
+import { getActiveApp, initActiveWin } from './activeWindow'
+import { getRunningProcesses, initPsList } from './processScanner'
+import { tickActive, tickRunning, endRunningSession, initSessionManager } from './sessionManager'
+import { resolveGroup } from '../grouping/groupEngine'
+import { CHANNELS } from '@shared/channels'
+import type { TickPayload } from '@shared/types'
+
+let pollTimer: NodeJS.Timeout | null = null
+let isRunning = false
+
+// Track which app_ids were running in the previous tick
+const prevRunningAppIds = new Set<number>()
+
+export async function startTracker(): Promise<void> {
+  const machineId = getSetting('machine_id') as string
+  initSessionManager(machineId)
+
+  await initActiveWin()
+  await initPsList()
+
+  isRunning = true
+  schedulePoll()
+  console.log('[Tracker] Started')
+}
+
+export function stopTracker(): void {
+  isRunning = false
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+  console.log('[Tracker] Stopped')
+}
+
+function schedulePoll(): void {
+  if (!isRunning) return
+  const interval = (getSetting('poll_interval_ms') as number) ?? 5000
+  pollTimer = setTimeout(async () => {
+    await pollTick()
+    schedulePoll()
+  }, interval)
+}
+
+async function pollTick(): Promise<void> {
+  const now = Date.now()
+
+  try {
+    const [activeApp, runningProcesses] = await Promise.all([
+      getActiveApp(),
+      getRunningProcesses()
+    ])
+
+    // ── Tracked apps lookup ──────────────────────────────────────────
+    const db = getDb()
+    const trackedMode = (getSetting('tracking_mode') as string) ?? 'blacklist'
+
+    // Build a map of exe_name → app record for running processes
+    const currentRunningIds = new Set<number>()
+
+    for (const proc of runningProcesses) {
+      // For blacklist mode: track everything not explicitly excluded
+      // For whitelist mode: track only explicitly included apps
+      const appRow = db
+        .prepare<[string], { id: number; is_tracked: number } | undefined>(
+          'SELECT id, is_tracked FROM apps WHERE exe_name = ?'
+        )
+        .get(proc.exeName)
+
+      if (appRow) {
+        const shouldTrack =
+          trackedMode === 'blacklist' ? appRow.is_tracked === 1 : appRow.is_tracked === 1
+
+        if (shouldTrack) {
+          currentRunningIds.add(appRow.id)
+          tickRunning(appRow.id, now)
+        }
+      } else if (trackedMode === 'blacklist') {
+        // Auto-discover new apps in blacklist mode
+        const displayName = deriveDisplayName(proc.exeName)
+        const appId = upsertApp(proc.exeName, null, displayName, now)
+        resolveGroup(proc.exeName, null).then((groupId) => {
+          if (groupId !== null) {
+            db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(
+              groupId,
+              appId
+            )
+          }
+        })
+        currentRunningIds.add(appId)
+        tickRunning(appId, now)
+      }
+    }
+
+    // Close sessions for processes that stopped running
+    for (const prevId of prevRunningAppIds) {
+      if (!currentRunningIds.has(prevId)) {
+        endRunningSession(prevId, now)
+      }
+    }
+    prevRunningAppIds.clear()
+    for (const id of currentRunningIds) prevRunningAppIds.add(id)
+
+    // ── Active window ────────────────────────────────────────────────
+    let activeAppId: number | null = null
+    let activeDisplayName: string | null = null
+
+    if (activeApp) {
+      let appId = db
+        .prepare<[string], { id: number } | undefined>('SELECT id FROM apps WHERE exe_name = ?')
+        .get(activeApp.exeName)?.id ?? null
+
+      if (!appId) {
+        const displayName = deriveDisplayName(activeApp.exeName)
+        appId = upsertApp(activeApp.exeName, activeApp.exePath, displayName, now)
+        resolveGroup(activeApp.exeName, activeApp.exePath).then((groupId) => {
+          if (groupId !== null) {
+            db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(
+              groupId,
+              appId!
+            )
+          }
+        })
+      }
+
+      const appRecord = db
+        .prepare<[number], { display_name: string; is_tracked: number } | undefined>(
+          'SELECT display_name, is_tracked FROM apps WHERE id = ?'
+        )
+        .get(appId)
+
+      if (appRecord && (trackedMode === 'blacklist' || appRecord.is_tracked === 1)) {
+        tickActive(appId, activeApp.windowTitle, now)
+        activeAppId = appId
+        activeDisplayName = appRecord.display_name
+
+        // Update exe_path if we now have it
+        if (activeApp.exePath) {
+          db.prepare<[string, number], void>('UPDATE apps SET exe_path = ? WHERE id = ? AND exe_path IS NULL').run(
+            activeApp.exePath,
+            appId
+          )
+        }
+      }
+    }
+
+    // ── Push tick to renderer ────────────────────────────────────────
+    const payload: TickPayload = {
+      active_app:
+        activeAppId && activeDisplayName
+          ? {
+              app_id: activeAppId,
+              exe_name: activeApp!.exeName,
+              display_name: activeDisplayName
+            }
+          : null,
+      timestamp: now
+    }
+
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send(CHANNELS.TRACKING_TICK, payload)
+      }
+    })
+  } catch (err) {
+    console.error('[Tracker] Poll error:', err)
+  }
+}
+
+function deriveDisplayName(exeName: string): string {
+  return exeName
+    .replace(/\.exe$/i, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
