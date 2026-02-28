@@ -52,6 +52,13 @@ export interface RangeSummary {
   chart_points: ChartDataPoint[]
 }
 
+export interface AppRangeSummary {
+  active_ms: number
+  running_ms: number
+  chart_points: ChartDataPoint[]
+  member_summaries: SessionSummary[]
+}
+
 export interface ImportResult {
   appsAdded: number
   appsUpdated: number

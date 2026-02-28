@@ -17,7 +17,15 @@ export default function Sidebar(): JSX.Element {
         {NAV_ITEMS.map(({ path, label, Icon }) => (
           <button
             key={path}
-            className={`sidebar__link${location.pathname === path ? ' sidebar__link--active' : ''}`}
+            className={`sidebar__link${
+            (path === '/gallery'
+              ? location.pathname === '/gallery' ||
+                location.pathname.startsWith('/app/') ||
+                location.pathname.startsWith('/group/')
+              : location.pathname === path)
+              ? ' sidebar__link--active'
+              : ''
+          }`}
             onClick={() => navigate(path)}
           >
             <Icon className="sidebar__icon" />

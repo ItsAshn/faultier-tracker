@@ -62,6 +62,7 @@ const stub: ApiType = {
   deleteGroup: () => Promise.resolve(),
   reanalyzeGroups: () => Promise.resolve(),
   getSessionRange: () => Promise.resolve(MOCK_RANGE),
+  getAppSessionRange: () => Promise.resolve({ active_ms: 0, running_ms: 0, chart_points: [], member_summaries: [] }),
   clearAllSessions: () => Promise.resolve(),
   getAllSettings: () => Promise.resolve({} as any),
   setSetting: () => Promise.resolve(),

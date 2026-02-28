@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Fuse from 'fuse.js'
 import { Search, Images } from 'lucide-react'
 import '../styles/gallery.css'
 import { useAppStore } from '../store/appStore'
 import { useSessionStore } from '../store/sessionStore'
 import AppCard from '../components/gallery/AppCard'
-import AppCardEditor from '../components/gallery/AppCardEditor'
 import type { AppRecord, AppGroup } from '@shared/types'
 
 type FilterMode = 'all' | 'tracked' | 'ignored'
@@ -22,9 +22,9 @@ export default function Gallery(): JSX.Element {
   const groups = useAppStore((s) => s.groups)
   const summary = useSessionStore((s) => s.summary)
 
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterMode>('all')
-  const [editing, setEditing] = useState<GalleryItem | null>(null)
 
   // Build gallery items: one per group + ungrouped apps
   const allItems: GalleryItem[] = useMemo(() => {
@@ -136,19 +136,12 @@ export default function Gallery(): JSX.Element {
               isGroup={item.isGroup}
               memberCount={item.memberCount}
               todaySummary={getTodaySummary(item)}
-              onClick={() => setEditing(item)}
+              onClick={() => navigate(item.isGroup ? `/group/${item.id}` : `/app/${item.id}`)}
             />
           ))
         )}
       </div>
 
-      {editing && (
-        <AppCardEditor
-          item={editing.item}
-          isGroup={editing.isGroup}
-          onClose={() => setEditing(null)}
-        />
-      )}
     </main>
   )
 }

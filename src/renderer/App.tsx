@@ -6,6 +6,7 @@ import UpdateBanner from './components/layout/UpdateBanner'
 import Dashboard from './pages/Dashboard'
 import Gallery from './pages/Gallery'
 import Settings from './pages/Settings'
+import AppDetailPage from './pages/AppDetailPage'
 import { useAppStore } from './store/appStore'
 import { useSessionStore } from './store/sessionStore'
 import { useUpdateStore } from './store/updateStore'
@@ -62,6 +63,8 @@ export default function App(): JSX.Element {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/gallery" element={<Gallery />} />
+          <Route path="/app/:id" element={<AppDetailPage />} />
+          <Route path="/group/:id" element={<AppDetailPage />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>

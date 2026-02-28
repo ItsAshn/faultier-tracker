@@ -16,6 +16,7 @@ export const CHANNELS = {
 
   // Sessions / stats
   SESSIONS_GET_RANGE: 'sessions:getRange',
+  SESSIONS_GET_APP_RANGE: 'sessions:getAppRange',
   SESSIONS_CLEAR_ALL: 'sessions:clearAll',
 
   // Settings

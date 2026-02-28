@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { CHANNELS } from '@shared/channels'
 import type {
-  AppRecord, AppGroup, RangeSummary, ImportResult, SteamImportResult,
+  AppRecord, AppGroup, RangeSummary, AppRangeSummary, ImportResult, SteamImportResult,
   WindowControlAction, TickPayload, UpdateInfo, UpdateProgressInfo,
   ArtworkSearchResponse
 } from '@shared/types'
@@ -44,6 +44,15 @@ const api = {
     groupBy?: 'hour' | 'day'
   ): Promise<RangeSummary> =>
     ipcRenderer.invoke(CHANNELS.SESSIONS_GET_RANGE, from, to, groupBy),
+
+  getAppSessionRange: (
+    id: number,
+    from: number,
+    to: number,
+    groupBy: 'hour' | 'day',
+    isGroup: boolean
+  ): Promise<AppRangeSummary> =>
+    ipcRenderer.invoke(CHANNELS.SESSIONS_GET_APP_RANGE, id, from, to, groupBy, isGroup),
 
   clearAllSessions: (): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.SESSIONS_CLEAR_ALL),
@@ -115,8 +124,9 @@ const api = {
   downloadUpdate: (): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.UPDATE_DOWNLOAD),
 
-  quitAndInstall: (): void =>
-    ipcRenderer.send(CHANNELS.UPDATE_QUIT_AND_INSTALL),
+  quitAndInstall: (): void => {
+    ipcRenderer.invoke(CHANNELS.UPDATE_QUIT_AND_INSTALL)
+  },
 
   // Auto-updater — push subscriptions (main → renderer)
   onUpdateAvailable: (cb: (info: UpdateInfo) => void): (() => void) => {

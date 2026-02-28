@@ -9,7 +9,7 @@ import { searchSteamGridDB } from '../artwork/artworkProvider'
 import { CHANNELS } from '@shared/channels'
 import type {
   AppRecord, AppGroup, SessionSummary, RangeSummary, ChartDataPoint, WindowControlAction,
-  ArtworkSearchResponse
+  ArtworkSearchResponse, AppRangeSummary
 } from '@shared/types'
 import { getMainWindow } from '../window'
 import { startTracker, stopTracker } from '../tracking/tracker'
@@ -196,6 +196,95 @@ export function registerIpcHandlers(): void {
         top_app: appSummaries[0] ?? null,
         apps: appSummaries,
         chart_points: Array.from(chartMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+      }
+    }
+  )
+
+  ipcMain.handle(
+    CHANNELS.SESSIONS_GET_APP_RANGE,
+    (_e, id: number, from: number, to: number, groupBy: 'hour' | 'day', isGroup: boolean): AppRangeSummary => {
+      const sessions = isGroup
+        ? db
+            .prepare<
+              [number, number, number],
+              { app_id: number; session_type: string; started_at: number; ended_at: number }
+            >(
+              `SELECT s.app_id, s.session_type, s.started_at, s.ended_at
+               FROM sessions s
+               WHERE s.app_id IN (SELECT id FROM apps WHERE group_id = ?)
+                 AND s.ended_at IS NOT NULL AND s.started_at >= ? AND s.ended_at <= ?`
+            )
+            .all(id, from, to)
+        : db
+            .prepare<
+              [number, number, number],
+              { app_id: number; session_type: string; started_at: number; ended_at: number }
+            >(
+              `SELECT app_id, session_type, started_at, ended_at
+               FROM sessions
+               WHERE app_id = ? AND ended_at IS NOT NULL AND started_at >= ? AND ended_at <= ?`
+            )
+            .all(id, from, to)
+
+      let active_ms = 0
+      let running_ms = 0
+      for (const s of sessions) {
+        const dur = s.ended_at - s.started_at
+        if (s.session_type === 'active') active_ms += dur
+        else running_ms += dur
+      }
+
+      const fmt = (ts: number): string => {
+        const d = new Date(ts)
+        if (groupBy === 'hour') {
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:00`
+        }
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      }
+
+      const chartMap = new Map<string, ChartDataPoint>()
+      for (const s of sessions) {
+        const key = fmt(s.started_at)
+        if (!chartMap.has(key)) chartMap.set(key, { date: key, active_ms: 0, running_ms: 0 })
+        const pt = chartMap.get(key)!
+        const dur = s.ended_at - s.started_at
+        if (s.session_type === 'active') pt.active_ms += dur
+        else pt.running_ms += dur
+      }
+
+      let member_summaries: SessionSummary[] = []
+      if (isGroup) {
+        const members = db
+          .prepare<[number], { id: number; exe_name: string; display_name: string }>(
+            'SELECT id, exe_name, display_name FROM apps WHERE group_id = ?'
+          )
+          .all(id)
+        const memberMap = new Map<number, SessionSummary>()
+        for (const m of members) {
+          memberMap.set(m.id, {
+            app_id: m.id,
+            exe_name: m.exe_name,
+            display_name: m.display_name,
+            group_id: id,
+            active_ms: 0,
+            running_ms: 0
+          })
+        }
+        for (const s of sessions) {
+          const entry = memberMap.get(s.app_id)
+          if (!entry) continue
+          const dur = s.ended_at - s.started_at
+          if (s.session_type === 'active') entry.active_ms += dur
+          else entry.running_ms += dur
+        }
+        member_summaries = Array.from(memberMap.values()).sort((a, b) => b.active_ms - a.active_ms)
+      }
+
+      return {
+        active_ms,
+        running_ms,
+        chart_points: Array.from(chartMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
+        member_summaries
       }
     }
   )
