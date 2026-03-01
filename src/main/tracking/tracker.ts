@@ -125,18 +125,22 @@ async function pollTick(): Promise<void> {
     let activeDisplayName: string | null = null
 
     if (activeApp) {
-      let appId = db
-        .prepare<[string], { id: number } | undefined>('SELECT id FROM apps WHERE exe_name = ?')
-        .get(activeApp.exeName)?.id ?? null
+      // Single query fetches all fields we need for this app — avoids 3 sequential lookups
+      let appRow = db
+        .prepare<[string], { id: number; display_name: string; is_tracked: number; exe_path: string | null; group_id: number | null } | undefined>(
+          'SELECT id, display_name, is_tracked, exe_path, group_id FROM apps WHERE exe_name = ?'
+        )
+        .get(activeApp.exeName)
 
-      if (!appId) {
+      let appId: number
+      if (!appRow) {
         const displayName = deriveDisplayName(activeApp.exeName)
         appId = upsertApp(activeApp.exeName, activeApp.exePath, displayName, now)
         resolveGroup(activeApp.exeName, activeApp.exePath).then((groupId) => {
           if (groupId !== null) {
             db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(
               groupId,
-              appId!
+              appId
             )
           }
         })
@@ -151,15 +155,17 @@ async function pollTick(): Promise<void> {
             })
           }
         }
+        // Re-fetch so we have a full record for the logic below
+        appRow = db
+          .prepare<[string], { id: number; display_name: string; is_tracked: number; exe_path: string | null; group_id: number | null } | undefined>(
+            'SELECT id, display_name, is_tracked, exe_path, group_id FROM apps WHERE exe_name = ?'
+          )
+          .get(activeApp.exeName)
+      } else {
+        appId = appRow.id
       }
 
-      const appRecord = db
-        .prepare<[number], { display_name: string; is_tracked: number } | undefined>(
-          'SELECT display_name, is_tracked FROM apps WHERE id = ?'
-        )
-        .get(appId)
-
-      if (appRecord && appRecord.is_tracked === 1 && !isIdle) {
+      if (appRow && appRow.is_tracked === 1 && !isIdle) {
         tickActive(appId, activeApp.windowTitle, now)
         // If the focused app wasn't detected in the process scan (e.g. UWP/system
         // processes), still record it as running so focused ≤ running always holds.
@@ -170,32 +176,24 @@ async function pollTick(): Promise<void> {
           prevRunningAppIds.add(appId)
         }
         activeAppId = appId
-        activeDisplayName = appRecord.display_name
+        activeDisplayName = appRow.display_name
 
         // Update exe_path if we now have it; if this is the first time we get
         // the path AND the app has no group yet, re-run group resolution so
         // Steam library path matching can kick in.
-        if (activeApp.exePath) {
-          const stored = db
-            .prepare<[number], { exe_path: string | null; group_id: number | null } | undefined>(
-              'SELECT exe_path, group_id FROM apps WHERE id = ?'
-            )
-            .get(appId)
+        if (activeApp.exePath && !appRow.exe_path) {
+          db.prepare<[string, number], void>('UPDATE apps SET exe_path = ? WHERE id = ?')
+            .run(activeApp.exePath, appId)
 
-          if (!stored?.exe_path) {
-            db.prepare<[string, number], void>('UPDATE apps SET exe_path = ? WHERE id = ?')
-              .run(activeApp.exePath, appId)
-
-            if (!stored?.group_id) {
-              resolveGroup(activeApp.exeName, activeApp.exePath).then((groupId) => {
-                if (groupId !== null) {
-                  db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(
-                    groupId,
-                    appId!
-                  )
-                }
-              })
-            }
+          if (!appRow.group_id) {
+            resolveGroup(activeApp.exeName, activeApp.exePath).then((groupId) => {
+              if (groupId !== null) {
+                db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(
+                  groupId,
+                  appId
+                )
+              }
+            })
           }
         }
       }

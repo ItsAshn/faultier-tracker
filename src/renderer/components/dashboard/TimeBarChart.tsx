@@ -13,8 +13,8 @@ function AppIcon({ appId }: { appId: number }): JSX.Element {
 }
 
 const APP_COLORS = [
-  '#4fc3f7', '#81c784', '#ffb74d', '#f06292',
-  '#4db6ac', '#ff8a65', '#ba68c8', '#90a4ae'
+  '#f59e0b', '#81c784', '#fb923c', '#f06292',
+  '#4db6ac', '#ff8a65', '#a78bfa', '#90a4ae'
 ]
 
 function fmtMs(ms: number): string {
@@ -173,14 +173,14 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
             className={`chart-legend__item${!showActive ? ' chart-legend__item--hidden' : ''}`}
             onClick={() => setShowActive((v) => !v)}
           >
-            <span className="chart-legend__dot" style={{ background: '#4fc3f7' }} />
+            <span className="chart-legend__dot" style={{ background: '#f59e0b' }} />
             Active
           </button>
           <button
             className={`chart-legend__item${!showRunning ? ' chart-legend__item--hidden' : ''}`}
             onClick={() => setShowRunning((v) => !v)}
           >
-            <span className="chart-legend__dot" style={{ background: '#7986cb' }} />
+            <span className="chart-legend__dot" style={{ background: '#888888' }} />
             Running
           </button>
         </div>
@@ -208,7 +208,7 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
             <Bar
               dataKey="active_ms"
               name="Active"
-              fill="#4fc3f7"
+              fill="#f59e0b"
               radius={[3, 3, 0, 0]}
               maxBarSize={40}
               style={{ cursor: 'pointer' }}
@@ -217,14 +217,14 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
               {data.map((entry) => (
                 <Cell
                   key={entry.date}
-                  fill={activeBucket === entry.date ? '#81d4fa' : '#4fc3f7'}
+                  fill={activeBucket === entry.date ? '#fbbf24' : '#f59e0b'}
                   opacity={activeBucket && activeBucket !== entry.date ? 0.55 : 1}
                 />
               ))}
             </Bar>
           )}
           {showRunning && (
-            <Bar dataKey="running_ms" name="Running" fill="#7986cb" radius={[3, 3, 0, 0]} maxBarSize={40} />
+            <Bar dataKey="running_ms" name="Running" fill="#888888" radius={[3, 3, 0, 0]} maxBarSize={40} />
           )}
         </BarChart>
       </ResponsiveContainer>

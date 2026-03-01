@@ -23,7 +23,6 @@ export default function TitleBar(): JSX.Element {
   return (
     <header className="titlebar">
       <div className="titlebar__logo">
-        <span style={{ fontSize: 18 }}>🦥</span>
         <span className="titlebar__logo-text">Faultier Tracker</span>
       </div>
 

@@ -90,12 +90,13 @@
   overflow: hidden;
   cursor: pointer;
   background: var(--color-surface-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 .app-card:hover {
   transform: scale(1.03);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(245, 158, 11, 0.2);
   z-index: 1;
 }
 
@@ -215,8 +216,8 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   background: rgba(0, 0, 0, 0.72);
-  color: var(--color-active);
-  border: 1px solid rgba(79, 195, 247, 0.3);
+  color: var(--color-accent);
+  border: 1px solid rgba(245, 158, 11, 0.3);
   backdrop-filter: blur(4px);
   text-shadow: none;
 }

@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import TitleBar from './components/layout/TitleBar'
-import Sidebar from './components/layout/Sidebar'
+import NavPills from './components/layout/NavPills'
 import UpdateBanner from './components/layout/UpdateBanner'
 import Dashboard from './pages/Dashboard'
 import Gallery from './pages/Gallery'
@@ -58,15 +58,17 @@ export default function App(): JSX.Element {
       <TitleBar />
       <UpdateBanner />
       <div className="main-layout">
-        <Sidebar />
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/gallery" element={<Gallery />} />
-          <Route path="/app/:id" element={<AppDetailPage />} />
-          <Route path="/group/:id" element={<AppDetailPage />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
+        <NavPills />
+        <div className="main-content">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/gallery" element={<Gallery />} />
+            <Route path="/app/:id" element={<AppDetailPage />} />
+            <Route path="/group/:id" element={<AppDetailPage />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </div>
       </div>
     </div>
   )

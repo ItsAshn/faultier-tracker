@@ -8,6 +8,15 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    version: 3,
+    up(db) {
+      // Add index on apps(exe_name) — queried on every tracking tick for every running process
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_apps_exe_name ON apps(exe_name);
+      `)
+    }
+  },
+  {
     version: 2,
     up(db) {
       // Add daily goal and category fields

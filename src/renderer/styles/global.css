@@ -1,23 +1,23 @@
 /* ── CSS Custom Properties ────────────────────────────────────────────────── */
 :root {
   /* Colors */
-  --color-bg:           #0f0f1a;
-  --color-surface:      #1a1a2e;
-  --color-surface-2:    #222236;
-  --color-surface-3:    #2a2a45;
-  --color-border:       #333355;
-  --color-border-light: #44446a;
+  --color-bg:           #0a0a0a;
+  --color-surface:      #111111;
+  --color-surface-2:    #1a1a1a;
+  --color-surface-3:    #242424;
+  --color-border:       #2a2a2a;
+  --color-border-light: #383838;
 
-  --color-accent:       #6c63ff;
-  --color-accent-dim:   #4b45b3;
-  --color-accent-glow:  rgba(108, 99, 255, 0.2);
+  --color-accent:       #f59e0b;
+  --color-accent-dim:   #d97706;
+  --color-accent-glow:  rgba(245, 158, 11, 0.15);
 
-  --color-active:       #4fc3f7;    /* active session indicator */
-  --color-running:      #7986cb;   /* running session indicator */
+  --color-active:       #f59e0b;   /* active session indicator */
+  --color-running:      #888888;   /* running session indicator */
 
-  --color-text:         #e8e8f0;
-  --color-text-muted:   #8888aa;
-  --color-text-dim:     #555577;
+  --color-text:         #e8e8e8;
+  --color-text-muted:   #888888;
+  --color-text-dim:     #555555;
 
   --color-success:      #4caf91;
   --color-warning:      #ffb74d;
@@ -36,7 +36,7 @@
   --space-12: 48px;
 
   /* Typography */
-  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'Cascadia Code', 'Consolas', monospace;
   --text-xs:   11px;
   --text-sm:   13px;
@@ -197,7 +197,7 @@ ul, ol {
 
 .btn--primary {
   background: var(--color-accent);
-  color: #fff;
+  color: #000;
 }
 
 .btn--primary:hover:not(:disabled) {

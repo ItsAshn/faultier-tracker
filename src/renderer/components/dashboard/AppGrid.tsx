@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Monitor } from 'lucide-react'
 import type { AppRecord, SessionSummary } from '@shared/types'
@@ -32,7 +32,8 @@ export default function AppGrid({ summaries, allApps, period, onPeriodChange, lo
   const navigate = useNavigate()
   const [icons, setIcons] = useState<Map<number, string>>(new Map())
 
-  const appIds = allApps.map((a) => a.id).join(',')
+  // Stable string key — only changes when the actual app IDs change
+  const appIds = useMemo(() => allApps.map((a) => a.id).join(','), [allApps])
 
   useEffect(() => {
     if (allApps.length === 0) return
@@ -47,17 +48,20 @@ export default function AppGrid({ summaries, allApps, period, onPeriodChange, lo
     })
   }, [appIds])
 
-  const merged = allApps.map((app) => ({
-    app,
-    activeMs: summaries.find((s) => s.app_id === app.id)?.active_ms ?? 0,
-  }))
-
-  merged.sort((a, b) => {
-    if (a.activeMs > 0 && b.activeMs === 0) return -1
-    if (a.activeMs === 0 && b.activeMs > 0) return 1
-    if (a.activeMs !== b.activeMs) return b.activeMs - a.activeMs
-    return a.app.display_name.localeCompare(b.app.display_name)
-  })
+  // Memoize the merge+sort so it doesn't run on every parent render
+  const merged = useMemo(() => {
+    const result = allApps.map((app) => ({
+      app,
+      activeMs: summaries.find((s) => s.app_id === app.id)?.active_ms ?? 0,
+    }))
+    result.sort((a, b) => {
+      if (a.activeMs > 0 && b.activeMs === 0) return -1
+      if (a.activeMs === 0 && b.activeMs > 0) return 1
+      if (a.activeMs !== b.activeMs) return b.activeMs - a.activeMs
+      return a.app.display_name.localeCompare(b.app.display_name)
+    })
+    return result
+  }, [allApps, summaries])
 
   return (
     <div className="app-grid">
@@ -85,25 +89,39 @@ export default function AppGrid({ summaries, allApps, period, onPeriodChange, lo
         <div className={`app-grid__cards${loading ? ' app-grid__cards--loading' : ''}`}>
           {merged.map(({ app, activeMs }) => {
             const icon = icons.get(app.id) ?? null
+            const time = fmtMs(activeMs)
             return (
               <button
                 key={app.id}
                 className={`app-grid__card${activeMs === 0 ? ' app-grid__card--inactive' : ''}`}
-                onClick={() => navigate(`/gallery/app/${app.id}`)}
+                onClick={() => navigate(`/app/${app.id}`)}
                 title={app.display_name}
               >
-                <div className="app-grid__artwork">
+                {/* Blurred backdrop */}
+                <div className="app-grid__backdrop">
                   {icon
-                    ? <img src={icon} alt={app.display_name} className="app-grid__art-img" />
-                    : <div className="app-grid__art-placeholder"><Monitor size={28} /></div>
+                    ? <img src={icon} alt="" className="app-grid__backdrop-img" />
+                    : <div className="app-grid__backdrop-fallback" />
                   }
                 </div>
-                <div className="app-grid__info">
-                  <div className="app-grid__name">{app.display_name}</div>
-                  <div className={`app-grid__time${activeMs > 0 ? ' app-grid__time--active' : ''}`}>
-                    {fmtMs(activeMs)}
-                  </div>
+
+                {/* Sharp centered icon */}
+                <div className="app-grid__art">
+                  {icon
+                    ? <img src={icon} alt={app.display_name} className="app-grid__art-img" />
+                    : <div className="app-grid__art-placeholder"><Monitor size={24} /></div>
+                  }
                 </div>
+
+                {/* Name overlay */}
+                <div className="app-grid__overlay">
+                  <div className="app-grid__name">{app.display_name}</div>
+                </div>
+
+                {/* Time badge */}
+                {time !== '—' && (
+                  <div className="app-grid__time-badge">{time}</div>
+                )}
               </button>
             )
           })}

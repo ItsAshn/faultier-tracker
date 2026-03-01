@@ -62,18 +62,17 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(CHANNELS.APPS_UPDATE, (_e, patch: Partial<AppRecord> & { id: number }): void => {
     const { id, display_name, description, notes, tags, group_id, daily_goal_ms } = patch
-    if (display_name !== undefined)
-      db.prepare<[string, number]>('UPDATE apps SET display_name = ? WHERE id = ?').run(display_name, id)
-    if (description !== undefined)
-      db.prepare<[string, number]>('UPDATE apps SET description = ? WHERE id = ?').run(description, id)
-    if (notes !== undefined)
-      db.prepare<[string, number]>('UPDATE apps SET notes = ? WHERE id = ?').run(notes, id)
-    if (tags !== undefined)
-      db.prepare<[string, number]>('UPDATE apps SET tags = ? WHERE id = ?').run(JSON.stringify(tags), id)
-    if (group_id !== undefined)
-      db.prepare<[number | null, number]>('UPDATE apps SET group_id = ? WHERE id = ?').run(group_id, id)
-    if ('daily_goal_ms' in patch)
-      db.prepare<[number | null, number]>('UPDATE apps SET daily_goal_ms = ? WHERE id = ?').run(daily_goal_ms ?? null, id)
+    const setClauses: string[] = []
+    const params: unknown[] = []
+    if (display_name !== undefined) { setClauses.push('display_name = ?'); params.push(display_name) }
+    if (description !== undefined) { setClauses.push('description = ?'); params.push(description) }
+    if (notes !== undefined) { setClauses.push('notes = ?'); params.push(notes) }
+    if (tags !== undefined) { setClauses.push('tags = ?'); params.push(JSON.stringify(tags)) }
+    if (group_id !== undefined) { setClauses.push('group_id = ?'); params.push(group_id) }
+    if ('daily_goal_ms' in patch) { setClauses.push('daily_goal_ms = ?'); params.push(daily_goal_ms ?? null) }
+    if (setClauses.length === 0) return
+    params.push(id)
+    db.prepare(`UPDATE apps SET ${setClauses.join(', ')} WHERE id = ?`).run(...params)
   })
 
   ipcMain.handle(CHANNELS.APPS_SET_TRACKED, (_e, id: number, tracked: boolean): void => {
@@ -109,16 +108,16 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(CHANNELS.GROUPS_UPDATE, (_e, patch: Partial<AppGroup> & { id: number }): void => {
     const { id, name, description, tags, daily_goal_ms, category } = patch
-    if (name !== undefined)
-      db.prepare<[string, number]>('UPDATE app_groups SET name = ? WHERE id = ?').run(name, id)
-    if (description !== undefined)
-      db.prepare<[string, number]>('UPDATE app_groups SET description = ? WHERE id = ?').run(description, id)
-    if (tags !== undefined)
-      db.prepare<[string, number]>('UPDATE app_groups SET tags = ? WHERE id = ?').run(JSON.stringify(tags), id)
-    if ('daily_goal_ms' in patch)
-      db.prepare<[number | null, number]>('UPDATE app_groups SET daily_goal_ms = ? WHERE id = ?').run(daily_goal_ms ?? null, id)
-    if ('category' in patch)
-      db.prepare<[string | null, number]>('UPDATE app_groups SET category = ? WHERE id = ?').run(category ?? null, id)
+    const setClauses: string[] = []
+    const params: unknown[] = []
+    if (name !== undefined) { setClauses.push('name = ?'); params.push(name) }
+    if (description !== undefined) { setClauses.push('description = ?'); params.push(description) }
+    if (tags !== undefined) { setClauses.push('tags = ?'); params.push(JSON.stringify(tags)) }
+    if ('daily_goal_ms' in patch) { setClauses.push('daily_goal_ms = ?'); params.push(daily_goal_ms ?? null) }
+    if ('category' in patch) { setClauses.push('category = ?'); params.push(category ?? null) }
+    if (setClauses.length === 0) return
+    params.push(id)
+    db.prepare(`UPDATE app_groups SET ${setClauses.join(', ')} WHERE id = ?`).run(...params)
   })
 
   ipcMain.handle(CHANNELS.GROUPS_DELETE, (_e, id: number): void => {

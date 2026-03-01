@@ -1,5 +1,5 @@
 import initSqlJs from 'sql.js'
-import type { Database as SqlJsDatabase } from 'sql.js'
+import type { Database as SqlJsDatabase, Statement } from 'sql.js'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
@@ -21,30 +21,42 @@ export interface DbCompat {
 }
 
 function wrapDb(raw: SqlJsDatabase): DbCompat {
+  // Cache compiled statements to avoid recompiling the same SQL repeatedly
+  const stmtCache = new Map<string, Statement>()
+
+  function getStmt(sql: string): Statement {
+    let stmt = stmtCache.get(sql)
+    if (!stmt) {
+      stmt = raw.prepare(sql)
+      stmtCache.set(sql, stmt)
+    }
+    return stmt
+  }
+
   return {
     prepare(sql: string) {
       return {
         get(...params: unknown[]) {
-          const stmt = raw.prepare(sql)
+          const stmt = getStmt(sql)
           stmt.bind(params)
           const row = stmt.step() ? stmt.getAsObject() : undefined
-          stmt.free()
+          stmt.reset()
           return row as any
         },
         all(...params: unknown[]) {
-          const stmt = raw.prepare(sql)
+          const stmt = getStmt(sql)
           stmt.bind(params)
           const rows: unknown[] = []
           while (stmt.step()) rows.push(stmt.getAsObject())
-          stmt.free()
+          stmt.reset()
           return rows as any[]
         },
         run(...params: unknown[]) {
-          const stmt = raw.prepare(sql)
+          const stmt = getStmt(sql)
           stmt.run(params)
           const r = raw.exec('SELECT last_insert_rowid()')
           const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0
-          stmt.free()
+          stmt.reset()
           return { lastInsertRowid }
         }
       }
@@ -74,6 +86,11 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
     },
 
     close() {
+      // Free all cached compiled statements before closing the DB
+      for (const stmt of stmtCache.values()) {
+        try { stmt.free() } catch { /* ignore */ }
+      }
+      stmtCache.clear()
       persistDb()
       raw.close()
     }
@@ -86,6 +103,10 @@ let _db: DbCompat | null = null
 let _rawDb: SqlJsDatabase | null = null
 let _dbPath = ''
 let _saveTimer: NodeJS.Timeout | null = null
+let _isSaving = false
+
+// In-memory settings cache — populated on first getSetting() call, invalidated on set
+let _settingsCache: Map<string, unknown> | null = null
 
 export function getDb(): DbCompat {
   if (!_db) throw new Error('Database not initialized. Call openDb() first.')
@@ -116,8 +137,19 @@ export async function openDb(): Promise<DbCompat> {
   runMigrations(_db)
   seedDefaults(_db)
 
-  // Auto-save every 30 seconds
-  _saveTimer = setInterval(persistDb, 30_000)
+  // Auto-save every 30 seconds using async I/O to avoid blocking the main thread
+  _saveTimer = setInterval(async () => {
+    if (!_rawDb || !_dbPath || _isSaving) return
+    _isSaving = true
+    try {
+      const data = _rawDb.export()
+      await fs.promises.writeFile(_dbPath, Buffer.from(data))
+    } catch (err) {
+      console.error('[DB] Auto-save failed:', err)
+    } finally {
+      _isSaving = false
+    }
+  }, 30_000)
 
   console.log('[DB] Opened:', _dbPath)
   return _db
@@ -131,8 +163,8 @@ export function persistDb(): void {
 
 export function closeDb(): void {
   if (_saveTimer) { clearInterval(_saveTimer); _saveTimer = null }
-  persistDb()
-  _rawDb?.close()
+  _settingsCache = null
+  _db?.close()  // frees statement cache, persists DB, closes raw
   _rawDb = null
   _db = null
   console.log('[DB] Closed')
@@ -140,21 +172,27 @@ export function closeDb(): void {
 
 // ─── Settings helpers ──────────────────────────────────────────────────────
 
-export function getSetting(key: string): unknown {
+function loadSettingsCache(): void {
   const db = getDb()
-  const row = db.prepare<[string], { value: string }>('SELECT value FROM settings WHERE key = ?').get(key)
-  return row ? JSON.parse(row.value) : null
+  const rows = db.prepare<[], { key: string; value: string }>('SELECT key, value FROM settings').all()
+  _settingsCache = new Map(rows.map((r) => [r.key, JSON.parse(r.value)]))
+}
+
+export function getSetting(key: string): unknown {
+  if (!_settingsCache) loadSettingsCache()
+  return _settingsCache!.get(key) ?? null
 }
 
 export function setSetting(key: string, value: unknown): void {
   const db = getDb()
   db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(key, JSON.stringify(value))
+  // Update in-memory cache so next getSetting() is instant
+  if (_settingsCache) _settingsCache.set(key, value)
 }
 
 export function getAllSettings(): Record<string, unknown> {
-  const db = getDb()
-  const rows = db.prepare<[], { key: string; value: string }>('SELECT key, value FROM settings').all()
-  return Object.fromEntries(rows.map((r) => [r.key, JSON.parse(r.value)]))
+  if (!_settingsCache) loadSettingsCache()
+  return Object.fromEntries(_settingsCache!.entries())
 }
 
 // ─── App helpers ───────────────────────────────────────────────────────────

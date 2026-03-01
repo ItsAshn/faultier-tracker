@@ -14,6 +14,8 @@ interface SessionStore {
   activeDisplayName: string | null
   isIdle: boolean
   lastTickAt: number | null
+  // Internal: timestamp of last loadRange() call (not exposed to consumers)
+  _lastLoadAt: number | null
 
   setPreset: (preset: DateRangePreset) => void
   setCustomRange: (from: number, to: number) => void
@@ -48,6 +50,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   activeDisplayName: null,
   isIdle: false,
   lastTickAt: null,
+  _lastLoadAt: null,
 
   setPreset(preset) {
     set({ preset })
@@ -79,7 +82,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (!get().summary) set({ loading: true })
     try {
       const summary = await api.getSessionRange(from, to, groupBy)
-      set({ summary, loading: false })
+      set({ summary, loading: false, _lastLoadAt: Date.now() })
     } catch {
       set({ loading: false })
     }
@@ -93,6 +96,11 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       isIdle: payload.is_idle,
       lastTickAt: payload.timestamp
     })
-    get().loadRange()
+    // Throttle range reload: at most once every 30s during background ticks.
+    // User-driven actions (setPreset, setCustomRange) always reload immediately.
+    const lastLoad = get()._lastLoadAt
+    if (!lastLoad || Date.now() - lastLoad > 30_000) {
+      get().loadRange()
+    }
   }
 }))
