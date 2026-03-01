@@ -87,10 +87,16 @@ export async function resolveGroup(exeName: string, _exePath: string | null): Pr
   // name against Steam-imported apps (exe_name LIKE 'steam:%') so that games
   // with codename executables (e.g. "pioneergame.exe" → "Arc Raiders") are
   // automatically grouped with their Steam library entry.
+  //
+  // Both strings are normalized (non-alphanumeric stripped) before comparing so
+  // that "ArcRaiders" and "Arc Raiders" become identical (distance 0).  The
+  // tight threshold of 0.1 avoids false positives: e.g. "Portal 2" (7 chars
+  // after strip) vs "Portal" (6 chars) = 1/7 ≈ 0.14, which correctly won't match.
   if (_exePath) {
     const steamMatch = /steamapps[\\/]common[\\/]([^\\/]+)/i.exec(_exePath)
     if (steamMatch) {
-      const folderName = steamMatch[1].toLowerCase()
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const folderNorm = normalize(steamMatch[1])
       const steamApps = db
         .prepare<[], { id: number; display_name: string; group_id: number | null }>(
           "SELECT id, display_name, group_id FROM apps WHERE exe_name LIKE 'steam:%'"
@@ -105,8 +111,8 @@ export async function resolveGroup(exeName: string, _exePath: string | null): Pr
       } | null = null
 
       for (const steamApp of steamApps) {
-        const dist = normalizedDistance(folderName, steamApp.display_name.toLowerCase())
-        if (dist <= 0.25 && (!bestSteamMatch || dist < bestSteamMatch.dist)) {
+        const dist = normalizedDistance(folderNorm, normalize(steamApp.display_name))
+        if (dist <= 0.1 && (!bestSteamMatch || dist < bestSteamMatch.dist)) {
           bestSteamMatch = {
             appId: steamApp.id,
             displayName: steamApp.display_name,
