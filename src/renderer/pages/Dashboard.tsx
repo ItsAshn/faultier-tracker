@@ -1,80 +1,84 @@
 import { useEffect, useState } from 'react'
-import { Activity, Clock, Trophy, Zap, X, BarChart2, CalendarDays, ExternalLink } from 'lucide-react'
+import { Zap, X, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/dashboard.css'
 import { useSessionStore } from '../store/sessionStore'
 import { useAppStore } from '../store/appStore'
 import { api } from '../api/bridge'
-import DateRangePicker from '../components/dashboard/DateRangePicker'
-import SummaryCard from '../components/dashboard/SummaryCard'
-import TimeBarChart from '../components/dashboard/TimeBarChart'
+import HeroAppCard from '../components/dashboard/HeroAppCard'
 import Heatmap from '../components/dashboard/Heatmap'
-import { GroupTimeRow, UngroupedTimeRow } from '../components/dashboard/AppTimeRow'
+import AppGrid, { type GridPeriod } from '../components/dashboard/AppGrid'
+import type { RangeSummary } from '@shared/types'
 
-function fmtMs(ms: number): string {
-  if (ms < 60_000) return '0m'
-  const h = Math.floor(ms / 3_600_000)
-  const m = Math.floor((ms % 3_600_000) / 60_000)
-  if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
+function getWeekRange(): { from: number; to: number } {
+  const now = new Date()
+  const dayOfWeek = now.getDay() // 0 = Sun
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const monday = new Date(now)
+  monday.setDate(now.getDate() - daysFromMonday)
+  monday.setHours(0, 0, 0, 0)
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  sunday.setHours(23, 59, 59, 999)
+  return { from: monday.getTime(), to: sunday.getTime() }
+}
+
+function getPeriodRange(period: GridPeriod): { from: number; to: number } {
+  const now = new Date()
+  if (period === 'week') return getWeekRange()
+  if (period === 'month') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    return { from, to: now.getTime() }
+  }
+  return { from: 0, to: now.getTime() }
 }
 
 export default function Dashboard(): JSX.Element {
-  const summary = useSessionStore((s) => s.summary)
-  const loadRange = useSessionStore((s) => s.loadRange)
-  const setPreset = useSessionStore((s) => s.setPreset)
-  const setCustomRange = useSessionStore((s) => s.setCustomRange)
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
+  const setCustomRange = useSessionStore((s) => s.setCustomRange)
+  const setPreset = useSessionStore((s) => s.setPreset)
   const apps = useAppStore((s) => s.apps)
-  const groups = useAppStore((s) => s.groups)
   const settings = useAppStore((s) => s.settings)
   const setSetting = useAppStore((s) => s.setSetting)
   const navigate = useNavigate()
 
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  const [showHeatmap, setShowHeatmap] = useState(false)
   const showOnboarding = lastTickAt === null && !bannerDismissed
-
-  // Steam prompt: show when >10 apps tracked and not dismissed
   const steamPromptDismissed = settings['steam_prompt_dismissed'] === 'true' || settings['steam_prompt_dismissed'] === true
   const showSteamPrompt = apps.length > 10 && !steamPromptDismissed && lastTickAt !== null
 
-  // Reload data every 30 seconds to update running totals
+  // Hero: always this week
+  const [heroSummary, setHeroSummary] = useState<RangeSummary | null>(null)
+  const [heroLoading, setHeroLoading] = useState(true)
+
+  // App grid: user-selectable period
+  const [gridPeriod, setGridPeriod] = useState<GridPeriod>('week')
+  const [gridSummary, setGridSummary] = useState<RangeSummary | null>(null)
+  const [gridLoading, setGridLoading] = useState(true)
+
   useEffect(() => {
-    const timer = setInterval(() => loadRange(), 30_000)
-    return () => clearInterval(timer)
+    setHeroLoading(true)
+    const { from, to } = getWeekRange()
+    api.getSessionRange(from, to, 'day').then((s) => {
+      setHeroSummary(s)
+      setHeroLoading(false)
+    })
   }, [])
 
-  const topAppId = summary?.top_app?.app_id ?? null
-  const [topAppIcon, setTopAppIcon] = useState<string | null>(null)
-
   useEffect(() => {
-    if (topAppId === null) { setTopAppIcon(null); return }
-    api.getIconForApp(topAppId).then(setTopAppIcon)
-  }, [topAppId])
-
-  const appSummaries = summary?.apps ?? []
-  const chartData = summary?.chart_points ?? []
-
-  // Group summaries by group_id
-  const grouped = new Map<number, { summaries: typeof appSummaries }>()
-  const ungrouped: typeof appSummaries = []
-
-  for (const s of appSummaries) {
-    if (s.group_id !== null) {
-      if (!grouped.has(s.group_id)) grouped.set(s.group_id, { summaries: [] })
-      grouped.get(s.group_id)!.summaries.push(s)
-    } else {
-      ungrouped.push(s)
-    }
-  }
+    setGridLoading(true)
+    const { from, to } = getPeriodRange(gridPeriod)
+    api.getSessionRange(from, to, 'day').then((s) => {
+      setGridSummary(s)
+      setGridLoading(false)
+    })
+  }, [gridPeriod])
 
   function handleHeatmapDayClick(dateStr: string): void {
     const from = new Date(dateStr + 'T00:00:00').getTime()
     const to = from + 86_400_000 - 1
     setCustomRange(from, to)
     setPreset('custom')
-    setShowHeatmap(false)
   }
 
   return (
@@ -115,87 +119,15 @@ export default function Dashboard(): JSX.Element {
         </div>
       )}
 
-      <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-          <button
-            className={`btn btn--ghost btn--icon-text${showHeatmap ? ' btn--active' : ''}`}
-            onClick={() => setShowHeatmap((v) => !v)}
-            title="Toggle heatmap"
-          >
-            {showHeatmap ? <BarChart2 size={14} /> : <CalendarDays size={14} />}
-            {showHeatmap ? 'Chart' : 'Heatmap'}
-          </button>
-          <DateRangePicker />
-        </div>
-      </div>
-
-      <div className="summary-cards">
-        <SummaryCard
-          label="Active Time"
-          value={fmtMs(summary?.total_active_ms ?? 0)}
-          sub="Focused on screen"
-          icon={<Activity size={16} />}
-        />
-        <SummaryCard
-          label="Running Time"
-          value={fmtMs(summary?.total_running_ms ?? 0)}
-          sub="Apps open"
-          icon={<Clock size={16} />}
-        />
-        <SummaryCard
-          label="Top App"
-          value={summary?.top_app ? fmtMs(summary.top_app.active_ms) : '—'}
-          sub={summary?.top_app?.display_name}
-          icon={
-            topAppIcon
-              ? <img src={topAppIcon} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
-              : <Trophy size={16} />
-          }
-        />
-      </div>
-
-      {showHeatmap
-        ? <Heatmap onDayClick={handleHeatmapDayClick} />
-        : <TimeBarChart data={chartData} appSummaries={appSummaries} />
-      }
-
-      <div className="time-table">
-        <div className="time-table__head">
-          <span>Application</span>
-          <span>Active</span>
-          <span>Running</span>
-          <span>Track</span>
-        </div>
-        <div className="time-table__body">
-          {appSummaries.length === 0 ? (
-            <div className="time-table__empty">
-              <Clock size={32} />
-              <span>{lastTickAt === null ? 'Waiting for first data — use your apps and they\'ll appear here' : 'No activity recorded for this period'}</span>
-            </div>
-          ) : (
-            <>
-              {Array.from(grouped.entries()).map(([groupId, { summaries }]) => {
-                const group = groups.find((g) => g.id === groupId)
-                if (!group) return null
-                return (
-                  <GroupTimeRow
-                    key={groupId}
-                    group={group}
-                    summaries={summaries}
-                    apps={apps}
-                  />
-                )
-              })}
-              {ungrouped.map((s) => {
-                const app = apps.find((a) => a.id === s.app_id)
-                if (!app) return null
-                return <UngroupedTimeRow key={s.app_id} summary={s} app={app} />
-              })}
-            </>
-          )}
-        </div>
-      </div>
+      <HeroAppCard summary={heroSummary} loading={heroLoading} />
+      <Heatmap onDayClick={handleHeatmapDayClick} />
+      <AppGrid
+        summaries={gridSummary?.apps ?? []}
+        allApps={apps}
+        period={gridPeriod}
+        onPeriodChange={setGridPeriod}
+        loading={gridLoading}
+      />
     </main>
   )
 }

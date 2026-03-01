@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-Faultier Tracker is an Electron + React desktop app that automatically tracks which applications are active or running on a Windows machine. It polls every 5 seconds, writes sessions to a local SQLite database (via sql.js/WASM), and presents time summaries through a React UI.
+Faultier Tracker is an Electron + React desktop app for people who want to know exactly how many hours they've put into a piece of software — think Blender, Photoshop, DaVinci Resolve, or any creative/professional tool that isn't on Steam. The core value is a single, honest number: "You spent 47 hours in Blender this month." It automatically tracks which applications are active or running on a Windows machine, polls every 5 seconds, writes sessions to a local SQLite database (via sql.js/WASM), and presents time summaries through a React UI.
+
+**Target user**: A creative or self-learner who uses non-gaming software (3D, video editing, illustration, CAD, coding IDEs, etc.) and wants accountability around how much time they invest in learning or practising those tools. Features should always serve the goal of surfacing meaningful time totals — not gamification for its own sake.
 
 ## Tech Stack
 
