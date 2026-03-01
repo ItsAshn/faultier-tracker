@@ -54,12 +54,16 @@ export default function Heatmap({ onDayClick }: Props): JSX.Element {
   const [tooltip, setTooltip] = useState<{ date: string; ms: number; x: number; y: number } | null>(null)
 
   useEffect(() => {
-    const oneYearAgo = Date.now() - 53 * 7 * 86_400_000
-    api.getDailyTotals(oneYearAgo, Date.now()).then((rows: DayTotal[]) => {
-      const m = new Map<string, number>()
-      for (const r of rows) m.set(r.date, r.active_ms)
-      setTotalsMap(m)
-    })
+    // Defer so hero card + leaderboard render first before the 365-day query fires
+    const timer = setTimeout(() => {
+      const oneYearAgo = Date.now() - 53 * 7 * 86_400_000
+      api.getDailyTotals(oneYearAgo, Date.now()).then((rows: DayTotal[]) => {
+        const m = new Map<string, number>()
+        for (const r of rows) m.set(r.date, r.active_ms)
+        setTotalsMap(m)
+      })
+    }, 150)
+    return () => clearTimeout(timer)
   }, [])
 
   const weeks = buildGrid()

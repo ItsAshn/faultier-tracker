@@ -3,6 +3,7 @@ import { Trophy } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { RangeSummary } from '@shared/types'
 import { api } from '../../api/bridge'
+import type { GridPeriod } from './TopAppsLeaderboard'
 
 function fmtMs(ms: number): string {
   if (ms < 60_000) return '0m'
@@ -12,12 +13,25 @@ function fmtMs(ms: number): string {
   return `${m}m`
 }
 
+const PERIOD_HERO_LABEL: Record<GridPeriod, string> = {
+  week: 'App of the Week',
+  month: 'App of the Month',
+  all: 'All-Time Top App',
+}
+
+const PERIOD_ACTIVE_LABEL: Record<GridPeriod, string> = {
+  week: 'this week',
+  month: 'this month',
+  all: 'all time',
+}
+
 interface Props {
   summary: RangeSummary | null
   loading: boolean
+  period: GridPeriod
 }
 
-export default function HeroAppCard({ summary, loading }: Props): JSX.Element {
+export default function HeroAppCard({ summary, loading, period }: Props): JSX.Element {
   const navigate = useNavigate()
   const topApp = summary?.top_app ?? null
   const [icon, setIcon] = useState<string | null>(null)
@@ -59,7 +73,7 @@ export default function HeroAppCard({ summary, loading }: Props): JSX.Element {
     >
       <div className="hero-card__label">
         <Trophy size={13} />
-        App of the Week
+        {PERIOD_HERO_LABEL[period]}
       </div>
       <div className="hero-card__body">
         <div className="hero-card__icon-wrap">
@@ -73,8 +87,8 @@ export default function HeroAppCard({ summary, loading }: Props): JSX.Element {
           <div className="hero-card__time">{fmtMs(topApp.active_ms)}</div>
           <div className="hero-card__sub">
             {daysActive > 0
-              ? `${daysActive} day${daysActive !== 1 ? 's' : ''} active this week`
-              : 'Active this week'
+              ? `${daysActive} day${daysActive !== 1 ? 's' : ''} active ${PERIOD_ACTIVE_LABEL[period]}`
+              : `Active ${PERIOD_ACTIVE_LABEL[period]}`
             }
           </div>
         </div>

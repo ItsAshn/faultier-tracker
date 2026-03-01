@@ -322,9 +322,9 @@
   height: 44px;
 }
 
-/* ── App grid ─────────────────────────────────────────────────────────────── */
+/* ── Top Apps Leaderboard ─────────────────────────────────────────────────── */
 
-.app-grid {
+.leaderboard {
   background: linear-gradient(180deg, #181818 0%, var(--color-surface) 100%);
   border: 1px solid var(--color-border);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -335,21 +335,21 @@
   gap: var(--space-4);
 }
 
-.app-grid__header {
+.leaderboard__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
 }
 
-.app-grid__title {
+.leaderboard__title {
   font-size: var(--text-md);
   font-weight: 600;
   color: var(--color-text);
   white-space: nowrap;
 }
 
-.app-grid__period {
+.leaderboard__period {
   display: flex;
   gap: var(--space-1);
   background: var(--color-surface-2);
@@ -358,7 +358,7 @@
   padding: 3px;
 }
 
-.app-grid__period-btn {
+.leaderboard__period-btn {
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-md);
   font-size: var(--text-xs);
@@ -371,17 +371,17 @@
   white-space: nowrap;
 }
 
-.app-grid__period-btn:hover {
+.leaderboard__period-btn:hover {
   color: var(--color-text);
 }
 
-.app-grid__period-btn--active {
+.leaderboard__period-btn--active {
   background: var(--color-surface-3);
   color: var(--color-text);
   box-shadow: var(--shadow-sm);
 }
 
-.app-grid__empty {
+.leaderboard__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -392,128 +392,176 @@
   font-size: var(--text-sm);
 }
 
-.app-grid__cards {
+.leaderboard__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Each row is a button */
+.leaderboard__row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: 20px 32px 1fr 100px 56px;
+  align-items: center;
   gap: var(--space-3);
-  transition: opacity var(--transition-normal);
-}
-
-.app-grid__cards--loading {
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* Portrait card — mirrors gallery AppCard */
-.app-grid__card {
-  position: relative;
-  aspect-ratio: 2 / 3;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
   cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+  width: 100%;
+}
+
+.leaderboard__row:hover {
   background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
-.app-grid__card:hover {
-  transform: scale(1.03);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(245, 158, 11, 0.2);
-  z-index: 1;
-}
-
-.app-grid__card--inactive {
-  filter: saturate(0.2) brightness(0.6);
-}
-
-.app-grid__card--inactive:hover {
-  filter: saturate(0.4) brightness(0.75);
-}
-
-/* Blurred backdrop */
-.app-grid__backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.app-grid__backdrop-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: blur(18px) brightness(0.3) saturate(1.2);
-  transform: scale(1.15);
-}
-
-.app-grid__backdrop-fallback {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, var(--color-surface-3) 0%, var(--color-surface) 100%);
-}
-
-/* Sharp centered icon */
-.app-grid__art {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 14px;
-}
-
-.app-grid__art-img {
-  width: 72%;
-  height: 72%;
-  object-fit: contain;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.7));
-}
-
-.app-grid__art-placeholder {
-  color: var(--color-text-dim);
-  opacity: 0.4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Name overlay at bottom */
-.app-grid__overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
-  padding: 24px var(--space-2) var(--space-2);
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 100%);
-}
-
-.app-grid__name {
+.leaderboard__rank {
   font-size: var(--text-xs);
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: var(--color-text-dim);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.leaderboard__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.leaderboard__icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.leaderboard__icon-placeholder {
+  color: var(--color-text-dim);
+  opacity: 0.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.leaderboard__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+  min-width: 0;
 }
 
-/* Time badge — top left */
-.app-grid__time-badge {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  z-index: 3;
-  padding: 3px 7px;
+.leaderboard__bar-wrap {
+  height: 4px;
+  background: var(--color-surface-3);
   border-radius: var(--radius-full);
-  font-size: 10px;
-  font-weight: 700;
+  overflow: hidden;
+}
+
+.leaderboard__bar {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  transition: width 300ms ease;
+  min-width: 2px;
+}
+
+.leaderboard__time {
+  font-size: var(--text-xs);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  background: rgba(0, 0, 0, 0.72);
   color: var(--color-accent);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  backdrop-filter: blur(4px);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Skeleton rows */
+.leaderboard__row--skeleton {
+  cursor: default;
+  pointer-events: none;
+}
+
+.leaderboard__row--skeleton:hover {
+  background: transparent;
+}
+
+.leaderboard__rank-skel,
+.leaderboard__icon-skel,
+.leaderboard__name-skel,
+.leaderboard__time-skel {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-surface-3) 50%, var(--color-surface-2) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.leaderboard__rank-skel {
+  width: 14px;
+  height: 12px;
+}
+
+.leaderboard__icon-skel {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+}
+
+.leaderboard__name-skel {
+  height: 13px;
+  width: 60%;
+}
+
+.leaderboard__bar-skel {
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-surface-3) 50%, var(--color-surface-2) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: var(--radius-full);
+}
+
+.leaderboard__time-skel {
+  width: 36px;
+  height: 12px;
+  margin-left: auto;
+}
+
+/* Footer link */
+.leaderboard__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+
+.leaderboard__gallery-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.leaderboard__gallery-link:hover {
+  color: var(--color-text);
+  background: var(--color-surface-2);
 }
 
 /* ── Summary cards (used in AppDetailPage) ────────────────────────────────── */

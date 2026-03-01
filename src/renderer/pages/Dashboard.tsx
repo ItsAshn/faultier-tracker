@@ -7,25 +7,22 @@ import { useAppStore } from '../store/appStore'
 import { api } from '../api/bridge'
 import HeroAppCard from '../components/dashboard/HeroAppCard'
 import Heatmap from '../components/dashboard/Heatmap'
-import AppGrid, { type GridPeriod } from '../components/dashboard/AppGrid'
+import TopAppsLeaderboard, { type GridPeriod } from '../components/dashboard/TopAppsLeaderboard'
 import type { RangeSummary } from '@shared/types'
-
-function getWeekRange(): { from: number; to: number } {
-  const now = new Date()
-  const dayOfWeek = now.getDay() // 0 = Sun
-  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-  const monday = new Date(now)
-  monday.setDate(now.getDate() - daysFromMonday)
-  monday.setHours(0, 0, 0, 0)
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  sunday.setHours(23, 59, 59, 999)
-  return { from: monday.getTime(), to: sunday.getTime() }
-}
 
 function getPeriodRange(period: GridPeriod): { from: number; to: number } {
   const now = new Date()
-  if (period === 'week') return getWeekRange()
+  if (period === 'week') {
+    const dayOfWeek = now.getDay()
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+    const monday = new Date(now)
+    monday.setDate(now.getDate() - daysFromMonday)
+    monday.setHours(0, 0, 0, 0)
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    sunday.setHours(23, 59, 59, 999)
+    return { from: monday.getTime(), to: sunday.getTime() }
+  }
   if (period === 'month') {
     const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
     return { from, to: now.getTime() }
@@ -47,32 +44,19 @@ export default function Dashboard(): JSX.Element {
   const steamPromptDismissed = settings['steam_prompt_dismissed'] === 'true' || settings['steam_prompt_dismissed'] === true
   const showSteamPrompt = apps.length > 10 && !steamPromptDismissed && lastTickAt !== null
 
-  // Hero: always this week
-  const [heroSummary, setHeroSummary] = useState<RangeSummary | null>(null)
-  const [heroLoading, setHeroLoading] = useState(true)
-
-  // App grid: user-selectable period
-  const [gridPeriod, setGridPeriod] = useState<GridPeriod>('week')
-  const [gridSummary, setGridSummary] = useState<RangeSummary | null>(null)
-  const [gridLoading, setGridLoading] = useState(true)
+  // Single shared summary — used by both HeroAppCard and TopAppsLeaderboard
+  const [period, setPeriod] = useState<GridPeriod>('week')
+  const [summary, setSummary] = useState<RangeSummary | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setHeroLoading(true)
-    const { from, to } = getWeekRange()
+    setLoading(true)
+    const { from, to } = getPeriodRange(period)
     api.getSessionRange(from, to, 'day').then((s) => {
-      setHeroSummary(s)
-      setHeroLoading(false)
+      setSummary(s)
+      setLoading(false)
     })
-  }, [])
-
-  useEffect(() => {
-    setGridLoading(true)
-    const { from, to } = getPeriodRange(gridPeriod)
-    api.getSessionRange(from, to, 'day').then((s) => {
-      setGridSummary(s)
-      setGridLoading(false)
-    })
-  }, [gridPeriod])
+  }, [period])
 
   function handleHeatmapDayClick(dateStr: string): void {
     const from = new Date(dateStr + 'T00:00:00').getTime()
@@ -119,14 +103,13 @@ export default function Dashboard(): JSX.Element {
         </div>
       )}
 
-      <HeroAppCard summary={heroSummary} loading={heroLoading} />
+      <HeroAppCard summary={summary} loading={loading} period={period} />
       <Heatmap onDayClick={handleHeatmapDayClick} />
-      <AppGrid
-        summaries={gridSummary?.apps ?? []}
-        allApps={apps}
-        period={gridPeriod}
-        onPeriodChange={setGridPeriod}
-        loading={gridLoading}
+      <TopAppsLeaderboard
+        summaries={summary?.apps ?? []}
+        period={period}
+        onPeriodChange={setPeriod}
+        loading={loading}
       />
     </main>
   )
