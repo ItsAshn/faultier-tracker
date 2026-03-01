@@ -14,7 +14,10 @@ export interface AppRecord {
   tags: string[]
   first_seen: number
   last_seen: number
+  daily_goal_ms: number | null
 }
+
+export type AppCategory = 'work' | 'personal' | 'gaming' | 'creative' | 'system' | 'other'
 
 export interface AppGroup {
   id: number
@@ -25,6 +28,8 @@ export interface AppGroup {
   tags: string[]
   is_manual: boolean
   created_at: number
+  daily_goal_ms: number | null
+  category: AppCategory | null
 }
 
 export interface SessionSummary {
@@ -117,6 +122,7 @@ export interface TickPayload {
     app_id: number
   } | null
   timestamp: number
+  is_idle: boolean
 }
 
 export type WindowControlAction = 'minimize' | 'maximize' | 'close'
@@ -159,4 +165,21 @@ export interface ArtworkResult {
 export interface ArtworkSearchResponse {
   results: ArtworkResult[]
   error?: string
+}
+
+export interface TitleSummary {
+  window_title: string
+  duration_ms: number
+  last_seen: number
+}
+
+export interface DayTotal {
+  date: string      // 'YYYY-MM-DD'
+  active_ms: number
+}
+
+export interface BucketApp {
+  app_id: number
+  display_name: string
+  active_ms: number
 }

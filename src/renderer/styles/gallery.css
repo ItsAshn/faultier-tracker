@@ -202,6 +202,25 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+/* Time badge — top left corner, always visible */
+.app-card__time-badge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: 3;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--color-active);
+  border: 1px solid rgba(79, 195, 247, 0.3);
+  backdrop-filter: blur(4px);
+  text-shadow: none;
+}
+
 /* Tracking badge — top right corner */
 .app-card__track-btn {
   position: absolute;

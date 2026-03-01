@@ -336,6 +336,107 @@
   padding-top: var(--space-2);
 }
 
+/* ── Window title history ─────────────────────────────────────────────────── */
+
+.app-detail__titles {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.app-detail__titles-list {
+  border-top: 1px solid var(--color-border);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.app-detail__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.app-detail__title-row:last-child {
+  border-bottom: none;
+}
+
+.app-detail__title-row:hover {
+  background: var(--color-surface-2);
+}
+
+.app-detail__title-text {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+
+.app-detail__title-time {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  width: 52px;
+  text-align: right;
+}
+
+/* ── Goal progress ────────────────────────────────────────────────────────── */
+
+.app-detail__goal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.app-detail__goal-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.app-detail__goal-pct {
+  font-weight: 700;
+  color: var(--color-accent);
+  margin-left: auto;
+}
+
+.app-detail__goal-sub {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+}
+
+.app-detail__goal-bar-wrap {
+  height: 8px;
+  background: var(--color-surface-3);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.app-detail__goal-bar {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  transition: width 400ms ease;
+}
+
+.app-detail__goal-bar--done {
+  background: #4caf76;
+}
+
 /* ── Not found ────────────────────────────────────────────────────────────── */
 
 .app-detail__not-found {

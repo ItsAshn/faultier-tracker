@@ -8,6 +8,17 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    version: 2,
+    up(db) {
+      // Add daily goal and category fields
+      db.exec(`
+        ALTER TABLE apps ADD COLUMN daily_goal_ms INTEGER;
+        ALTER TABLE app_groups ADD COLUMN daily_goal_ms INTEGER;
+        ALTER TABLE app_groups ADD COLUMN category TEXT;
+      `)
+    }
+  },
+  {
     version: 1,
     up(db) {
       db.exec(`
@@ -106,7 +117,10 @@ export function seedDefaults(db: DbCompat): void {
     ['machine_id', JSON.stringify(uuidv4())],
     ['record_titles', 'true'],
     ['theme', '"system"'],
-    ['dashboard_default_range', '"today"']
+    ['dashboard_default_range', '"today"'],
+    ['idle_threshold_ms', '300000'],
+    ['break_reminder_mins', '0'],
+    ['steam_prompt_dismissed', 'false']
   ]
 
   db.transaction(() => {

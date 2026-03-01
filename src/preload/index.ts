@@ -3,7 +3,7 @@ import { CHANNELS } from '@shared/channels'
 import type {
   AppRecord, AppGroup, RangeSummary, AppRangeSummary, ImportResult, SteamImportResult,
   WindowControlAction, TickPayload, UpdateInfo, UpdateProgressInfo,
-  ArtworkSearchResponse
+  ArtworkSearchResponse, TitleSummary, DayTotal, BucketApp
 } from '@shared/types'
 
 // Typed API exposed to the renderer via contextBridge
@@ -54,6 +54,15 @@ const api = {
   ): Promise<AppRangeSummary> =>
     ipcRenderer.invoke(CHANNELS.SESSIONS_GET_APP_RANGE, id, from, to, groupBy, isGroup),
 
+  getSessionTitles: (appId: number, from: number, to: number, isGroup: boolean): Promise<TitleSummary[]> =>
+    ipcRenderer.invoke(CHANNELS.SESSIONS_GET_TITLES, appId, from, to, isGroup),
+
+  getDailyTotals: (from: number, to: number): Promise<DayTotal[]> =>
+    ipcRenderer.invoke(CHANNELS.SESSIONS_GET_DAILY_TOTALS, from, to),
+
+  getBucketApps: (from: number, to: number): Promise<BucketApp[]> =>
+    ipcRenderer.invoke(CHANNELS.SESSIONS_GET_BUCKET_APPS, from, to),
+
   clearAllSessions: (): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.SESSIONS_CLEAR_ALL),
 
@@ -87,6 +96,9 @@ const api = {
   // Data transfer
   exportData: (): Promise<{ success: boolean; filePath?: string; error?: string }> =>
     ipcRenderer.invoke(CHANNELS.DATA_EXPORT),
+
+  exportDataCsv: (): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+    ipcRenderer.invoke(CHANNELS.DATA_EXPORT_CSV),
 
   importData: (): Promise<ImportResult & { error?: string }> =>
     ipcRenderer.invoke(CHANNELS.DATA_IMPORT),

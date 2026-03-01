@@ -67,6 +67,17 @@ function toggleWindow(win: BrowserWindow): void {
   }
 }
 
+export function updateTrayTooltip(displayName: string | null, isIdle: boolean): void {
+  if (!tray) return
+  if (isIdle) {
+    tray.setToolTip('Faultier Tracker — Idle')
+  } else if (displayName) {
+    tray.setToolTip(`Faultier Tracker — ${displayName}`)
+  } else {
+    tray.setToolTip('Faultier Tracker')
+  }
+}
+
 export function destroyTray(): void {
   tray?.destroy()
   tray = null

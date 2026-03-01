@@ -124,6 +124,72 @@ export async function exportData(): Promise<{ success: boolean; filePath?: strin
   return { success: true, filePath }
 }
 
+// ─── CSV Export ────────────────────────────────────────────────────────────
+
+export async function exportDataCsv(): Promise<{ success: boolean; filePath?: string; error?: string }> {
+  const db = getDb()
+
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Export Faultier Tracker Data as CSV',
+    defaultPath: path.join(
+      app.getPath('documents'),
+      `faultier-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`
+    ),
+    filters: [{ name: 'CSV', extensions: ['csv'] }]
+  })
+
+  if (canceled || !filePath) return { success: false }
+
+  const apps = db.prepare<[], { id: number; display_name: string; group_id: number | null }>(
+    'SELECT id, display_name, group_id FROM apps'
+  ).all()
+
+  const groups = db.prepare<[], { id: number; name: string }>(
+    'SELECT id, name FROM app_groups'
+  ).all()
+
+  const groupMap = new Map(groups.map((g) => [g.id, g.name]))
+  const appMap = new Map(apps.map((a) => [a.id, a]))
+
+  const sessions = db.prepare<[], {
+    app_id: number; session_type: string; started_at: number; ended_at: number
+  }>(
+    'SELECT app_id, session_type, started_at, ended_at FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at'
+  ).all()
+
+  // Aggregate per day per app
+  const agg = new Map<string, Map<number, { active_ms: number; running_ms: number }>>()
+
+  for (const s of sessions) {
+    const d = new Date(s.started_at)
+    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    if (!agg.has(day)) agg.set(day, new Map())
+    const dayMap = agg.get(day)!
+    if (!dayMap.has(s.app_id)) dayMap.set(s.app_id, { active_ms: 0, running_ms: 0 })
+    const entry = dayMap.get(s.app_id)!
+    const dur = s.ended_at - s.started_at
+    if (s.session_type === 'active') entry.active_ms += dur
+    else entry.running_ms += dur
+  }
+
+  const rows: string[] = ['date,app_name,group_name,active_minutes,running_minutes']
+
+  for (const [day, dayMap] of Array.from(agg.entries()).sort()) {
+    for (const [appId, { active_ms, running_ms }] of dayMap) {
+      const appInfo = appMap.get(appId)
+      if (!appInfo) continue
+      const appName = appInfo.display_name.replace(/"/g, '""')
+      const groupName = appInfo.group_id ? (groupMap.get(appInfo.group_id) ?? '').replace(/"/g, '""') : ''
+      const activeMins = (active_ms / 60000).toFixed(2)
+      const runningMins = (running_ms / 60000).toFixed(2)
+      rows.push(`${day},"${appName}","${groupName}",${activeMins},${runningMins}`)
+    }
+  }
+
+  fs.writeFileSync(filePath, rows.join('\n'), 'utf-8')
+  return { success: true, filePath }
+}
+
 // ─── Import ────────────────────────────────────────────────────────────────
 
 export async function importData(): Promise<ImportResult & { error?: string }> {

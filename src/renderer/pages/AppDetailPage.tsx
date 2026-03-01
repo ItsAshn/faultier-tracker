@@ -1,11 +1,11 @@
 import { useState, useEffect, KeyboardEvent } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Clock, Activity, AppWindow, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Clock, Activity, AppWindow, X, Target } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import '../styles/app-detail.css'
 import { useAppStore } from '../store/appStore'
 import { api } from '../api/bridge'
-import type { AppRecord, AppGroup, AppRangeSummary } from '@shared/types'
+import type { AppRecord, AppGroup, AppRangeSummary, TitleSummary, AppCategory } from '@shared/types'
 import TimeBarChart from '../components/dashboard/TimeBarChart'
 import ImageUploader from '../components/gallery/ImageUploader'
 import ArtworkSearchModal from '../components/gallery/ArtworkSearchModal'
@@ -96,6 +96,8 @@ export default function AppDetailPage(): JSX.Element {
   const [preset, setPreset] = useState<Preset>('week')
   const [rangeData, setRangeData] = useState<AppRangeSummary | null>(null)
   const [loading, setLoading] = useState(false)
+  const [titles, setTitles] = useState<TitleSummary[]>([])
+  const [titlesOpen, setTitlesOpen] = useState(false)
 
   // Hero icon
   const [iconSrc, setIconSrc] = useState<string | null>(null)
@@ -111,6 +113,8 @@ export default function AppDetailPage(): JSX.Element {
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [groupId, setGroupId] = useState<number | null>(null)
+  const [dailyGoalHours, setDailyGoalHours] = useState('')
+  const [category, setCategory] = useState<AppCategory | null>(null)
 
   // Sync form state when item loads
   useEffect(() => {
@@ -120,6 +124,8 @@ export default function AppDetailPage(): JSX.Element {
       setDisplayName(g.name)
       setDescription(g.description)
       setTags(g.tags)
+      setDailyGoalHours(g.daily_goal_ms ? String(g.daily_goal_ms / 3_600_000) : '')
+      setCategory(g.category)
     } else {
       const a = item as AppRecord
       setDisplayName(a.display_name)
@@ -127,6 +133,7 @@ export default function AppDetailPage(): JSX.Element {
       setNotes(a.notes)
       setTags(a.tags)
       setGroupId(a.group_id)
+      setDailyGoalHours(a.daily_goal_ms ? String(a.daily_goal_ms / 3_600_000) : '')
     }
   }, [item?.id])
 
@@ -151,6 +158,7 @@ export default function AppDetailPage(): JSX.Element {
     api.getAppSessionRange(numId, from, to, groupBy, isGroup)
       .then(setRangeData)
       .finally(() => setLoading(false))
+    api.getSessionTitles(numId, from, to, isGroup).then(setTitles)
   }, [numId, isGroup, preset, item?.id])
 
   function addTag(): void {
@@ -169,10 +177,11 @@ export default function AppDetailPage(): JSX.Element {
   }
 
   async function handleSave(): Promise<void> {
+    const goalMs = dailyGoalHours.trim() ? Math.round(parseFloat(dailyGoalHours) * 3_600_000) : null
     if (isGroup) {
-      await updateGroup({ id: numId, name: displayName, description, tags })
+      await updateGroup({ id: numId, name: displayName, description, tags, daily_goal_ms: goalMs, category })
     } else {
-      await updateApp({ id: numId, display_name: displayName, description, notes, tags })
+      await updateApp({ id: numId, display_name: displayName, description, notes, tags, daily_goal_ms: goalMs })
       if (groupId !== (item as AppRecord).group_id) {
         await setAppGroup(numId, groupId)
       }
@@ -187,6 +196,8 @@ export default function AppDetailPage(): JSX.Element {
       setDisplayName(g.name)
       setDescription(g.description)
       setTags(g.tags)
+      setDailyGoalHours(g.daily_goal_ms ? String(g.daily_goal_ms / 3_600_000) : '')
+      setCategory(g.category)
     } else {
       const a = item as AppRecord
       setDisplayName(a.display_name)
@@ -194,6 +205,7 @@ export default function AppDetailPage(): JSX.Element {
       setNotes(a.notes)
       setTags(a.tags)
       setGroupId(a.group_id)
+      setDailyGoalHours(a.daily_goal_ms ? String(a.daily_goal_ms / 3_600_000) : '')
     }
     setEditOpen(false)
   }
@@ -216,6 +228,10 @@ export default function AppDetailPage(): JSX.Element {
   const isTracked = !isGroup && (item as AppRecord).is_tracked
   const memberCount = isGroup ? apps.filter((a) => a.group_id === numId).length : 0
   const maxMemberMs = rangeData?.member_summaries[0]?.active_ms ?? 0
+
+  const itemGoalMs = isGroup ? (item as AppGroup).daily_goal_ms : (item as AppRecord).daily_goal_ms
+  const activeMs = rangeData?.active_ms ?? 0
+  const goalPct = itemGoalMs && itemGoalMs > 0 ? Math.min(100, Math.round((activeMs / itemGoalMs) * 100)) : null
 
   return (
     <main className="page-content app-detail">
@@ -314,12 +330,58 @@ export default function AppDetailPage(): JSX.Element {
         </div>
       </div>
 
+      {/* Daily goal progress */}
+      {goalPct !== null && (
+        <div className="app-detail__goal">
+          <div className="app-detail__goal-header">
+            <Target size={14} />
+            <span>Daily Goal Progress</span>
+            <span className="app-detail__goal-pct">{goalPct}%</span>
+            <span className="app-detail__goal-sub">
+              {fmtMs(activeMs)} of {fmtMs(itemGoalMs!)} goal
+            </span>
+          </div>
+          <div className="app-detail__goal-bar-wrap">
+            <div
+              className={`app-detail__goal-bar${goalPct >= 100 ? ' app-detail__goal-bar--done' : ''}`}
+              style={{ width: `${goalPct}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Chart */}
       {rangeData && rangeData.chart_points.length > 0 && (
         <TimeBarChart data={rangeData.chart_points} />
       )}
       {!loading && rangeData && rangeData.chart_points.length === 0 && (
         <div className="app-detail__empty-chart">No activity in this period.</div>
+      )}
+
+      {/* Window title history */}
+      {titles.length > 0 && (
+        <div className="app-detail__titles">
+          <button
+            className="app-detail__edit-header"
+            onClick={() => setTitlesOpen((v) => !v)}
+          >
+            <span className="app-detail__edit-header-title">Window Titles ({titles.length})</span>
+            <ChevronDown
+              size={16}
+              className={`app-detail__edit-chevron${titlesOpen ? ' app-detail__edit-chevron--open' : ''}`}
+            />
+          </button>
+          {titlesOpen && (
+            <div className="app-detail__titles-list">
+              {titles.map((t) => (
+                <div key={t.window_title} className="app-detail__title-row">
+                  <span className="app-detail__title-text" title={t.window_title}>{t.window_title}</span>
+                  <span className="app-detail__title-time">{fmtMs(t.duration_ms)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Member apps (groups only) */}
@@ -441,6 +503,39 @@ export default function AppDetailPage(): JSX.Element {
                 </select>
               </div>
             )}
+
+            {isGroup && (
+              <div className="field">
+                <label className="field__label">Category</label>
+                <select
+                  className="input"
+                  value={category ?? ''}
+                  onChange={(e) => setCategory((e.target.value as AppCategory) || null)}
+                >
+                  <option value="">— None —</option>
+                  <option value="work">Work</option>
+                  <option value="personal">Personal</option>
+                  <option value="gaming">Gaming</option>
+                  <option value="creative">Creative</option>
+                  <option value="system">System</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            )}
+
+            <div className="field">
+              <label className="field__label">Daily Goal (hours, e.g. 2.5)</label>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                max="24"
+                step="0.5"
+                value={dailyGoalHours}
+                onChange={(e) => setDailyGoalHours(e.target.value)}
+                placeholder="No goal set"
+              />
+            </div>
 
             <div className="app-detail__edit-actions">
               <button className="btn btn--ghost" onClick={handleCancel}>Cancel</button>

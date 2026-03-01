@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Activity, Clock, Trophy } from 'lucide-react'
+import { Activity, Clock, Trophy, Zap, X, BarChart2, CalendarDays, ExternalLink } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import '../styles/dashboard.css'
 import { useSessionStore } from '../store/sessionStore'
 import { useAppStore } from '../store/appStore'
@@ -7,6 +8,7 @@ import { api } from '../api/bridge'
 import DateRangePicker from '../components/dashboard/DateRangePicker'
 import SummaryCard from '../components/dashboard/SummaryCard'
 import TimeBarChart from '../components/dashboard/TimeBarChart'
+import Heatmap from '../components/dashboard/Heatmap'
 import { GroupTimeRow, UngroupedTimeRow } from '../components/dashboard/AppTimeRow'
 
 function fmtMs(ms: number): string {
@@ -20,8 +22,22 @@ function fmtMs(ms: number): string {
 export default function Dashboard(): JSX.Element {
   const summary = useSessionStore((s) => s.summary)
   const loadRange = useSessionStore((s) => s.loadRange)
+  const setPreset = useSessionStore((s) => s.setPreset)
+  const setCustomRange = useSessionStore((s) => s.setCustomRange)
+  const lastTickAt = useSessionStore((s) => s.lastTickAt)
   const apps = useAppStore((s) => s.apps)
   const groups = useAppStore((s) => s.groups)
+  const settings = useAppStore((s) => s.settings)
+  const setSetting = useAppStore((s) => s.setSetting)
+  const navigate = useNavigate()
+
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [showHeatmap, setShowHeatmap] = useState(false)
+  const showOnboarding = lastTickAt === null && !bannerDismissed
+
+  // Steam prompt: show when >10 apps tracked and not dismissed
+  const steamPromptDismissed = settings['steam_prompt_dismissed'] === 'true' || settings['steam_prompt_dismissed'] === true
+  const showSteamPrompt = apps.length > 10 && !steamPromptDismissed && lastTickAt !== null
 
   // Reload data every 30 seconds to update running totals
   useEffect(() => {
@@ -53,11 +69,65 @@ export default function Dashboard(): JSX.Element {
     }
   }
 
+  function handleHeatmapDayClick(dateStr: string): void {
+    const from = new Date(dateStr + 'T00:00:00').getTime()
+    const to = from + 86_400_000 - 1
+    setCustomRange(from, to)
+    setPreset('custom')
+    setShowHeatmap(false)
+  }
+
   return (
     <main className="page-content">
+      {showOnboarding && (
+        <div className="onboarding-banner">
+          <Zap size={16} className="onboarding-banner__icon" />
+          <div className="onboarding-banner__text">
+            <strong>Faultier Tracker is running.</strong>
+            {' '}Apps will appear here automatically as you use your computer — typically within 5 seconds.
+          </div>
+          <button className="onboarding-banner__close" onClick={() => setBannerDismissed(true)} title="Dismiss">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {showSteamPrompt && (
+        <div className="onboarding-banner onboarding-banner--steam">
+          <ExternalLink size={16} className="onboarding-banner__icon" />
+          <div className="onboarding-banner__text">
+            <strong>Using Steam?</strong>
+            {' '}Import your game library for better artwork and grouping.{' '}
+            <button
+              className="onboarding-banner__link"
+              onClick={() => navigate('/settings')}
+            >
+              Go to Settings → Data
+            </button>
+          </div>
+          <button
+            className="onboarding-banner__close"
+            onClick={() => setSetting('steam_prompt_dismissed', true)}
+            title="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       <div className="page-header">
         <h1 className="page-title">Dashboard</h1>
-        <DateRangePicker />
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          <button
+            className={`btn btn--ghost btn--icon-text${showHeatmap ? ' btn--active' : ''}`}
+            onClick={() => setShowHeatmap((v) => !v)}
+            title="Toggle heatmap"
+          >
+            {showHeatmap ? <BarChart2 size={14} /> : <CalendarDays size={14} />}
+            {showHeatmap ? 'Chart' : 'Heatmap'}
+          </button>
+          <DateRangePicker />
+        </div>
       </div>
 
       <div className="summary-cards">
@@ -85,7 +155,10 @@ export default function Dashboard(): JSX.Element {
         />
       </div>
 
-      <TimeBarChart data={chartData} appSummaries={appSummaries} />
+      {showHeatmap
+        ? <Heatmap onDayClick={handleHeatmapDayClick} />
+        : <TimeBarChart data={chartData} appSummaries={appSummaries} />
+      }
 
       <div className="time-table">
         <div className="time-table__head">
@@ -98,7 +171,7 @@ export default function Dashboard(): JSX.Element {
           {appSummaries.length === 0 ? (
             <div className="time-table__empty">
               <Clock size={32} />
-              <span>No activity recorded for this period</span>
+              <span>{lastTickAt === null ? 'Waiting for first data — use your apps and they\'ll appear here' : 'No activity recorded for this period'}</span>
             </div>
           ) : (
             <>

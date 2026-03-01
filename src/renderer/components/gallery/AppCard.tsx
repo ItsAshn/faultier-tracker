@@ -90,19 +90,21 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
         }
       </div>
 
-      {/* Bottom gradient overlay with name + time */}
+      {/* Time badge — top left, always visible when there's data */}
+      {hasTime && (
+        <div className="app-card__time-badge">
+          {fmtMs(displayMs)}
+        </div>
+      )}
+
+      {/* Bottom gradient overlay with name + member count */}
       <div className="app-card__overlay">
         <span className="app-card__name" title={name}>{name}</span>
-        <div className="app-card__overlay-meta">
-          {hasTime && (
-            <span className="app-card__time">
-              {fmtMs(displayMs)}{activeMs > 0 ? ' active' : ''}
-            </span>
-          )}
-          {memberCount !== undefined && memberCount > 1 && (
+        {memberCount !== undefined && memberCount > 1 && (
+          <div className="app-card__overlay-meta">
             <span className="app-card__count">{memberCount} apps</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Track toggle — top-right */}

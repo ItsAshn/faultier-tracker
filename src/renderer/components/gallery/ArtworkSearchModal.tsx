@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Search, Loader } from 'lucide-react'
 import { api } from '../../api/bridge'
 import type { ArtworkResult } from '@shared/types'
@@ -29,6 +29,12 @@ export default function ArtworkSearchModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [applying, setApplying] = useState<number | null>(null)
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   async function handleSearch(): Promise<void> {
     const q = query.trim()

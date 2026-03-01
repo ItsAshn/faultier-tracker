@@ -11,6 +11,9 @@ interface SessionStore {
   customTo: number | null
   activeAppId: number | null
   activeExeName: string | null
+  activeDisplayName: string | null
+  isIdle: boolean
+  lastTickAt: number | null
 
   setPreset: (preset: DateRangePreset) => void
   setCustomRange: (from: number, to: number) => void
@@ -42,6 +45,9 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   customTo: null,
   activeAppId: null,
   activeExeName: null,
+  activeDisplayName: null,
+  isIdle: false,
+  lastTickAt: null,
 
   setPreset(preset) {
     set({ preset })
@@ -82,7 +88,10 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   onTick(payload) {
     set({
       activeAppId: payload.active_app?.app_id ?? null,
-      activeExeName: payload.active_app?.exe_name ?? null
+      activeExeName: payload.active_app?.exe_name ?? null,
+      activeDisplayName: payload.active_app?.display_name ?? null,
+      isIdle: payload.is_idle,
+      lastTickAt: payload.timestamp
     })
     get().loadRange()
   }

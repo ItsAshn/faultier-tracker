@@ -1,9 +1,10 @@
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, powerMonitor, Notification } from 'electron'
 import { getDb, getSetting, upsertApp } from '../db/client'
 import { getActiveApp, initActiveWin } from './activeWindow'
 import { getRunningProcesses, initPsList } from './processScanner'
 import { tickActive, tickRunning, endRunningSession, initSessionManager } from './sessionManager'
 import { resolveGroup } from '../grouping/groupEngine'
+import { updateTrayTooltip } from '../tray'
 import { CHANNELS } from '@shared/channels'
 import type { AppRecord, TickPayload } from '@shared/types'
 
@@ -12,6 +13,10 @@ let isRunning = false
 
 // Track which app_ids were running in the previous tick
 const prevRunningAppIds = new Set<number>()
+
+// Break reminder tracking
+let continuousActiveMs = 0
+let lastBreakNotifAt = 0
 
 export async function startTracker(): Promise<void> {
   const machineId = getSetting('machine_id') as string
@@ -47,6 +52,10 @@ async function pollTick(): Promise<void> {
   const now = Date.now()
 
   try {
+    const idleThreshold = (getSetting('idle_threshold_ms') as number) ?? 300000
+    const idleSecs = powerMonitor.getSystemIdleTime()
+    const isIdle = idleSecs * 1000 >= idleThreshold
+
     const [activeApp, runningProcesses] = await Promise.all([
       getActiveApp(),
       getRunningProcesses()
@@ -150,7 +159,7 @@ async function pollTick(): Promise<void> {
         )
         .get(appId)
 
-      if (appRecord && appRecord.is_tracked === 1) {
+      if (appRecord && appRecord.is_tracked === 1 && !isIdle) {
         tickActive(appId, activeApp.windowTitle, now)
         // If the focused app wasn't detected in the process scan (e.g. UWP/system
         // processes), still record it as running so focused ≤ running always holds.
@@ -202,7 +211,38 @@ async function pollTick(): Promise<void> {
               display_name: activeDisplayName
             }
           : null,
-      timestamp: now
+      timestamp: now,
+      is_idle: isIdle
+    }
+
+    updateTrayTooltip(activeDisplayName, isIdle)
+
+    // ── Break reminder ───────────────────────────────────────────────
+    const breakReminderMins = (getSetting('break_reminder_mins') as number) ?? 0
+    const interval = (getSetting('poll_interval_ms') as number) ?? 5000
+    if (breakReminderMins > 0) {
+      if (activeAppId && !isIdle) {
+        continuousActiveMs += interval
+        const breakThresholdMs = breakReminderMins * 60_000
+        if (
+          continuousActiveMs >= breakThresholdMs &&
+          Date.now() - lastBreakNotifAt > breakThresholdMs
+        ) {
+          lastBreakNotifAt = Date.now()
+          const h = Math.floor(continuousActiveMs / 3_600_000)
+          const m = Math.floor((continuousActiveMs % 3_600_000) / 60_000)
+          const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`
+          new Notification({
+            title: 'Time for a break!',
+            body: `You've been active for ${timeStr}. Consider taking a short break.`,
+          }).show()
+        }
+      } else {
+        // Reset when idle or no active app
+        continuousActiveMs = 0
+      }
+    } else {
+      continuousActiveMs = 0
     }
 
     BrowserWindow.getAllWindows().forEach((win) => {

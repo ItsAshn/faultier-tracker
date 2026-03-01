@@ -17,6 +17,9 @@ export const CHANNELS = {
   // Sessions / stats
   SESSIONS_GET_RANGE: 'sessions:getRange',
   SESSIONS_GET_APP_RANGE: 'sessions:getAppRange',
+  SESSIONS_GET_TITLES: 'sessions:getTitles',
+  SESSIONS_GET_DAILY_TOTALS: 'sessions:getDailyTotals',
+  SESSIONS_GET_BUCKET_APPS: 'sessions:getBucketApps',
   SESSIONS_CLEAR_ALL: 'sessions:clearAll',
 
   // Settings
@@ -35,6 +38,7 @@ export const CHANNELS = {
 
   // Data transfer
   DATA_EXPORT: 'data:export',
+  DATA_EXPORT_CSV: 'data:exportCsv',
   DATA_IMPORT: 'data:import',
   DATA_STEAM_IMPORT: 'data:steamImport',
 

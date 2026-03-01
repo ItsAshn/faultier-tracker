@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell
 } from 'recharts'
-import type { ChartDataPoint, SessionSummary } from '@shared/types'
+import type { ChartDataPoint, SessionSummary, BucketApp } from '@shared/types'
 import { api } from '../../api/bridge'
 
 function AppIcon({ appId }: { appId: number }): JSX.Element {
@@ -110,6 +110,23 @@ function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
   )
 }
 
+interface DrilldownPopover {
+  bucketDate: string
+  apps: BucketApp[]
+  x: number
+  y: number
+}
+
+function parseBucketRange(date: string): { from: number; to: number } {
+  // date is either 'YYYY-MM-DD' or 'YYYY-MM-DD HH:00'
+  if (date.includes(' ')) {
+    const from = new Date(date.replace(' ', 'T') + ':00').getTime()
+    return { from, to: from + 3_600_000 - 1 }
+  }
+  const from = new Date(date + 'T00:00:00').getTime()
+  return { from, to: from + 86_400_000 - 1 }
+}
+
 interface Props {
   data: ChartDataPoint[]
   appSummaries?: SessionSummary[]
@@ -118,9 +135,37 @@ interface Props {
 export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.Element {
   const [showActive, setShowActive] = useState(true)
   const [showRunning, setShowRunning] = useState(true)
+  const [drilldown, setDrilldown] = useState<DrilldownPopover | null>(null)
+  const [activeBucket, setActiveBucket] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!drilldown) return
+    function handler(e: MouseEvent): void {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setDrilldown(null)
+        setActiveBucket(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [drilldown])
+
+  async function handleBarClick(barData: ChartDataPoint, _index: number, e: React.MouseEvent): Promise<void> {
+    if (activeBucket === barData.date) {
+      setDrilldown(null)
+      setActiveBucket(null)
+      return
+    }
+    setActiveBucket(barData.date)
+    const { from, to } = parseBucketRange(barData.date)
+    const apps = await api.getBucketApps(from, to)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setDrilldown({ bucketDate: barData.date, apps, x: rect.left, y: rect.top })
+  }
 
   return (
-    <div className="chart-container">
+    <div className="chart-container" ref={containerRef} style={{ position: 'relative' }}>
       <div className="chart-header">
         <span className="chart-title">Time Overview</span>
         <div className="chart-legend">
@@ -160,7 +205,23 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
           {showActive && (
-            <Bar dataKey="active_ms" name="Active" fill="#4fc3f7" radius={[3, 3, 0, 0]} maxBarSize={40} />
+            <Bar
+              dataKey="active_ms"
+              name="Active"
+              fill="#4fc3f7"
+              radius={[3, 3, 0, 0]}
+              maxBarSize={40}
+              style={{ cursor: 'pointer' }}
+              onClick={(barData: ChartDataPoint, index: number, e: React.MouseEvent) => handleBarClick(barData, index, e)}
+            >
+              {data.map((entry) => (
+                <Cell
+                  key={entry.date}
+                  fill={activeBucket === entry.date ? '#81d4fa' : '#4fc3f7'}
+                  opacity={activeBucket && activeBucket !== entry.date ? 0.55 : 1}
+                />
+              ))}
+            </Bar>
           )}
           {showRunning && (
             <Bar dataKey="running_ms" name="Running" fill="#7986cb" radius={[3, 3, 0, 0]} maxBarSize={40} />
@@ -169,6 +230,27 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
       </ResponsiveContainer>
 
       {appSummaries.length > 0 && <AppBreakdown appSummaries={appSummaries} />}
+
+      {/* Drill-down popover */}
+      {drilldown && (
+        <div
+          className="chart-drilldown"
+          style={{ position: 'fixed', left: drilldown.x, top: drilldown.y - 8, transform: 'translate(-50%, -100%)' }}
+        >
+          <div className="chart-drilldown__title">{fmtLabel(drilldown.bucketDate)}</div>
+          {drilldown.apps.length === 0 ? (
+            <div className="chart-drilldown__empty">No data</div>
+          ) : (
+            drilldown.apps.map((app) => (
+              <div key={app.app_id} className="chart-drilldown__row">
+                <span className="chart-drilldown__name">{app.display_name}</span>
+                <span className="chart-drilldown__time">{fmtMs(app.active_ms)}</span>
+              </div>
+            ))
+          )}
+          <div className="chart-drilldown__arrow" />
+        </div>
+      )}
     </div>
   )
 }

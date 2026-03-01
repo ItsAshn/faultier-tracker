@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Download, Upload, Trash2, Gamepad2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, Upload, Trash2, Gamepad2, ChevronDown, ChevronUp, Table } from 'lucide-react'
 import { api } from '../../api/bridge'
 import type { ImportResult, SteamImportResult } from '@shared/types'
 import { useSessionStore } from '../../store/sessionStore'
@@ -7,6 +7,7 @@ import { useAppStore } from '../../store/appStore'
 
 export default function ImportExport(): JSX.Element {
   const [exporting, setExporting] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [exportPath, setExportPath] = useState<string | null>(null)
@@ -26,6 +27,15 @@ export default function ImportExport(): JSX.Element {
     setExporting(true)
     const result = await api.exportData()
     setExporting(false)
+    if (result.success && result.filePath) {
+      setExportPath(result.filePath)
+    }
+  }
+
+  async function handleExportCsv(): Promise<void> {
+    setExportingCsv(true)
+    const result = await api.exportDataCsv()
+    setExportingCsv(false)
     if (result.success && result.filePath) {
       setExportPath(result.filePath)
     }
@@ -67,7 +77,11 @@ export default function ImportExport(): JSX.Element {
       <div className="data-actions">
         <button className="btn btn--ghost" onClick={handleExport} disabled={exporting}>
           <Download size={14} />
-          {exporting ? 'Exporting...' : 'Export data'}
+          {exporting ? 'Exporting...' : 'Export JSON'}
+        </button>
+        <button className="btn btn--ghost" onClick={handleExportCsv} disabled={exportingCsv}>
+          <Table size={14} />
+          {exportingCsv ? 'Exporting...' : 'Export CSV'}
         </button>
         <button className="btn btn--ghost" onClick={handleImport} disabled={importing}>
           <Upload size={14} />

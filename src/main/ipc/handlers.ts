@@ -2,14 +2,14 @@ import { ipcMain, dialog, BrowserWindow, net } from 'electron'
 import { getDb, getSetting, setSetting, getAllSettings } from '../db/client'
 import { extractAndCacheIcon, saveCustomImage, clearCustomImage, readFileAsDataUrl } from '../icons/iconExtractor'
 import { reanalyzeGroups, invalidateGroupCache } from '../grouping/groupEngine'
-import { exportData, importData } from '../importExport/dataTransfer'
+import { exportData, exportDataCsv, importData } from '../importExport/dataTransfer'
 import { importFromSteam } from '../importExport/steamImport'
 import { autoFetchSteamArtwork } from '../artwork/autoFetch'
 import { searchSteamGridDB } from '../artwork/artworkProvider'
 import { CHANNELS } from '@shared/channels'
 import type {
   AppRecord, AppGroup, SessionSummary, RangeSummary, ChartDataPoint, WindowControlAction,
-  ArtworkSearchResponse, AppRangeSummary
+  ArtworkSearchResponse, AppRangeSummary, TitleSummary, DayTotal, BucketApp
 } from '@shared/types'
 import { getMainWindow } from '../window'
 import { startTracker, stopTracker } from '../tracking/tracker'
@@ -18,12 +18,13 @@ function mapApp(raw: {
   id: number; exe_name: string; exe_path: string | null; display_name: string;
   group_id: number | null; is_tracked: number; icon_cache_path: string | null;
   custom_image_path: string | null; description: string; notes: string; tags: string;
-  first_seen: number; last_seen: number
+  first_seen: number; last_seen: number; daily_goal_ms: number | null
 }): AppRecord {
   return {
     ...raw,
     is_tracked: raw.is_tracked === 1,
     tags: JSON.parse(raw.tags ?? '[]'),
+    daily_goal_ms: raw.daily_goal_ms ?? null,
     // Never send raw file:// paths to the renderer — AppCard fetches icons
     // via getIconForApp which returns safe base64 data URLs.
     icon_cache_path: null,
@@ -33,12 +34,15 @@ function mapApp(raw: {
 
 function mapGroup(raw: {
   id: number; name: string; description: string; icon_cache_path: string | null;
-  custom_image_path: string | null; tags: string; is_manual: number; created_at: number
+  custom_image_path: string | null; tags: string; is_manual: number; created_at: number;
+  daily_goal_ms: number | null; category: string | null
 }): AppGroup {
   return {
     ...raw,
     is_manual: raw.is_manual === 1,
-    tags: JSON.parse(raw.tags ?? '[]')
+    tags: JSON.parse(raw.tags ?? '[]'),
+    daily_goal_ms: raw.daily_goal_ms ?? null,
+    category: (raw.category as AppGroup['category']) ?? null,
   }
 }
 
@@ -57,7 +61,7 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(CHANNELS.APPS_UPDATE, (_e, patch: Partial<AppRecord> & { id: number }): void => {
-    const { id, display_name, description, notes, tags, group_id } = patch
+    const { id, display_name, description, notes, tags, group_id, daily_goal_ms } = patch
     if (display_name !== undefined)
       db.prepare<[string, number]>('UPDATE apps SET display_name = ? WHERE id = ?').run(display_name, id)
     if (description !== undefined)
@@ -68,6 +72,8 @@ export function registerIpcHandlers(): void {
       db.prepare<[string, number]>('UPDATE apps SET tags = ? WHERE id = ?').run(JSON.stringify(tags), id)
     if (group_id !== undefined)
       db.prepare<[number | null, number]>('UPDATE apps SET group_id = ? WHERE id = ?').run(group_id, id)
+    if ('daily_goal_ms' in patch)
+      db.prepare<[number | null, number]>('UPDATE apps SET daily_goal_ms = ? WHERE id = ?').run(daily_goal_ms ?? null, id)
   })
 
   ipcMain.handle(CHANNELS.APPS_SET_TRACKED, (_e, id: number, tracked: boolean): void => {
@@ -102,13 +108,17 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(CHANNELS.GROUPS_UPDATE, (_e, patch: Partial<AppGroup> & { id: number }): void => {
-    const { id, name, description, tags } = patch
+    const { id, name, description, tags, daily_goal_ms, category } = patch
     if (name !== undefined)
       db.prepare<[string, number]>('UPDATE app_groups SET name = ? WHERE id = ?').run(name, id)
     if (description !== undefined)
       db.prepare<[string, number]>('UPDATE app_groups SET description = ? WHERE id = ?').run(description, id)
     if (tags !== undefined)
       db.prepare<[string, number]>('UPDATE app_groups SET tags = ? WHERE id = ?').run(JSON.stringify(tags), id)
+    if ('daily_goal_ms' in patch)
+      db.prepare<[number | null, number]>('UPDATE app_groups SET daily_goal_ms = ? WHERE id = ?').run(daily_goal_ms ?? null, id)
+    if ('category' in patch)
+      db.prepare<[string | null, number]>('UPDATE app_groups SET category = ? WHERE id = ?').run(category ?? null, id)
   })
 
   ipcMain.handle(CHANNELS.GROUPS_DELETE, (_e, id: number): void => {
@@ -298,6 +308,91 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(
+    CHANNELS.SESSIONS_GET_TITLES,
+    (_e, appId: number, from: number, to: number, isGroup: boolean): TitleSummary[] => {
+      const rows = isGroup
+        ? db.prepare<[number, number, number], { window_title: string; started_at: number; ended_at: number }>(
+            `SELECT window_title, started_at, ended_at
+             FROM sessions
+             WHERE app_id IN (SELECT id FROM apps WHERE group_id = ?)
+               AND session_type = 'active'
+               AND window_title IS NOT NULL AND window_title != ''
+               AND started_at >= ? AND ended_at IS NOT NULL AND ended_at <= ?
+             ORDER BY started_at DESC`
+          ).all(appId, from, to)
+        : db.prepare<[number, number, number], { window_title: string; started_at: number; ended_at: number }>(
+            `SELECT window_title, started_at, ended_at
+             FROM sessions
+             WHERE app_id = ?
+               AND session_type = 'active'
+               AND window_title IS NOT NULL AND window_title != ''
+               AND started_at >= ? AND ended_at IS NOT NULL AND ended_at <= ?
+             ORDER BY started_at DESC`
+          ).all(appId, from, to)
+
+      const titleMap = new Map<string, { duration_ms: number; last_seen: number }>()
+      for (const r of rows) {
+        const dur = r.ended_at - r.started_at
+        const existing = titleMap.get(r.window_title)
+        if (existing) {
+          existing.duration_ms += dur
+          if (r.ended_at > existing.last_seen) existing.last_seen = r.ended_at
+        } else {
+          titleMap.set(r.window_title, { duration_ms: dur, last_seen: r.ended_at })
+        }
+      }
+
+      return Array.from(titleMap.entries())
+        .map(([window_title, { duration_ms, last_seen }]) => ({ window_title, duration_ms, last_seen }))
+        .sort((a, b) => b.duration_ms - a.duration_ms)
+        .slice(0, 50)
+    }
+  )
+
+  ipcMain.handle(
+    CHANNELS.SESSIONS_GET_DAILY_TOTALS,
+    (_e, from: number, to: number): DayTotal[] => {
+      const rows = db
+        .prepare<[number, number], { day: string; active_ms: number }>(
+          `SELECT strftime('%Y-%m-%d', started_at/1000, 'unixepoch', 'localtime') AS day,
+                  SUM(ended_at - started_at) AS active_ms
+           FROM sessions
+           WHERE session_type = 'active'
+             AND started_at >= ?
+             AND ended_at IS NOT NULL
+             AND ended_at <= ?
+           GROUP BY day
+           ORDER BY day`
+        )
+        .all(from, to)
+      return rows
+    }
+  )
+
+  ipcMain.handle(
+    CHANNELS.SESSIONS_GET_BUCKET_APPS,
+    (_e, from: number, to: number): BucketApp[] => {
+      const rows = db
+        .prepare<[number, number], { app_id: number; display_name: string; active_ms: number }>(
+          `SELECT s.app_id,
+                  a.display_name,
+                  SUM(s.ended_at - s.started_at) AS active_ms
+           FROM sessions s
+           JOIN apps a ON a.id = s.app_id
+           WHERE s.session_type = 'active'
+             AND s.started_at >= ?
+             AND s.ended_at IS NOT NULL
+             AND s.ended_at <= ?
+           GROUP BY s.app_id
+           ORDER BY active_ms DESC
+           LIMIT 5`
+        )
+        .all(from, to)
+      return rows
+    }
+  )
+
   ipcMain.handle(CHANNELS.SESSIONS_CLEAR_ALL, (): void => {
     db.prepare('DELETE FROM sessions').run()
   })
@@ -459,6 +554,7 @@ export function registerIpcHandlers(): void {
   // ── Data transfer ─────────────────────────────────────────────────────────
 
   ipcMain.handle(CHANNELS.DATA_EXPORT, () => exportData())
+  ipcMain.handle(CHANNELS.DATA_EXPORT_CSV, () => exportDataCsv())
   ipcMain.handle(CHANNELS.DATA_IMPORT, () => importData())
   ipcMain.handle(CHANNELS.DATA_STEAM_IMPORT, async (_e, apiKey: string, steamId: string) => {
     const result = await importFromSteam(apiKey, steamId)

@@ -21,6 +21,8 @@ export default function Settings(): JSX.Element {
   const setSetting = useAppStore((s) => s.setSetting)
 
   const pollInterval = Number(settings['poll_interval_ms'] ?? 5000)
+  const idleThreshold = Number(settings['idle_threshold_ms'] ?? 300000)
+  const breakReminderMins = Number(settings['break_reminder_mins'] ?? 0)
   const trackingMode = (settings['tracking_mode'] as string) ?? 'blacklist'
   const storedSgdbKey = (settings['steamgriddb_api_key'] as string) ?? ''
 
@@ -79,6 +81,46 @@ export default function Settings(): JSX.Element {
                 onChange={(e) => setSetting('poll_interval_ms', Number(e.target.value))}
               />
               <span className="polling-row__value">{pollInterval / 1000}s</span>
+            </div>
+          </div>
+
+          <div className="settings-card">
+            <div className="settings-card__title">Idle Detection</div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
+              If you step away from your desk, active tracking pauses after this period of inactivity.
+            </p>
+            <div className="polling-row">
+              <span className="polling-row__label">Pause after</span>
+              <input
+                type="range"
+                min={60000}
+                max={1800000}
+                step={60000}
+                value={idleThreshold}
+                onChange={(e) => setSetting('idle_threshold_ms', Number(e.target.value))}
+              />
+              <span className="polling-row__value">{Math.round(idleThreshold / 60000)}m</span>
+            </div>
+          </div>
+
+          <div className="settings-card">
+            <div className="settings-card__title">Break Reminder</div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
+              Receive a desktop notification after this much continuous active time. Set to 0 to disable.
+            </p>
+            <div className="polling-row">
+              <span className="polling-row__label">Remind after</span>
+              <input
+                type="range"
+                min={0}
+                max={120}
+                step={5}
+                value={breakReminderMins}
+                onChange={(e) => setSetting('break_reminder_mins', Number(e.target.value))}
+              />
+              <span className="polling-row__value">
+                {breakReminderMins === 0 ? 'Off' : `${breakReminderMins}m`}
+              </span>
             </div>
           </div>
 
