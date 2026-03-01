@@ -163,12 +163,31 @@ async function pollTick(): Promise<void> {
         activeAppId = appId
         activeDisplayName = appRecord.display_name
 
-        // Update exe_path if we now have it
+        // Update exe_path if we now have it; if this is the first time we get
+        // the path AND the app has no group yet, re-run group resolution so
+        // Steam library path matching can kick in.
         if (activeApp.exePath) {
-          db.prepare<[string, number], void>('UPDATE apps SET exe_path = ? WHERE id = ? AND exe_path IS NULL').run(
-            activeApp.exePath,
-            appId
-          )
+          const stored = db
+            .prepare<[number], { exe_path: string | null; group_id: number | null } | undefined>(
+              'SELECT exe_path, group_id FROM apps WHERE id = ?'
+            )
+            .get(appId)
+
+          if (!stored?.exe_path) {
+            db.prepare<[string, number], void>('UPDATE apps SET exe_path = ? WHERE id = ?')
+              .run(activeApp.exePath, appId)
+
+            if (!stored?.group_id) {
+              resolveGroup(activeApp.exeName, activeApp.exePath).then((groupId) => {
+                if (groupId !== null) {
+                  db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(
+                    groupId,
+                    appId!
+                  )
+                }
+              })
+            }
+          }
         }
       }
     }

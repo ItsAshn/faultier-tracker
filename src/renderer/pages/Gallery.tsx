@@ -9,6 +9,7 @@ import { api } from '../api/bridge'
 import type { AppRecord, AppGroup, RangeSummary } from '@shared/types'
 
 type FilterMode = 'tracked' | 'ignored'
+type SortMode = 'time' | 'name' | 'last_seen'
 
 const SCROLL_KEY = 'gallery-scroll'
 
@@ -32,6 +33,7 @@ export default function Gallery(): JSX.Element {
   const mainRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterMode>('tracked')
+  const [sort, setSort] = useState<SortMode>('time')
 
   // Restore scroll position when returning from a detail page
   useEffect(() => {
@@ -87,10 +89,6 @@ export default function Gallery(): JSX.Element {
     threshold: 0.4
   }), [filtered])
 
-  const displayed = search.trim()
-    ? fuse.search(search).map((r) => r.item)
-    : filtered
-
   function getAllTimeSummary(item: GalleryItem) {
     if (!allTimeSummary) return null
     if (item.isGroup) {
@@ -108,6 +106,35 @@ export default function Gallery(): JSX.Element {
     }
     return allTimeSummary.apps.find((s) => s.app_id === item.id) ?? null
   }
+
+  function getItemTotalMs(item: GalleryItem): number {
+    const s = getAllTimeSummary(item)
+    return s ? s.active_ms + s.running_ms : 0
+  }
+
+  function getItemLastSeen(item: GalleryItem): number {
+    if (item.isGroup) {
+      return apps
+        .filter((a) => a.group_id === item.id)
+        .reduce((max, a) => Math.max(max, a.last_seen), 0)
+    }
+    return (item.item as AppRecord).last_seen
+  }
+
+  function getItemName(item: GalleryItem): string {
+    return item.isGroup ? (item.item as AppGroup).name : (item.item as AppRecord).display_name
+  }
+
+  const displayed = useMemo(() => {
+    if (search.trim()) return fuse.search(search).map((r) => r.item)
+    return [...filtered].sort((a, b) => {
+      if (sort === 'time') return getItemTotalMs(b) - getItemTotalMs(a)
+      if (sort === 'name') return getItemName(a).localeCompare(getItemName(b), undefined, { sensitivity: 'base' })
+      // last_seen
+      return getItemLastSeen(b) - getItemLastSeen(a)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, filtered, fuse, sort, allTimeSummary])
 
   function handleCardClick(item: GalleryItem): void {
     if (mainRef.current) sessionStorage.setItem(SCROLL_KEY, String(mainRef.current.scrollTop))
@@ -143,6 +170,27 @@ export default function Gallery(): JSX.Element {
             onClick={() => setFilter('ignored')}
           >
             Ignored
+          </button>
+        </div>
+
+        <div className="gallery-filter">
+          <button
+            className={`gallery-filter__btn${sort === 'time' ? ' gallery-filter__btn--active' : ''}`}
+            onClick={() => setSort('time')}
+          >
+            Most time
+          </button>
+          <button
+            className={`gallery-filter__btn${sort === 'name' ? ' gallery-filter__btn--active' : ''}`}
+            onClick={() => setSort('name')}
+          >
+            Name
+          </button>
+          <button
+            className={`gallery-filter__btn${sort === 'last_seen' ? ' gallery-filter__btn--active' : ''}`}
+            onClick={() => setSort('last_seen')}
+          >
+            Recent
           </button>
         </div>
       </div>

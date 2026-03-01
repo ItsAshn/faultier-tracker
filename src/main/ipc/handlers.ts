@@ -124,16 +124,19 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.SESSIONS_GET_RANGE,
     (_e, from: number, to: number, groupBy: 'hour' | 'day' = 'day'): RangeSummary => {
+      const now = Date.now()
       const sessions = db
         .prepare<
-          [number, number],
+          [number, number, number, number],
           { app_id: number; session_type: string; started_at: number; ended_at: number }
         >(
-          `SELECT app_id, session_type, started_at, ended_at
+          `SELECT app_id, session_type, started_at,
+                  MIN(COALESCE(ended_at, ?), ?) AS ended_at
            FROM sessions
-           WHERE ended_at IS NOT NULL AND started_at >= ? AND ended_at <= ?`
+           WHERE started_at >= ?
+             AND (ended_at IS NULL OR ended_at <= ?)`
         )
-        .all(from, to)
+        .all(now, to, from, to)
 
       const apps = db
         .prepare<[], { id: number; exe_name: string; display_name: string; group_id: number | null }>(
@@ -203,28 +206,34 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.SESSIONS_GET_APP_RANGE,
     (_e, id: number, from: number, to: number, groupBy: 'hour' | 'day', isGroup: boolean): AppRangeSummary => {
+      const now = Date.now()
       const sessions = isGroup
         ? db
             .prepare<
-              [number, number, number],
+              [number, number, number, number, number],
               { app_id: number; session_type: string; started_at: number; ended_at: number }
             >(
-              `SELECT s.app_id, s.session_type, s.started_at, s.ended_at
+              `SELECT s.app_id, s.session_type, s.started_at,
+                      MIN(COALESCE(s.ended_at, ?), ?) AS ended_at
                FROM sessions s
                WHERE s.app_id IN (SELECT id FROM apps WHERE group_id = ?)
-                 AND s.ended_at IS NOT NULL AND s.started_at >= ? AND s.ended_at <= ?`
+                 AND s.started_at >= ?
+                 AND (s.ended_at IS NULL OR s.ended_at <= ?)`
             )
-            .all(id, from, to)
+            .all(now, to, id, from, to)
         : db
             .prepare<
-              [number, number, number],
+              [number, number, number, number, number],
               { app_id: number; session_type: string; started_at: number; ended_at: number }
             >(
-              `SELECT app_id, session_type, started_at, ended_at
+              `SELECT app_id, session_type, started_at,
+                      MIN(COALESCE(ended_at, ?), ?) AS ended_at
                FROM sessions
-               WHERE app_id = ? AND ended_at IS NOT NULL AND started_at >= ? AND ended_at <= ?`
+               WHERE app_id = ?
+                 AND started_at >= ?
+                 AND (ended_at IS NULL OR ended_at <= ?)`
             )
-            .all(id, from, to)
+            .all(now, to, id, from, to)
 
       let active_ms = 0
       let running_ms = 0

@@ -61,7 +61,8 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary?.active_ms ?? 0
   const runningMs = summary?.running_ms ?? 0
-  const hasTime = activeMs > 0 || runningMs > 0
+  const displayMs = activeMs > 0 ? activeMs : runningMs
+  const hasTime = displayMs > 0
 
   return (
     <div
@@ -95,7 +96,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
         <div className="app-card__overlay-meta">
           {hasTime && (
             <span className="app-card__time">
-              {fmtMs(activeMs)} active
+              {fmtMs(displayMs)}{activeMs > 0 ? ' active' : ''}
             </span>
           )}
           {memberCount !== undefined && memberCount > 1 && (

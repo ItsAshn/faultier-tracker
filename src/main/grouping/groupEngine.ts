@@ -66,6 +66,7 @@ export async function resolveGroup(exeName: string, _exePath: string | null): Pr
   const lowerExe = exeName.toLowerCase().replace(/\.exe$/i, '')
   const lowerExeFull = exeName.toLowerCase()
   const now = Date.now()
+  const db = getDb()
 
   // ── Step 1: Manual rules ─────────────────────────────────────────────────
   const manualMatch =
@@ -81,11 +82,54 @@ export async function resolveGroup(exeName: string, _exePath: string | null): Pr
     }
   }
 
+  // ── Step 2.5: Steam library path matching ────────────────────────────────
+  // If the exe lives inside steamapps/common/<GameFolder>/, match that folder
+  // name against Steam-imported apps (exe_name LIKE 'steam:%') so that games
+  // with codename executables (e.g. "pioneergame.exe" → "Arc Raiders") are
+  // automatically grouped with their Steam library entry.
+  if (_exePath) {
+    const steamMatch = /steamapps[\\/]common[\\/]([^\\/]+)/i.exec(_exePath)
+    if (steamMatch) {
+      const folderName = steamMatch[1].toLowerCase()
+      const steamApps = db
+        .prepare<[], { id: number; display_name: string; group_id: number | null }>(
+          "SELECT id, display_name, group_id FROM apps WHERE exe_name LIKE 'steam:%'"
+        )
+        .all()
+
+      let bestSteamMatch: {
+        appId: number
+        displayName: string
+        groupId: number | null
+        dist: number
+      } | null = null
+
+      for (const steamApp of steamApps) {
+        const dist = normalizedDistance(folderName, steamApp.display_name.toLowerCase())
+        if (dist <= 0.25 && (!bestSteamMatch || dist < bestSteamMatch.dist)) {
+          bestSteamMatch = {
+            appId: steamApp.id,
+            displayName: steamApp.display_name,
+            groupId: steamApp.group_id,
+            dist
+          }
+        }
+      }
+
+      if (bestSteamMatch) {
+        if (bestSteamMatch.groupId !== null) return bestSteamMatch.groupId
+        const groupId = ensureGroup(bestSteamMatch.displayName, now)
+        db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?')
+          .run(groupId, bestSteamMatch.appId)
+        return groupId
+      }
+    }
+  }
+
   // ── Step 3: Version-string stripping ─────────────────────────────────────
   const candidate = stripVersionSuffixes(lowerExe).toLowerCase()
   if (!candidate || candidate.length < 3) return null
 
-  const db = getDb()
   const existingGroups = db
     .prepare<[], { id: number; name: string }>('SELECT id, name FROM app_groups')
     .all()

@@ -69,7 +69,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       groupBy = preset === 'today' ? 'hour' : 'day'
     }
 
-    set({ loading: true })
+    // Only show loading spinner on the first load; subsequent refreshes are silent
+    if (!get().summary) set({ loading: true })
     try {
       const summary = await api.getSessionRange(from, to, groupBy)
       set({ summary, loading: false })
@@ -83,5 +84,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
       activeAppId: payload.active_app?.app_id ?? null,
       activeExeName: payload.active_app?.exe_name ?? null
     })
+    get().loadRange()
   }
 }))
