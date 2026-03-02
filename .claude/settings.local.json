@@ -102,7 +102,10 @@
       "WebFetch(domain:kraegenbrink.com)",
       "Bash(git add src/)",
       "Bash(git push origin v0.5.1)",
-      "Bash(git add src/renderer/components/dashboard/AppGrid.tsx src/renderer/components/dashboard/Heatmap.tsx src/renderer/components/dashboard/HeroAppCard.tsx src/renderer/components/dashboard/TopAppsLeaderboard.tsx src/renderer/pages/Dashboard.tsx src/renderer/styles/dashboard.css .claude/settings.local.json)"
+      "Bash(git add src/renderer/components/dashboard/AppGrid.tsx src/renderer/components/dashboard/Heatmap.tsx src/renderer/components/dashboard/HeroAppCard.tsx src/renderer/components/dashboard/TopAppsLeaderboard.tsx src/renderer/pages/Dashboard.tsx src/renderer/styles/dashboard.css .claude/settings.local.json)",
+      "Bash(git push origin v0.5.2)",
+      "Bash(git add src/main/db/client.ts src/main/db/migrations.ts src/main/index.ts src/main/ipc/handlers.ts src/renderer/pages/Dashboard.tsx src/renderer/pages/Settings.tsx)",
+      "Bash(git push origin v0.5.3)"
     ]
   }
 }
