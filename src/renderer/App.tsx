@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import TitleBar from './components/layout/TitleBar'
 import NavPills from './components/layout/NavPills'
@@ -12,6 +12,75 @@ import { useSessionStore } from './store/sessionStore'
 import { useUpdateStore } from './store/updateStore'
 import { api } from './api/bridge'
 
+function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element {
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    const handleError = () => setHasError(true)
+    const handleUnhandled = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled promise rejection:', event.reason)
+      setHasError(true)
+    }
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandled)
+    return () => {
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandled)
+    }
+  }, [])
+
+  if (hasError) {
+    return (
+      <div className="app-shell">
+        <TitleBar />
+        <div className="main-layout">
+          <div className="main-content" style={{ padding: '2rem', textAlign: 'center' }}>
+            <h2 style={{ marginBottom: '1rem' }}>Something went wrong</h2>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
+              The app encountered an unexpected error. Please restart the application.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'var(--color-accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              Reload App
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
+
+function LoadingOverlay(): JSX.Element | null {
+  const [loading, setLoading] = useState(true)
+  const apps = useAppStore((s) => s.apps)
+
+  useEffect(() => {
+    if (apps.length > 0) {
+      const timer = setTimeout(() => setLoading(false), 500)
+      return () => clearTimeout(timer)
+    }
+  }, [apps])
+
+  if (!loading) return null
+
+  return (
+    <div className="loading-overlay">
+      <div className="loading-spinner" />
+    </div>
+  )
+}
+
 export default function App(): JSX.Element {
   const loadAll = useAppStore((s) => s.loadAll)
   const loadRange = useSessionStore((s) => s.loadRange)
@@ -22,7 +91,12 @@ export default function App(): JSX.Element {
   const setDownloaded = useUpdateStore((s) => s.setDownloaded)
   const setError = useUpdateStore((s) => s.setError)
 
+  const initialized = useRef(false)
+
   useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+
     loadAll()
     loadRange()
 
@@ -51,25 +125,28 @@ export default function App(): JSX.Element {
       unsubDownloaded()
       unsubError()
     }
-  }, [])
+  }, [loadAll, loadRange, onTick, setAvailable, setNotAvailable, setProgress, setDownloaded, setError])
 
   return (
-    <div className="app-shell">
-      <TitleBar />
-      <UpdateBanner />
-      <div className="main-layout">
-        <NavPills />
-        <div className="main-content">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/gallery" element={<Gallery />} />
-            <Route path="/app/:id" element={<AppDetailPage />} />
-            <Route path="/group/:id" element={<AppDetailPage />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+    <ErrorBoundary>
+      <div className="app-shell">
+        <LoadingOverlay />
+        <TitleBar />
+        <UpdateBanner />
+        <div className="main-layout">
+          <NavPills />
+          <div className="main-content">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/app/:id" element={<AppDetailPage />} />
+              <Route path="/group/:id" element={<AppDetailPage />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   )
 }

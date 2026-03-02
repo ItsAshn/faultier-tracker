@@ -1,39 +1,45 @@
-import { useEffect, useState } from 'react'
-import { Zap, X, ExternalLink } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Zap, X, ExternalLink, Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/dashboard.css'
 import { useSessionStore } from '../store/sessionStore'
 import { useAppStore } from '../store/appStore'
-import { api } from '../api/bridge'
 import HeroAppCard from '../components/dashboard/HeroAppCard'
 import Heatmap from '../components/dashboard/Heatmap'
 import TopAppsLeaderboard, { type GridPeriod } from '../components/dashboard/TopAppsLeaderboard'
-import type { RangeSummary } from '@shared/types'
+import type { DateRangePreset } from '@shared/types'
 
-function getPeriodRange(period: GridPeriod): { from: number; to: number } {
-  const now = new Date()
-  if (period === 'week') {
-    const dayOfWeek = now.getDay()
-    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
-    const monday = new Date(now)
-    monday.setDate(now.getDate() - daysFromMonday)
-    monday.setHours(0, 0, 0, 0)
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
-    sunday.setHours(23, 59, 59, 999)
-    return { from: monday.getTime(), to: sunday.getTime() }
-  }
-  if (period === 'month') {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
-    return { from, to: now.getTime() }
-  }
-  return { from: 0, to: now.getTime() }
+function CurrentActivityCard(): JSX.Element | null {
+  const activeDisplayName = useSessionStore((s) => s.activeDisplayName)
+  const isIdle = useSessionStore((s) => s.isIdle)
+  const lastTickAt = useSessionStore((s) => s.lastTickAt)
+
+  if (!lastTickAt || isIdle) return null
+
+  return (
+    <div className="current-activity-card">
+      <div className="current-activity-card__icon">
+        <Activity size={16} />
+      </div>
+      <div className="current-activity-card__content">
+        <div className="current-activity-card__label">Currently tracking</div>
+        <div className="current-activity-card__name">{activeDisplayName}</div>
+      </div>
+    </div>
+  )
+}
+
+function gridPeriodToPreset(period: GridPeriod): DateRangePreset {
+  return period === 'week' ? 'week' : period === 'month' ? 'month' : 'all'
 }
 
 export default function Dashboard(): JSX.Element {
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
-  const setCustomRange = useSessionStore((s) => s.setCustomRange)
+  const summary = useSessionStore((s) => s.summary)
+  const loading = useSessionStore((s) => s.loading)
+  const preset = useSessionStore((s) => s.preset)
   const setPreset = useSessionStore((s) => s.setPreset)
+  const setCustomRange = useSessionStore((s) => s.setCustomRange)
   const apps = useAppStore((s) => s.apps)
   const settings = useAppStore((s) => s.settings)
   const setSetting = useAppStore((s) => s.setSetting)
@@ -44,27 +50,26 @@ export default function Dashboard(): JSX.Element {
   const steamPromptDismissed = settings['steam_prompt_dismissed'] === 'true' || settings['steam_prompt_dismissed'] === true
   const showSteamPrompt = apps.length > 10 && !steamPromptDismissed && lastTickAt !== null
 
-  // Single shared summary — used by both HeroAppCard and TopAppsLeaderboard
-  const [period, setPeriod] = useState<GridPeriod>('week')
-  const [summary, setSummary] = useState<RangeSummary | null>(null)
-  const [loading, setLoading] = useState(true)
+  const period: GridPeriod = preset === 'all' ? 'all' : preset === 'month' ? 'month' : 'week'
 
   useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    const { from, to } = getPeriodRange(period)
-    api.getSessionRange(from, to, 'day').then((s) => {
-      if (!cancelled) { setSummary(s); setLoading(false) }
-    }).catch(() => {
-      if (!cancelled) setLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [period])
+    if (!lastTickAt) return
+    const timer = setTimeout(() => {
+      if (preset === 'today') {
+        setPreset('week')
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [lastTickAt])
 
   function handleHeatmapDayClick(dateStr: string): void {
     const from = new Date(dateStr + 'T00:00:00').getTime()
     const to = from + 86_400_000 - 1
     setCustomRange(from, to)
+  }
+
+  function handlePeriodChange(newPeriod: GridPeriod): void {
+    setPreset(gridPeriodToPreset(newPeriod))
   }
 
   return (
@@ -105,12 +110,13 @@ export default function Dashboard(): JSX.Element {
         </div>
       )}
 
+      <CurrentActivityCard />
       <HeroAppCard summary={summary} loading={loading} period={period} />
       <Heatmap onDayClick={handleHeatmapDayClick} />
       <TopAppsLeaderboard
         summaries={summary?.apps ?? []}
         period={period}
-        onPeriodChange={setPeriod}
+        onPeriodChange={handlePeriodChange}
         loading={loading}
       />
     </main>
