@@ -38,26 +38,35 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
       return {
         get(...params: unknown[]) {
           const stmt = getStmt(sql)
-          stmt.bind(params)
-          const row = stmt.step() ? stmt.getAsObject() : undefined
-          stmt.reset()
-          return row as any
+          try {
+            stmt.bind(params)
+            const row = stmt.step() ? stmt.getAsObject() : undefined
+            return row as any
+          } finally {
+            stmt.reset()
+          }
         },
         all(...params: unknown[]) {
           const stmt = getStmt(sql)
-          stmt.bind(params)
-          const rows: unknown[] = []
-          while (stmt.step()) rows.push(stmt.getAsObject())
-          stmt.reset()
-          return rows as any[]
+          try {
+            stmt.bind(params)
+            const rows: unknown[] = []
+            while (stmt.step()) rows.push(stmt.getAsObject())
+            return rows as any[]
+          } finally {
+            stmt.reset()
+          }
         },
         run(...params: unknown[]) {
           const stmt = getStmt(sql)
-          stmt.run(params)
-          const r = raw.exec('SELECT last_insert_rowid()')
-          const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0
-          stmt.reset()
-          return { lastInsertRowid }
+          try {
+            stmt.run(params)
+            const r = raw.exec('SELECT last_insert_rowid()')
+            const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0
+            return { lastInsertRowid }
+          } finally {
+            stmt.reset()
+          }
         }
       }
     },

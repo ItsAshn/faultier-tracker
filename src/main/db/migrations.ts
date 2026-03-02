@@ -129,7 +129,8 @@ export function seedDefaults(db: DbCompat): void {
     ['dashboard_default_range', '"today"'],
     ['idle_threshold_ms', '300000'],
     ['break_reminder_mins', '0'],
-    ['steam_prompt_dismissed', 'false']
+    ['steam_prompt_dismissed', 'false'],
+    ['launch_at_startup', 'false']
   ]
 
   db.transaction(() => {

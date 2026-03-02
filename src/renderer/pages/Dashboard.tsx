@@ -50,19 +50,21 @@ export default function Dashboard(): JSX.Element {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     setLoading(true)
     const { from, to } = getPeriodRange(period)
     api.getSessionRange(from, to, 'day').then((s) => {
-      setSummary(s)
-      setLoading(false)
+      if (!cancelled) { setSummary(s); setLoading(false) }
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
     })
+    return () => { cancelled = true }
   }, [period])
 
   function handleHeatmapDayClick(dateStr: string): void {
     const from = new Date(dateStr + 'T00:00:00').getTime()
     const to = from + 86_400_000 - 1
     setCustomRange(from, to)
-    setPreset('custom')
   }
 
   return (

@@ -24,6 +24,7 @@ export default function Settings(): JSX.Element {
   const idleThreshold = Number(settings['idle_threshold_ms'] ?? 300000)
   const breakReminderMins = Number(settings['break_reminder_mins'] ?? 0)
   const trackingMode = (settings['tracking_mode'] as string) ?? 'blacklist'
+  const launchAtStartup = settings['launch_at_startup'] === true || settings['launch_at_startup'] === 'true'
   const storedSgdbKey = (settings['steamgriddb_api_key'] as string) ?? ''
 
   async function saveSgdbKey(): Promise<void> {
@@ -68,6 +69,27 @@ export default function Settings(): JSX.Element {
 
       {tab === 'tracking' && (
         <div className="settings-section">
+          <div className="settings-card">
+            <div className="settings-card__title">Launch at Startup</div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
+              Automatically start Faultier Tracker when you log in to Windows.
+            </p>
+            <div className="mode-toggle">
+              <button
+                className={`mode-toggle__btn${launchAtStartup ? ' mode-toggle__btn--active' : ''}`}
+                onClick={() => setSetting('launch_at_startup', true)}
+              >
+                On
+              </button>
+              <button
+                className={`mode-toggle__btn${!launchAtStartup ? ' mode-toggle__btn--active' : ''}`}
+                onClick={() => setSetting('launch_at_startup', false)}
+              >
+                Off
+              </button>
+            </div>
+          </div>
+
           <div className="settings-card">
             <div className="settings-card__title">Poll Interval</div>
             <div className="polling-row">

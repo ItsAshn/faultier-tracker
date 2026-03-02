@@ -1,5 +1,5 @@
 import { app, BrowserWindow } from 'electron'
-import { openDb, closeDb } from './db/client'
+import { openDb, closeDb, getSetting } from './db/client'
 import { createWindow } from './window'
 import { createTray, destroyTray } from './tray'
 import { registerIpcHandlers } from './ipc/handlers'
@@ -27,6 +27,12 @@ app.on('second-instance', () => {
 
 app.whenReady().then(async () => {
   await openDb()
+
+  // Sync startup login item with stored preference (packaged app only)
+  if (app.isPackaged) {
+    const launchAtStartup = getSetting('launch_at_startup')
+    app.setLoginItemSettings({ openAtLogin: launchAtStartup === true || launchAtStartup === 'true' })
+  }
 
   const win = createWindow()
   createTray(win)

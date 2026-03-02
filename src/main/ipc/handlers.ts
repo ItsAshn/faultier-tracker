@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow, net } from 'electron'
+import { ipcMain, dialog, BrowserWindow, net, app } from 'electron'
 import { getDb, getSetting, setSetting, getAllSettings } from '../db/client'
 import { extractAndCacheIcon, saveCustomImage, clearCustomImage, readFileAsDataUrl } from '../icons/iconExtractor'
 import { reanalyzeGroups, invalidateGroupCache } from '../grouping/groupEngine'
@@ -406,6 +406,10 @@ export function registerIpcHandlers(): void {
     if (key === 'poll_interval_ms') {
       stopTracker()
       startTracker()
+    }
+    // Sync OS login item if startup setting changed (packaged app only)
+    if (key === 'launch_at_startup' && app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: value === true || value === 'true' })
     }
   })
 
