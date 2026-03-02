@@ -1,10 +1,10 @@
-import { v4 as uuidv4 } from 'uuid'
-import type { DbCompat } from './client'
+import { v4 as uuidv4 } from "uuid";
+import type { DbCompat } from "./client";
 
 type Migration = {
-  version: number
-  up: (db: DbCompat) => void
-}
+  version: number;
+  up: (db: DbCompat) => void;
+};
 
 const migrations: Migration[] = [
   {
@@ -13,8 +13,8 @@ const migrations: Migration[] = [
       // Add index on apps(exe_name) — queried on every tracking tick for every running process
       db.exec(`
         CREATE INDEX IF NOT EXISTS idx_apps_exe_name ON apps(exe_name);
-      `)
-    }
+      `);
+    },
   },
   {
     version: 2,
@@ -24,8 +24,8 @@ const migrations: Migration[] = [
         ALTER TABLE apps ADD COLUMN daily_goal_ms INTEGER;
         ALTER TABLE app_groups ADD COLUMN daily_goal_ms INTEGER;
         ALTER TABLE app_groups ADD COLUMN category TEXT;
-      `)
-    }
+      `);
+    },
   },
   {
     version: 1,
@@ -89,53 +89,60 @@ const migrations: Migration[] = [
         CREATE TABLE IF NOT EXISTS schema_migrations (
           version INTEGER PRIMARY KEY
         );
-      `)
-    }
-  }
-]
+      `);
+    },
+  },
+];
 
 export function runMigrations(db: DbCompat): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version INTEGER PRIMARY KEY
     );
-  `)
+  `);
 
   const current = db
-    .prepare<[], { version: number }>(
-      'SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1'
-    )
-    .get()
+    .prepare<
+      [],
+      { version: number }
+    >("SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1")
+    .get();
 
-  const currentVersion = (current?.version as number) ?? 0
-  const pending = migrations.filter((m) => m.version > currentVersion)
+  const currentVersion = (current?.version as number) ?? 0;
+  const pending = migrations
+    .filter((m) => m.version > currentVersion)
+    .sort((a, b) => a.version - b.version);
 
   for (const migration of pending) {
     db.transaction(() => {
-      migration.up(db)
-      db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(migration.version)
-    })()
-    console.log(`[DB] Ran migration v${migration.version}`)
+      migration.up(db);
+      db.prepare(
+        "INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)",
+      ).run(migration.version);
+    })();
+    console.log(`[DB] Ran migration v${migration.version}`);
   }
 }
 
 export function seedDefaults(db: DbCompat): void {
   const defaults: Array<[string, string]> = [
-    ['poll_interval_ms', '5000'],
-    ['tracking_mode', '"blacklist"'],
-    ['machine_id', JSON.stringify(uuidv4())],
-    ['record_titles', 'true'],
-    ['theme', '"system"'],
-    ['dashboard_default_range', '"today"'],
-    ['idle_threshold_ms', '300000'],
-    ['break_reminder_mins', '0'],
-    ['steam_prompt_dismissed', 'false'],
-    ['launch_at_startup', 'false']
-  ]
+    ["poll_interval_ms", "5000"],
+    ["tracking_mode", '"blacklist"'],
+    ["machine_id", JSON.stringify(uuidv4())],
+    ["record_titles", "true"],
+    ["theme", '"system"'],
+    ["dashboard_default_range", '"today"'],
+    ["idle_threshold_ms", "300000"],
+    ["break_reminder_mins", "0"],
+    ["steam_prompt_dismissed", "false"],
+    ["launch_at_startup", "false"],
+  ];
 
   db.transaction(() => {
     for (const [key, value] of defaults) {
-      db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').run(key, value)
+      db.prepare(
+        "INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)",
+      ).run(key, value);
     }
-  })()
+  })();
 }

@@ -70,10 +70,10 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
-  closeAllSessions(Date.now());
-  stopTracker();
+  try { closeAllSessions(Date.now()) } catch { /* DB may not be initialised if startup failed */ }
+  try { stopTracker() } catch { /* ignore */ }
   destroyTray();
-  closeDb();
+  try { closeDb() } catch { /* ignore */ }
 });
 
 // On macOS, keep the app running when all windows are closed
