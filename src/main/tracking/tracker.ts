@@ -112,7 +112,7 @@ async function pollTick(): Promise<void> {
               "UPDATE apps SET group_id = ? WHERE id = ?",
             ).run(groupId, appId);
           }
-        });
+        }).catch((err) => console.error("[Tracker] resolveGroup failed:", err));
         // Notify renderer of the newly discovered app
         const newApp = db
           .prepare<[number], AppRecord>("SELECT * FROM apps WHERE id = ?")
@@ -172,7 +172,7 @@ async function pollTick(): Promise<void> {
               "UPDATE apps SET group_id = ? WHERE id = ?",
             ).run(groupId, appId);
           }
-        });
+        }).catch((err) => console.error("[Tracker] resolveGroup failed:", err));
         // Notify renderer of the newly discovered app (if not already sent from process scan)
         if (!currentRunningIds.has(appId)) {
           const newApp = db
@@ -233,7 +233,7 @@ async function pollTick(): Promise<void> {
                   ).run(groupId, appId);
                 }
               },
-            );
+            ).catch((err) => console.error("[Tracker] resolveGroup failed:", err));
           }
         }
       }

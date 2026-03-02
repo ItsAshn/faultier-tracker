@@ -125,7 +125,7 @@ export interface TickPayload {
   is_idle: boolean
 }
 
-export type WindowControlAction = 'minimize' | 'maximize' | 'close'
+export type WindowControlAction = 'minimize' | 'maximize' | 'close' | 'restart'
 
 export type TrackingMode = 'whitelist' | 'blacklist'
 

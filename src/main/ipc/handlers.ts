@@ -835,5 +835,10 @@ export function registerIpcHandlers(): void {
     else if (action === "maximize")
       win.isMaximized() ? win.unmaximize() : win.maximize();
     else if (action === "close") win.hide();
+    else if (action === "restart") {
+      const { app } = require('electron');
+      app.relaunch();
+      app.quit();
+    }
   });
 }

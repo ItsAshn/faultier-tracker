@@ -91,3 +91,17 @@ app.on("activate", () => {
     win.show();
   }
 });
+
+// Global exception handlers to prevent silent crashes
+process.on("uncaughtException", (err) => {
+  console.error("[Main] Uncaught exception:", err);
+  dialog.showErrorBox(
+    "Faultier Tracker — Unexpected Error",
+    `An unexpected error occurred:\n\n${err.message}`,
+  );
+  app.quit();
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[Main] Unhandled rejection:", reason);
+});

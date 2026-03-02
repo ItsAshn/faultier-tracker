@@ -40,7 +40,7 @@ function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element
               The app encountered an unexpected error. Please restart the application.
             </p>
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => api.windowControl('restart')}
               style={{
                 padding: '0.5rem 1rem',
                 background: 'var(--color-accent)',
@@ -50,7 +50,7 @@ function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element
                 cursor: 'pointer'
               }}
             >
-              Reload App
+              Restart App
             </button>
           </div>
         </div>
