@@ -123,6 +123,7 @@ let _rawDb: SqlJsDatabase | null = null;
 let _dbPath = "";
 let _saveTimer: NodeJS.Timeout | null = null;
 let _isSaving = false;
+let _dbWasCorrupted = false;
 
 // In-memory settings cache — populated on first getSetting() call, invalidated on set
 let _settingsCache: Map<string, unknown> | null = null;
@@ -130,6 +131,10 @@ let _settingsCache: Map<string, unknown> | null = null;
 export function getDb(): DbCompat {
   if (!_db) throw new Error("Database not initialized. Call openDb() first.");
   return _db;
+}
+
+export function wasDbCorrupted(): boolean {
+  return _dbWasCorrupted;
 }
 
 export async function openDb(): Promise<DbCompat> {
@@ -147,8 +152,16 @@ export async function openDb(): Promise<DbCompat> {
   const SQL = await initSqlJs({ locateFile: () => wasmPath });
 
   if (fs.existsSync(_dbPath)) {
-    const buffer = fs.readFileSync(_dbPath);
-    _rawDb = new SQL.Database(buffer);
+    try {
+      const buffer = await fs.promises.readFile(_dbPath);
+      _rawDb = new SQL.Database(buffer);
+    } catch (err) {
+      console.error("[DB] Corrupted database file detected, backing up and creating fresh:", err);
+      const backupPath = `${_dbPath}.corrupted.${Date.now()}`;
+      fs.renameSync(_dbPath, backupPath);
+      _rawDb = new SQL.Database();
+      _dbWasCorrupted = true;
+    }
   } else {
     _rawDb = new SQL.Database();
   }

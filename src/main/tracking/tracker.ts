@@ -106,14 +106,13 @@ async function pollTick(): Promise<void> {
         // Auto-discover new apps in blacklist mode
         const displayName = deriveDisplayName(proc.exeName);
         const appId = upsertApp(proc.exeName, null, displayName, now);
-        resolveGroup(proc.exeName, null).then((groupId) => {
-          if (groupId !== null) {
-            db.prepare<[number, number], void>(
-              "UPDATE apps SET group_id = ? WHERE id = ?",
-            ).run(groupId, appId);
-          }
-        }).catch((err) => console.error("[Tracker] resolveGroup failed:", err));
-        // Notify renderer of the newly discovered app
+        const groupId = await resolveGroup(proc.exeName, null);
+        if (groupId !== null) {
+          db.prepare<[number, number], void>(
+            "UPDATE apps SET group_id = ? WHERE id = ?",
+          ).run(groupId, appId);
+        }
+        // Notify renderer of the newly discovered app (with group_id now populated)
         const newApp = db
           .prepare<[number], AppRecord>("SELECT * FROM apps WHERE id = ?")
           .get(appId);
@@ -166,13 +165,12 @@ async function pollTick(): Promise<void> {
           displayName,
           now,
         );
-        resolveGroup(activeApp.exeName, activeApp.exePath).then((groupId) => {
-          if (groupId !== null) {
-            db.prepare<[number, number], void>(
-              "UPDATE apps SET group_id = ? WHERE id = ?",
-            ).run(groupId, appId);
-          }
-        }).catch((err) => console.error("[Tracker] resolveGroup failed:", err));
+        const groupId = await resolveGroup(activeApp.exeName, activeApp.exePath);
+        if (groupId !== null) {
+          db.prepare<[number, number], void>(
+            "UPDATE apps SET group_id = ? WHERE id = ?",
+          ).run(groupId, appId);
+        }
         // Notify renderer of the newly discovered app (if not already sent from process scan)
         if (!currentRunningIds.has(appId)) {
           const newApp = db
@@ -225,15 +223,12 @@ async function pollTick(): Promise<void> {
           ).run(activeApp.exePath, appId);
 
           if (!appRow.group_id) {
-            resolveGroup(activeApp.exeName, activeApp.exePath).then(
-              (groupId) => {
-                if (groupId !== null) {
-                  db.prepare<[number, number], void>(
-                    "UPDATE apps SET group_id = ? WHERE id = ?",
-                  ).run(groupId, appId);
-                }
-              },
-            ).catch((err) => console.error("[Tracker] resolveGroup failed:", err));
+            const groupId = await resolveGroup(activeApp.exeName, activeApp.exePath);
+            if (groupId !== null) {
+              db.prepare<[number, number], void>(
+                "UPDATE apps SET group_id = ? WHERE id = ?",
+              ).run(groupId, appId);
+            }
           }
         }
       }

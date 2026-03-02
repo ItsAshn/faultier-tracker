@@ -14,6 +14,8 @@ interface SessionStore {
   activeDisplayName: string | null
   isIdle: boolean
   lastTickAt: number | null
+  error: string | null
+  clearError: () => void
   // Internal: timestamp of last loadRange() call (not exposed to consumers)
   _lastLoadAt: number | null
 
@@ -51,6 +53,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   isIdle: false,
   lastTickAt: null,
   _lastLoadAt: null,
+  error: null,
+  clearError: () => set({ error: null }),
 
   setPreset(preset) {
     set({ preset })
@@ -83,8 +87,8 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     try {
       const summary = await api.getSessionRange(from, to, groupBy)
       set({ summary, loading: false, _lastLoadAt: Date.now() })
-    } catch {
-      set({ loading: false })
+    } catch (err) {
+      set({ loading: false, error: String(err) })
     }
   },
 

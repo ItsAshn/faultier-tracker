@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog } from "electron";
-import { openDb, closeDb, getSetting } from "./db/client";
+import { openDb, closeDb, getSetting, wasDbCorrupted } from "./db/client";
 import { createWindow } from "./window";
 import { createTray, destroyTray } from "./tray";
 import { registerIpcHandlers } from "./ipc/handlers";
@@ -31,6 +31,16 @@ app.on("second-instance", () => {
 app.whenReady().then(async () => {
   try {
     await openDb();
+
+    if (wasDbCorrupted()) {
+      dialog.showMessageBox({
+        type: "warning",
+        title: "Faultier Tracker — Database Recovered",
+        message: "A corrupted database file was detected and backed up. A fresh database has been created.\n\nYour previous data has been preserved in a backup file.",
+        buttons: ["OK"],
+      });
+    }
+
     repairOrphanedSessions(getSetting("machine_id") as string, Date.now());
 
     // Sync startup login item with stored preference (packaged app only)
