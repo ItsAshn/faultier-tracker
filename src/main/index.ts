@@ -4,7 +4,7 @@ import { createWindow } from './window'
 import { createTray, destroyTray } from './tray'
 import { registerIpcHandlers } from './ipc/handlers'
 import { startTracker, stopTracker } from './tracking/tracker'
-import { closeAllSessions } from './tracking/sessionManager'
+import { closeAllSessions, repairOrphanedSessions } from './tracking/sessionManager'
 import { initUpdater } from './updater'
 import { autoFetchSteamArtwork } from './artwork/autoFetch'
 
@@ -27,6 +27,7 @@ app.on('second-instance', () => {
 
 app.whenReady().then(async () => {
   await openDb()
+  repairOrphanedSessions(getSetting('machine_id') as string, Date.now())
 
   // Sync startup login item with stored preference (packaged app only)
   if (app.isPackaged) {

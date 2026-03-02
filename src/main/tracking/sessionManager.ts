@@ -135,6 +135,16 @@ export function closeAllSessions(now: number): void {
   runningSessions.clear()
 }
 
+// Called on startup to close sessions left open by a previous crash.
+// Normal shutdowns go through closeAllSessions() via before-quit, so this
+// only has work to do when the process was force-killed or crashed.
+export function repairOrphanedSessions(machineId: string, now: number): void {
+  const db = getDb()
+  db.prepare<[number, string], void>(
+    'UPDATE sessions SET ended_at = ? WHERE ended_at IS NULL AND machine_id = ?'
+  ).run(now, machineId)
+}
+
 // Returns current active app ID (for IPC push)
 export function getActiveAppId(): number | null {
   const entry = [...activeSessions.entries()][0]
