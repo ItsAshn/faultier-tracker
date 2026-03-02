@@ -1,74 +1,93 @@
-import { app, BrowserWindow } from 'electron'
-import { openDb, closeDb, getSetting } from './db/client'
-import { createWindow } from './window'
-import { createTray, destroyTray } from './tray'
-import { registerIpcHandlers } from './ipc/handlers'
-import { startTracker, stopTracker } from './tracking/tracker'
-import { closeAllSessions, repairOrphanedSessions } from './tracking/sessionManager'
-import { initUpdater } from './updater'
-import { autoFetchSteamArtwork } from './artwork/autoFetch'
+import { app, BrowserWindow, dialog } from "electron";
+import { openDb, closeDb, getSetting } from "./db/client";
+import { createWindow } from "./window";
+import { createTray, destroyTray } from "./tray";
+import { registerIpcHandlers } from "./ipc/handlers";
+import { startTracker, stopTracker } from "./tracking/tracker";
+import {
+  closeAllSessions,
+  repairOrphanedSessions,
+} from "./tracking/sessionManager";
+import { initUpdater } from "./updater";
+import { autoFetchSteamArtwork } from "./artwork/autoFetch";
 
 // Prevent multiple instances
-const gotLock = app.requestSingleInstanceLock()
+const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
-  app.quit()
-  process.exit(0)
+  app.quit();
+  process.exit(0);
 }
 
-app.on('second-instance', () => {
+app.on("second-instance", () => {
   // Focus the existing window when user tries to open a second instance
-  const wins = BrowserWindow.getAllWindows()
+  const wins = BrowserWindow.getAllWindows();
   if (wins[0]) {
-    if (wins[0].isMinimized()) wins[0].restore()
-    wins[0].show()
-    wins[0].focus()
+    if (wins[0].isMinimized()) wins[0].restore();
+    wins[0].show();
+    wins[0].focus();
   }
-})
+});
 
 app.whenReady().then(async () => {
-  await openDb()
-  repairOrphanedSessions(getSetting('machine_id') as string, Date.now())
+  try {
+    await openDb();
+    repairOrphanedSessions(getSetting("machine_id") as string, Date.now());
 
-  // Sync startup login item with stored preference (packaged app only)
-  if (app.isPackaged) {
-    const launchAtStartup = getSetting('launch_at_startup')
-    app.setLoginItemSettings({ openAtLogin: launchAtStartup === true || launchAtStartup === 'true' })
+    // Sync startup login item with stored preference (packaged app only)
+    if (app.isPackaged) {
+      const launchAtStartup = getSetting("launch_at_startup");
+      app.setLoginItemSettings({
+        openAtLogin: launchAtStartup === true || launchAtStartup === "true",
+      });
+    }
+
+    const win = createWindow();
+
+    // Register ready-to-show immediately after window creation to avoid a race
+    // condition where the renderer finishes loading during startTracker() and
+    // fires the event before the listener is registered, leaving the window
+    // permanently hidden.
+    const showTimeout = setTimeout(() => win.show(), 10000);
+    win.once("ready-to-show", () => {
+      clearTimeout(showTimeout);
+      win.show();
+      // Background artwork fetch — starts 5s after window appears to avoid blocking startup
+      setTimeout(() => autoFetchSteamArtwork().catch(console.error), 5000);
+    });
+
+    createTray(win);
+    registerIpcHandlers();
+    initUpdater();
+
+    await startTracker();
+  } catch (err) {
+    dialog.showErrorBox(
+      "Faultier Tracker — Startup Error",
+      `The app failed to start:\n\n${err instanceof Error ? err.message : String(err)}`,
+    );
+    app.quit();
   }
+});
 
-  const win = createWindow()
-  createTray(win)
-  registerIpcHandlers()
-  initUpdater()
-
-  await startTracker()
-
-  // Show window after everything is ready
-  win.once('ready-to-show', () => {
-    win.show()
-    // Background artwork fetch — starts 5s after window appears to avoid blocking startup
-    setTimeout(() => autoFetchSteamArtwork().catch(console.error), 5000)
-  })
-})
-
-app.on('before-quit', () => {
-  closeAllSessions(Date.now())
-  stopTracker()
-  destroyTray()
-  closeDb()
-})
+app.on("before-quit", () => {
+  closeAllSessions(Date.now());
+  stopTracker();
+  destroyTray();
+  closeDb();
+});
 
 // On macOS, keep the app running when all windows are closed
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
     // On Windows/Linux, we hide to tray rather than quitting (handled by window.ts)
     // so this event fires rarely; just don't quit here.
   }
-})
+});
 
-app.on('activate', () => {
+app.on("activate", () => {
   // On macOS, re-create window when dock icon is clicked with no open windows
   if (BrowserWindow.getAllWindows().length === 0) {
-    const win = createWindow()
-    win.show()
+    const win = createWindow();
+    win.show();
   }
-})
+});
