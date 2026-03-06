@@ -61,7 +61,7 @@ export default function Heatmap({ onDayClick }: Props): JSX.Element {
         const m = new Map<string, number>()
         for (const r of rows) m.set(r.date, r.active_ms)
         setTotalsMap(m)
-      })
+      }).catch(() => {})
     }, 150)
     return () => clearTimeout(timer)
   }, [])

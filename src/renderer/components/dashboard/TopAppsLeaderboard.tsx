@@ -50,7 +50,7 @@ export default function TopAppsLeaderboard({ summaries, period, onPeriodChange, 
         if (r.icon) m.set(r.id, r.icon)
       }
       setIcons(m)
-    })
+    }).catch(() => {})
   }, [topIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

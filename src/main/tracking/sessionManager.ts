@@ -161,7 +161,13 @@ export function closeAllSessions(now: number): void {
 export function repairOrphanedSessions(machineId: string, now: number): void {
   try {
     const db = getDb()
-    const endTime = _lastTickTime || now
+    // Use the most recent app activity timestamp as a proxy for when the last
+    // tick ran before the crash. This is much more accurate than using `now`
+    // (restart time), which would inflate durations by the time the app was closed.
+    const row = db.prepare<[], { last_seen: number } | undefined>(
+      'SELECT MAX(last_seen) AS last_seen FROM apps'
+    ).get()
+    const endTime = row?.last_seen ?? now
     db.prepare<[number, string], void>(
       'UPDATE sessions SET ended_at = ? WHERE ended_at IS NULL AND machine_id = ?'
     ).run(endTime, machineId)

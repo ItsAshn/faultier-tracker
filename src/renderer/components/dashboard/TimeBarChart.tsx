@@ -7,7 +7,7 @@ import { api } from '../../api/bridge'
 
 function AppIcon({ appId }: { appId: number }): JSX.Element {
   const [src, setSrc] = useState<string | null>(null)
-  useEffect(() => { api.getIconForApp(appId).then(setSrc) }, [appId])
+  useEffect(() => { api.getIconForApp(appId).then(setSrc).catch(() => {}) }, [appId])
   if (src) return <img src={src} alt="" width={20} height={20} style={{ borderRadius: 3, objectFit: 'contain', flexShrink: 0 }} />
   return <div style={{ width: 20, height: 20, borderRadius: 3, background: 'var(--color-surface-3)', flexShrink: 0 }} />
 }
@@ -158,10 +158,14 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
       return
     }
     setActiveBucket(barData.date)
-    const { from, to } = parseBucketRange(barData.date)
-    const apps = await api.getBucketApps(from, to)
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setDrilldown({ bucketDate: barData.date, apps, x: rect.left, y: rect.top })
+    try {
+      const { from, to } = parseBucketRange(barData.date)
+      const apps = await api.getBucketApps(from, to)
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setDrilldown({ bucketDate: barData.date, apps, x: rect.left, y: rect.top })
+    } catch {
+      setActiveBucket(null)
+    }
   }
 
   return (

@@ -38,7 +38,7 @@ export default function HeroAppCard({ summary, loading, period }: Props): JSX.El
 
   useEffect(() => {
     if (!topApp) { setIcon(null); return }
-    api.getIconForApp(topApp.app_id).then(setIcon)
+    api.getIconForApp(topApp.app_id).then(setIcon).catch(() => {})
   }, [topApp?.app_id])
 
   const daysActive = summary?.chart_points.filter((p) => p.active_ms > 0).length ?? 0
