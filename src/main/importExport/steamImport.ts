@@ -19,6 +19,8 @@ interface SteamApiResponse {
 export async function importFromSteam(apiKey: string, steamId: string): Promise<SteamImportResult> {
   const result: SteamImportResult = { gamesImported: 0, sessionsAdded: 0, duplicates: 0, errors: [] }
 
+  console.log(`[SteamImport] starting import for steamId=${steamId}`)
+
   // ── Fetch games from Steam API ─────────────────────────────────────────────
   let games: SteamGame[]
   try {
@@ -28,7 +30,9 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
       `&steamid=${encodeURIComponent(steamId)}` +
       `&include_appinfo=1&include_played_free_games=1&format=json`
 
+    console.log(`[SteamImport] fetching from Steam API...`)
     const res = await net.fetch(url)
+    console.log(`[SteamImport] Steam API response status: ${res.status}`)
 
     if (res.status === 401 || res.status === 403) {
       result.errors.push('Invalid API key. Visit steamcommunity.com/dev/apikey to get one.')
@@ -40,6 +44,7 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
     }
 
     const data = await res.json() as SteamApiResponse
+    console.log(`[SteamImport] total games in response: ${data.response?.game_count ?? 0}`)
 
     if (!data.response?.games?.length) {
       result.errors.push(
@@ -49,6 +54,7 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
     }
 
     games = data.response.games.filter((g) => g.playtime_forever > 0)
+    console.log(`[SteamImport] games with playtime > 0: ${games.length}`)
 
     if (games.length === 0) {
       result.errors.push('No games with recorded playtime found.')
@@ -56,6 +62,7 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
     }
   } catch (err) {
     result.errors.push(`Could not reach Steam API: ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`[SteamImport] network error:`, err)
     return result
   }
 
@@ -93,23 +100,28 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
       if (existing) {
         appId = existing.id
         updateApp.run(game.name, now, appId)
+        console.log(`[SteamImport] updated existing app id=${appId} exeName=${exeName} name="${game.name}"`)
       } else {
         const r = insertApp.run(exeName, game.name, now, now)
         appId = r.lastInsertRowid as number
         result.gamesImported++
+        console.log(`[SteamImport] inserted new app id=${appId} exeName=${exeName} name="${game.name}"`)
       }
 
       // One synthetic session per game — skip if already imported
       const dup = hasSteamSession.get(appId)
       if ((dup?.count ?? 0) > 0) {
         result.duplicates++
+        console.log(`[SteamImport] skipping duplicate session for app id=${appId} name="${game.name}"`)
         continue
       }
 
       insertSession.run(appId, 'running', startedAt, endedAt, 'steam-import')
       result.sessionsAdded++
+      console.log(`[SteamImport] inserted session for app id=${appId} name="${game.name}" playtime=${Math.round(playtimeMs/60000)}m startedAt=${new Date(startedAt).toISOString()}`)
     }
   })()
 
+  console.log(`[SteamImport] done — gamesImported=${result.gamesImported} sessionsAdded=${result.sessionsAdded} duplicates=${result.duplicates} errors=${result.errors.length}`)
   return result
 }

@@ -512,19 +512,22 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.SESSIONS_GET_DAILY_TOTALS,
     (_e, from: number, to: number): DayTotal[] => {
+      console.log(`[IPC] getDailyTotals from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
       const rows = db
-        .prepare<[number, number], { day: string; active_ms: number }>(
-          `SELECT strftime('%Y-%m-%d', started_at/1000, 'unixepoch', 'localtime') AS day,
+        .prepare<[number, number], { date: string; active_ms: number }>(
+          // Include both 'active' and 'running' session types so that Steam
+          // imports (which create 'running' sessions) appear in the heatmap.
+          `SELECT strftime('%Y-%m-%d', started_at/1000, 'unixepoch', 'localtime') AS date,
                   SUM(ended_at - started_at) AS active_ms
            FROM sessions
-           WHERE session_type = 'active'
-             AND started_at >= ?
+           WHERE started_at >= ?
              AND ended_at IS NOT NULL
              AND ended_at <= ?
-           GROUP BY day
-           ORDER BY day`,
+           GROUP BY date
+           ORDER BY date`,
         )
         .all(from, to);
+      console.log(`[IPC] getDailyTotals -> ${rows.length} day(s) returned`);
       return rows;
     },
   );
@@ -532,6 +535,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.SESSIONS_GET_BUCKET_APPS,
     (_e, from: number, to: number): BucketApp[] => {
+      console.log(`[IPC] getBucketApps from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
+      // Use MAX(active_ms, running_ms) per app so Steam-imported games
+      // (which only have 'running' sessions) still appear in the leaderboard.
       const rows = db
         .prepare<
           [number, number],
@@ -539,11 +545,13 @@ export function registerIpcHandlers(): void {
         >(
           `SELECT s.app_id,
                   a.display_name,
-                  SUM(s.ended_at - s.started_at) AS active_ms
+                  MAX(
+                    SUM(CASE WHEN s.session_type = 'active' THEN s.ended_at - s.started_at ELSE 0 END),
+                    SUM(CASE WHEN s.session_type = 'running' THEN s.ended_at - s.started_at ELSE 0 END)
+                  ) AS active_ms
            FROM sessions s
            JOIN apps a ON a.id = s.app_id
-           WHERE s.session_type = 'active'
-             AND s.started_at >= ?
+           WHERE s.started_at >= ?
              AND s.ended_at IS NOT NULL
              AND s.ended_at <= ?
            GROUP BY s.app_id
@@ -551,6 +559,7 @@ export function registerIpcHandlers(): void {
            LIMIT 5`,
         )
         .all(from, to);
+      console.log(`[IPC] getBucketApps -> ${rows.length} app(s):`, rows.map(r => `${r.display_name}=${Math.round(r.active_ms/60000)}m`).join(', '));
       return rows;
     },
   );
@@ -596,22 +605,36 @@ export function registerIpcHandlers(): void {
         }
       >("SELECT exe_path, icon_cache_path, custom_image_path FROM apps WHERE id = ?")
       .get(appId);
-    if (!row) return null;
+    if (!row) {
+      console.warn(`[Icon] resolveAppIcon: no app found for id=${appId}`);
+      return null;
+    }
 
     const customDataUrl = readFileAsDataUrl(row.custom_image_path);
-    if (customDataUrl) return customDataUrl;
+    if (customDataUrl) {
+      console.log(`[Icon] app ${appId}: returning custom image (${row.custom_image_path})`);
+      return customDataUrl;
+    }
 
     const cachedDataUrl = readFileAsDataUrl(row.icon_cache_path);
-    if (cachedDataUrl) return cachedDataUrl;
+    if (cachedDataUrl) {
+      console.log(`[Icon] app ${appId}: returning cached icon (${row.icon_cache_path})`);
+      return cachedDataUrl;
+    }
 
     if (row.exe_path) {
+      console.log(`[Icon] app ${appId}: extracting icon from exe (${row.exe_path})`);
       const fsPath = await extractAndCacheIcon(appId, row.exe_path);
       if (fsPath) {
         db.prepare<[string, number]>(
           "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
         ).run(fsPath, appId);
+        console.log(`[Icon] app ${appId}: icon extracted and cached at ${fsPath}`);
         return readFileAsDataUrl(fsPath);
       }
+      console.warn(`[Icon] app ${appId}: icon extraction failed for exe=${row.exe_path}`);
+    } else {
+      console.log(`[Icon] app ${appId}: no exe_path, no icon available`);
     }
     return null;
   }
@@ -623,13 +646,22 @@ export function registerIpcHandlers(): void {
         { icon_cache_path: string | null; custom_image_path: string | null }
       >("SELECT icon_cache_path, custom_image_path FROM app_groups WHERE id = ?")
       .get(groupId);
-    if (!group) return null;
+    if (!group) {
+      console.warn(`[Icon] resolveGroupIcon: no group found for id=${groupId}`);
+      return null;
+    }
 
     const customDataUrl = readFileAsDataUrl(group.custom_image_path);
-    if (customDataUrl) return customDataUrl;
+    if (customDataUrl) {
+      console.log(`[Icon] group ${groupId}: returning custom image`);
+      return customDataUrl;
+    }
 
     const cachedDataUrl = readFileAsDataUrl(group.icon_cache_path);
-    if (cachedDataUrl) return cachedDataUrl;
+    if (cachedDataUrl) {
+      console.log(`[Icon] group ${groupId}: returning cached icon`);
+      return cachedDataUrl;
+    }
 
     const member = db
       .prepare<
@@ -640,9 +672,13 @@ export function registerIpcHandlers(): void {
 
     if (member) {
       const memberDataUrl = readFileAsDataUrl(member.icon_cache_path);
-      if (memberDataUrl) return memberDataUrl;
+      if (memberDataUrl) {
+        console.log(`[Icon] group ${groupId}: returning member app ${member.id} cached icon`);
+        return memberDataUrl;
+      }
 
       if (member.exe_path) {
+        console.log(`[Icon] group ${groupId}: extracting icon from member app ${member.id} (${member.exe_path})`);
         const fsPath = await extractAndCacheIcon(member.id, member.exe_path);
         if (fsPath) {
           db.prepare<[string, number]>(
@@ -651,9 +687,13 @@ export function registerIpcHandlers(): void {
           db.prepare<[string, number]>(
             "UPDATE app_groups SET icon_cache_path = ? WHERE id = ?",
           ).run(fsPath, groupId);
+          console.log(`[Icon] group ${groupId}: icon extracted and cached at ${fsPath}`);
           return readFileAsDataUrl(fsPath);
         }
+        console.warn(`[Icon] group ${groupId}: icon extraction failed for member ${member.id}`);
       }
+    } else {
+      console.log(`[Icon] group ${groupId}: no member with exe_path found, no icon available`);
     }
     return null;
   }

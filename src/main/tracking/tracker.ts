@@ -75,6 +75,8 @@ async function pollTick(): Promise<void> {
       getRunningProcesses(),
     ]);
 
+    console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} runningCount=${runningProcesses.length}`);
+
     // ── Tracked apps lookup ──────────────────────────────────────────
     const db = getDb();
     const trackedMode = (getSetting("tracking_mode") as string) ?? "blacklist";
@@ -114,6 +116,7 @@ async function pollTick(): Promise<void> {
       } else if (trackedMode === "blacklist") {
         // Auto-discover new apps in blacklist mode
         const displayName = deriveDisplayName(proc.exeName);
+        console.log(`[Tracker] auto-discovering new app: ${proc.exeName} -> "${displayName}"`);
         const appId = upsertApp(proc.exeName, null, displayName, now);
         const groupId = await resolveGroup(proc.exeName, null);
         if (groupId !== null) {
@@ -141,6 +144,7 @@ async function pollTick(): Promise<void> {
     // Close sessions for processes that stopped running
     for (const prevId of prevRunningAppIds) {
       if (!currentRunningIds.has(prevId)) {
+        console.log(`[Tracker] app id=${prevId} stopped running — closing running session`);
         endRunningSession(prevId, now);
       }
     }
@@ -170,6 +174,7 @@ async function pollTick(): Promise<void> {
       let appId: number;
       if (!appRow) {
         const displayName = deriveDisplayName(activeApp.exeName);
+        console.log(`[Tracker] active window new app: ${activeApp.exeName} -> "${displayName}"`);
         appId = upsertApp(
           activeApp.exeName,
           activeApp.exePath,
@@ -229,6 +234,7 @@ async function pollTick(): Promise<void> {
         // the path AND the app has no group yet, re-run group resolution so
         // Steam library path matching can kick in.
         if (activeApp.exePath && !appRow.exe_path) {
+          console.log(`[Tracker] updating exe_path for app id=${appId}: ${activeApp.exePath}`);
           db.prepare<[string, number], void>(
             "UPDATE apps SET exe_path = ? WHERE id = ?",
           ).run(activeApp.exePath, appId);
@@ -242,6 +248,8 @@ async function pollTick(): Promise<void> {
             }
           }
         }
+      } else if (appRow) {
+        console.log(`[Tracker] active window ${activeApp.exeName} not ticked: is_tracked=${appRow.is_tracked} isIdle=${isIdle}`);
       }
     }
 

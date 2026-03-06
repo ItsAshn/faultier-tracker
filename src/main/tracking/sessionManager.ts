@@ -16,6 +16,7 @@ let _lastTickTime = 0
 
 export function initSessionManager(mid: string): void {
   machineId = mid
+  console.log(`[SessionManager] initialized with machineId=${mid}`)
 }
 
 function getPollInterval(): number {
@@ -38,7 +39,9 @@ function openSession(
     )
     .run(appId, type, now, recordTitles ? windowTitle : null, machineId)
 
-  return result.lastInsertRowid as number
+  const dbId = result.lastInsertRowid as number
+  console.log(`[SessionManager] opened ${type} session id=${dbId} for app=${appId}${windowTitle ? ` title="${windowTitle}"` : ''}`)
+  return dbId
 }
 
 function closeSession(dbId: number, endedAt: number): void {
@@ -46,6 +49,7 @@ function closeSession(dbId: number, endedAt: number): void {
   db.prepare<[number, number], void>(
     'UPDATE sessions SET ended_at = ? WHERE id = ?'
   ).run(endedAt, dbId)
+  console.log(`[SessionManager] closed session id=${dbId} endedAt=${new Date(endedAt).toISOString()}`)
 }
 
 export function tickActive(appId: number, windowTitle: string, now: number): void {
@@ -57,6 +61,7 @@ export function tickActive(appId: number, windowTitle: string, now: number): voi
     // Close sessions for apps that are no longer active
     for (const [existingAppId, session] of activeSessions.entries()) {
       if (existingAppId !== appId) {
+        console.log(`[SessionManager] tickActive: closing stale active session for app=${existingAppId} (new active=${appId})`)
         closeSession(session.dbId, session.lastTick + interval)
         activeSessions.delete(existingAppId)
       }
@@ -73,6 +78,7 @@ export function tickActive(appId: number, windowTitle: string, now: number): voi
 
     if (now - existing.lastTick > gapThreshold) {
       // Gap detected — close old session, start new one
+      console.log(`[SessionManager] tickActive: gap detected for app=${appId} (gap=${now - existing.lastTick}ms > threshold=${gapThreshold}ms)`)
       closeSession(existing.dbId, existing.lastTick + interval)
       const dbId = openSession(appId, 'active', now, windowTitle)
       activeSessions.set(appId, { dbId, startedAt: now, lastTick: now, windowTitle })
@@ -102,6 +108,7 @@ export function tickRunning(appId: number, now: number): void {
     }
 
     if (now - existing.lastTick > gapThreshold) {
+      console.log(`[SessionManager] tickRunning: gap detected for app=${appId} (gap=${now - existing.lastTick}ms > threshold=${gapThreshold}ms)`)
       closeSession(existing.dbId, existing.lastTick + interval)
       const dbId = openSession(appId, 'running', now, null)
       runningSessions.set(appId, { dbId, startedAt: now, lastTick: now, windowTitle: null })
@@ -120,6 +127,7 @@ export function endRunningSession(appId: number, now: number): void {
   try {
     const session = runningSessions.get(appId)
     if (session) {
+      console.log(`[SessionManager] endRunningSession: closing running session id=${session.dbId} for app=${appId}`)
       closeSession(session.dbId, now)
       runningSessions.delete(appId)
     }
@@ -133,6 +141,8 @@ export function closeAllSessions(now: number): void {
   try {
     const db = getDb()
     const interval = getPollInterval()
+
+    console.log(`[SessionManager] closeAllSessions: closing ${activeSessions.size} active + ${runningSessions.size} running session(s)`)
 
     const closeOne = db.prepare<[number, number], void>(
       'UPDATE sessions SET ended_at = ? WHERE id = ?'
@@ -150,6 +160,7 @@ export function closeAllSessions(now: number): void {
     closeAll()
     activeSessions.clear()
     runningSessions.clear()
+    console.log(`[SessionManager] closeAllSessions: done`)
   } catch (err) {
     console.error("[SessionManager] closeAllSessions error:", err)
   }
@@ -168,9 +179,10 @@ export function repairOrphanedSessions(machineId: string, now: number): void {
       'SELECT MAX(last_seen) AS last_seen FROM apps'
     ).get()
     const endTime = row?.last_seen ?? now
-    db.prepare<[number, string], void>(
+    const result = db.prepare<[number, string], void>(
       'UPDATE sessions SET ended_at = ? WHERE ended_at IS NULL AND machine_id = ?'
     ).run(endTime, machineId)
+    console.log(`[SessionManager] repairOrphanedSessions: closed ${(result as any).changes ?? '?'} orphaned session(s) using endTime=${new Date(endTime).toISOString()}`)
   } catch (err) {
     console.error("[SessionManager] repairOrphanedSessions error:", err)
   }
