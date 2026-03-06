@@ -206,6 +206,7 @@ const stub: ApiType = {
   setSetting: () => Promise.resolve(),
   getIconForApp: () => Promise.resolve(null),
   getIconForGroup: () => Promise.resolve(null),
+  getIconBatch: () => Promise.resolve({}),
   setCustomIcon: () => Promise.resolve(""),
   clearCustomIcon: () => Promise.resolve(),
   fetchIconFromUrl: () => Promise.resolve(null),

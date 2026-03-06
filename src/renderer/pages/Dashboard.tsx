@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Zap, X, ExternalLink, Activity } from 'lucide-react'
+import { Zap, X, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/dashboard.css'
 import { useSessionStore } from '../store/sessionStore'
@@ -8,26 +8,6 @@ import HeroAppCard from '../components/dashboard/HeroAppCard'
 import Heatmap from '../components/dashboard/Heatmap'
 import TopAppsLeaderboard, { type GridPeriod } from '../components/dashboard/TopAppsLeaderboard'
 import type { DateRangePreset } from '@shared/types'
-
-function CurrentActivityCard(): JSX.Element | null {
-  const activeDisplayName = useSessionStore((s) => s.activeDisplayName)
-  const isIdle = useSessionStore((s) => s.isIdle)
-  const lastTickAt = useSessionStore((s) => s.lastTickAt)
-
-  if (!lastTickAt || isIdle) return null
-
-  return (
-    <div className="current-activity-card">
-      <div className="current-activity-card__icon">
-        <Activity size={16} />
-      </div>
-      <div className="current-activity-card__content">
-        <div className="current-activity-card__label">Currently tracking</div>
-        <div className="current-activity-card__name">{activeDisplayName}</div>
-      </div>
-    </div>
-  )
-}
 
 function gridPeriodToPreset(period: GridPeriod): DateRangePreset {
   return period === 'week' ? 'week' : period === 'month' ? 'month' : 'all'
@@ -110,7 +90,6 @@ export default function Dashboard(): JSX.Element {
         </div>
       )}
 
-      <CurrentActivityCard />
       <HeroAppCard summary={summary} loading={loading} period={period} />
       <Heatmap onDayClick={handleHeatmapDayClick} />
       <TopAppsLeaderboard

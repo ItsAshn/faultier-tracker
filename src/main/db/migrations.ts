@@ -8,6 +8,15 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    version: 4,
+    up(db) {
+      // Covering index for the session range query used by SESSIONS_GET_RANGE every 30s
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_sessions_time_range ON sessions(started_at, ended_at);
+      `);
+    },
+  },
+  {
     version: 3,
     up(db) {
       // Add index on apps(exe_name) — queried on every tracking tick for every running process

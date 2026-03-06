@@ -82,15 +82,24 @@ async function pollTick(): Promise<void> {
     // Build a map of exe_name → app record for running processes
     const currentRunningIds = new Set<number>();
 
+    // Batch query: one DB round-trip for all running processes instead of N
+    const uniqueExeNames = [...new Set(runningProcesses.map((p) => p.exeName))];
+    const knownApps = new Map<string, { id: number; is_tracked: number }>();
+    if (uniqueExeNames.length > 0) {
+      const placeholders = uniqueExeNames.map(() => "?").join(",");
+      const rows = db
+        .prepare<
+          string[],
+          { id: number; exe_name: string; is_tracked: number }
+        >(`SELECT id, exe_name, is_tracked FROM apps WHERE exe_name IN (${placeholders})`)
+        .all(...uniqueExeNames);
+      for (const row of rows) knownApps.set(row.exe_name, row);
+    }
+
     for (const proc of runningProcesses) {
       // For blacklist mode: track everything not explicitly excluded
       // For whitelist mode: track only explicitly included apps
-      const appRow = db
-        .prepare<
-          [string],
-          { id: number; is_tracked: number } | undefined
-        >("SELECT id, is_tracked FROM apps WHERE exe_name = ?")
-        .get(proc.exeName);
+      const appRow = knownApps.get(proc.exeName);
 
       if (appRow) {
         const shouldTrack =
@@ -122,6 +131,8 @@ async function pollTick(): Promise<void> {
               win.webContents.send(CHANNELS.TRACKING_APP_SEEN, newApp);
           });
         }
+        // Add to knownApps so duplicates in runningProcesses skip re-discovery
+        knownApps.set(proc.exeName, { id: appId, is_tracked: 1 });
         currentRunningIds.add(appId);
         tickRunning(appId, now);
       }

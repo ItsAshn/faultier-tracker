@@ -4,6 +4,43 @@ import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
 import { api } from '../../api/bridge'
 import { useAppStore } from '../../store/appStore'
 
+// ── Module-level icon batch queue ────────────────────────────────────────────
+// Collects icon requests from all visible cards within a 50ms window and fires
+// a single IPC call instead of one call per card.
+const _iconCache = new Map<string, string | null>()
+const _pending = new Map<string, Array<(icon: string | null) => void>>()
+let _batchTimer: ReturnType<typeof setTimeout> | null = null
+
+function requestIcon(id: number, isGroup: boolean): Promise<string | null> {
+  const key = `${isGroup ? 'g' : 'a'}:${id}`
+  if (_iconCache.has(key)) return Promise.resolve(_iconCache.get(key)!)
+  return new Promise((resolve) => {
+    if (!_pending.has(key)) _pending.set(key, [])
+    _pending.get(key)!.push(resolve)
+    if (_batchTimer) clearTimeout(_batchTimer)
+    _batchTimer = setTimeout(async () => {
+      _batchTimer = null
+      const keys = [..._pending.keys()]
+      const reqs = keys.map((k) => ({ id: +k.split(':')[1], isGroup: k.startsWith('g:') }))
+      const captured = new Map(_pending)
+      _pending.clear()
+      try {
+        const results = await api.getIconBatch(reqs)
+        for (const [k, resolvers] of captured) {
+          const icon = results[k] ?? null
+          _iconCache.set(k, icon)
+          resolvers.forEach((r) => r(icon))
+        }
+      } catch {
+        for (const [k, resolvers] of captured) {
+          _iconCache.set(k, null)
+          resolvers.forEach((r) => r(null))
+        }
+      }
+    }, 50)
+  })
+}
+
 function fmtMs(ms: number): string {
   if (ms < 60_000) return '< 1m'
   const h = Math.floor(ms / 3_600_000)
@@ -37,11 +74,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       ([entry]) => {
         if (entry.isIntersecting) {
           observer.disconnect()
-          if (isGroup) {
-            api.getIconForGroup(item.id).then(setIconSrc).catch(() => {})
-          } else {
-            api.getIconForApp(item.id).then(setIconSrc).catch(() => {})
-          }
+          requestIcon(item.id, isGroup).then(setIconSrc).catch(() => {})
         }
       },
       { rootMargin: '200px' }

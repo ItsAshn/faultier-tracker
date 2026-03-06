@@ -251,88 +251,63 @@ export function registerIpcHandlers(): void {
       groupBy: "hour" | "day" = "day",
     ): RangeSummary => {
       const now = Date.now();
-      const sessions = db
+
+      // Query A: per-app aggregated totals via SQL — avoids loading all raw rows into JS
+      // and eliminates the separate full apps-table fetch.
+      const appSummaries = db
         .prepare<
-          [number, number, number, number, number],
+          [number, number, number, number, number, number, number, number],
           {
             app_id: number;
-            session_type: string;
-            started_at: number;
-            ended_at: number;
-          }
-        >(
-          `SELECT app_id, session_type,
-                  MAX(started_at, ?) AS started_at,
-                  MIN(COALESCE(ended_at, ?), ?) AS ended_at
-           FROM sessions
-           WHERE started_at < ?
-             AND (ended_at IS NULL OR ended_at > ?)`,
-        )
-        .all(from, now, to, to, from);
-
-      const apps = db
-        .prepare<
-          [],
-          {
-            id: number;
             exe_name: string;
             display_name: string;
             group_id: number | null;
+            active_ms: number;
+            running_ms: number;
           }
-        >("SELECT id, exe_name, display_name, group_id FROM apps")
-        .all();
+        >(
+          `SELECT a.id AS app_id, a.exe_name, a.display_name, a.group_id,
+                  SUM(CASE WHEN s.session_type = 'active'
+                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
+                       ELSE 0 END) AS active_ms,
+                  SUM(CASE WHEN s.session_type = 'running'
+                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
+                       ELSE 0 END) AS running_ms
+           FROM sessions s
+           JOIN apps a ON a.id = s.app_id
+           WHERE s.started_at < ?
+             AND (s.ended_at IS NULL OR s.ended_at > ?)
+           GROUP BY s.app_id
+           ORDER BY active_ms DESC`,
+        )
+        .all(now, to, from, now, to, from, to, from);
 
-      const appMap = new Map(apps.map((a) => [a.id, a]));
-      const summaryMap = new Map<number, SessionSummary>();
-
-      for (const s of sessions) {
-        const app = appMap.get(s.app_id);
-        if (!app) continue;
-        const dur = s.ended_at - s.started_at;
-        if (!summaryMap.has(s.app_id)) {
-          summaryMap.set(s.app_id, {
-            app_id: s.app_id,
-            exe_name: app.exe_name,
-            display_name: app.display_name,
-            group_id: app.group_id,
-            active_ms: 0,
-            running_ms: 0,
-          });
-        }
-        const entry = summaryMap.get(s.app_id)!;
-        if (s.session_type === "active") entry.active_ms += dur;
-        else entry.running_ms += dur;
-      }
-
-      const appSummaries = Array.from(summaryMap.values()).sort(
-        (a, b) => b.active_ms - a.active_ms,
-      );
-
-      // Chart points
-      const chartMap = new Map<string, ChartDataPoint>();
-      const fmt = (ts: number): string => {
-        const d = new Date(ts);
-        if (groupBy === "hour") {
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:00`;
-        }
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      };
-
-      for (const s of sessions) {
-        const key = fmt(s.started_at);
-        if (!chartMap.has(key))
-          chartMap.set(key, { date: key, active_ms: 0, running_ms: 0 });
-        const pt = chartMap.get(key)!;
-        const dur = s.ended_at - s.started_at;
-        if (s.session_type === "active") pt.active_ms += dur;
-        else pt.running_ms += dur;
-      }
+      // Query B: chart points bucketed in SQL — no JS date-formatting loop
+      const dateFmt = groupBy === "hour"
+        ? "%Y-%m-%d %H:00"
+        : "%Y-%m-%d";
+      const chartPoints = db
+        .prepare<
+          [number, number, number, number, number, number, number, number, number],
+          { date: string; active_ms: number; running_ms: number }
+        >(
+          `SELECT strftime(?, MAX(s.started_at, ?) / 1000, 'unixepoch', 'localtime') AS date,
+                  SUM(CASE WHEN s.session_type = 'active'
+                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
+                       ELSE 0 END) AS active_ms,
+                  SUM(CASE WHEN s.session_type = 'running'
+                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
+                       ELSE 0 END) AS running_ms
+           FROM sessions s
+           WHERE s.started_at < ?
+             AND (s.ended_at IS NULL OR s.ended_at > ?)
+           GROUP BY date
+           ORDER BY date`,
+        )
+        .all(dateFmt, from, now, to, from, now, to, from, to, from);
 
       const totalActive = appSummaries.reduce((acc, a) => acc + a.active_ms, 0);
-      const totalRunning = appSummaries.reduce(
-        (acc, a) => acc + a.running_ms,
-        0,
-      );
+      const totalRunning = appSummaries.reduce((acc, a) => acc + a.running_ms, 0);
 
       return {
         from,
@@ -341,9 +316,7 @@ export function registerIpcHandlers(): void {
         total_running_ms: totalRunning,
         top_app: appSummaries[0] ?? null,
         apps: appSummaries,
-        chart_points: Array.from(chartMap.values()).sort((a, b) =>
-          a.date.localeCompare(b.date),
-        ),
+        chart_points: chartPoints,
       };
     },
   );
@@ -610,91 +583,109 @@ export function registerIpcHandlers(): void {
 
   // ── Icons ─────────────────────────────────────────────────────────────────
 
-  ipcMain.handle(
-    CHANNELS.ICONS_GET_FOR_APP,
-    async (_e, appId: number): Promise<string | null> => {
-      const row = db
-        .prepare<
-          [number],
-          {
-            exe_path: string | null;
-            icon_cache_path: string | null;
-            custom_image_path: string | null;
-          }
-        >("SELECT exe_path, icon_cache_path, custom_image_path FROM apps WHERE id = ?")
-        .get(appId);
-      if (!row) return null;
+  // ── Shared icon resolution helpers ───────────────────────────────────────
 
-      // custom image takes priority
-      const customDataUrl = readFileAsDataUrl(row.custom_image_path);
-      if (customDataUrl) return customDataUrl;
+  async function resolveAppIcon(appId: number): Promise<string | null> {
+    const row = db
+      .prepare<
+        [number],
+        {
+          exe_path: string | null;
+          icon_cache_path: string | null;
+          custom_image_path: string | null;
+        }
+      >("SELECT exe_path, icon_cache_path, custom_image_path FROM apps WHERE id = ?")
+      .get(appId);
+    if (!row) return null;
 
-      // cached exe icon
-      const cachedDataUrl = readFileAsDataUrl(row.icon_cache_path);
-      if (cachedDataUrl) return cachedDataUrl;
+    const customDataUrl = readFileAsDataUrl(row.custom_image_path);
+    if (customDataUrl) return customDataUrl;
 
-      // extract fresh from exe
-      if (row.exe_path) {
-        const fsPath = await extractAndCacheIcon(appId, row.exe_path);
+    const cachedDataUrl = readFileAsDataUrl(row.icon_cache_path);
+    if (cachedDataUrl) return cachedDataUrl;
+
+    if (row.exe_path) {
+      const fsPath = await extractAndCacheIcon(appId, row.exe_path);
+      if (fsPath) {
+        db.prepare<[string, number]>(
+          "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
+        ).run(fsPath, appId);
+        return readFileAsDataUrl(fsPath);
+      }
+    }
+    return null;
+  }
+
+  async function resolveGroupIcon(groupId: number): Promise<string | null> {
+    const group = db
+      .prepare<
+        [number],
+        { icon_cache_path: string | null; custom_image_path: string | null }
+      >("SELECT icon_cache_path, custom_image_path FROM app_groups WHERE id = ?")
+      .get(groupId);
+    if (!group) return null;
+
+    const customDataUrl = readFileAsDataUrl(group.custom_image_path);
+    if (customDataUrl) return customDataUrl;
+
+    const cachedDataUrl = readFileAsDataUrl(group.icon_cache_path);
+    if (cachedDataUrl) return cachedDataUrl;
+
+    const member = db
+      .prepare<
+        [number],
+        { id: number; exe_path: string | null; icon_cache_path: string | null }
+      >("SELECT id, exe_path, icon_cache_path FROM apps WHERE group_id = ? AND exe_path IS NOT NULL LIMIT 1")
+      .get(groupId);
+
+    if (member) {
+      const memberDataUrl = readFileAsDataUrl(member.icon_cache_path);
+      if (memberDataUrl) return memberDataUrl;
+
+      if (member.exe_path) {
+        const fsPath = await extractAndCacheIcon(member.id, member.exe_path);
         if (fsPath) {
           db.prepare<[string, number]>(
             "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
-          ).run(fsPath, appId);
+          ).run(fsPath, member.id);
+          db.prepare<[string, number]>(
+            "UPDATE app_groups SET icon_cache_path = ? WHERE id = ?",
+          ).run(fsPath, groupId);
           return readFileAsDataUrl(fsPath);
         }
       }
+    }
+    return null;
+  }
 
-      return null;
-    },
+  ipcMain.handle(
+    CHANNELS.ICONS_GET_FOR_APP,
+    (_e, appId: number): Promise<string | null> => resolveAppIcon(appId),
   );
 
   ipcMain.handle(
     CHANNELS.ICONS_GET_FOR_GROUP,
-    async (_e, groupId: number): Promise<string | null> => {
-      const group = db
-        .prepare<
-          [number],
-          { icon_cache_path: string | null; custom_image_path: string | null }
-        >("SELECT icon_cache_path, custom_image_path FROM app_groups WHERE id = ?")
-        .get(groupId);
-      if (!group) return null;
+    (_e, groupId: number): Promise<string | null> => resolveGroupIcon(groupId),
+  );
 
-      const customDataUrl = readFileAsDataUrl(group.custom_image_path);
-      if (customDataUrl) return customDataUrl;
-
-      const cachedDataUrl = readFileAsDataUrl(group.icon_cache_path);
-      if (cachedDataUrl) return cachedDataUrl;
-
-      // Fall back to a member app's icon
-      const member = db
-        .prepare<
-          [number],
-          {
-            id: number;
-            exe_path: string | null;
-            icon_cache_path: string | null;
-          }
-        >("SELECT id, exe_path, icon_cache_path FROM apps WHERE group_id = ? AND exe_path IS NOT NULL LIMIT 1")
-        .get(groupId);
-
-      if (member) {
-        const memberDataUrl = readFileAsDataUrl(member.icon_cache_path);
-        if (memberDataUrl) return memberDataUrl;
-
-        if (member.exe_path) {
-          const fsPath = await extractAndCacheIcon(member.id, member.exe_path);
-          if (fsPath) {
-            db.prepare<[string, number]>(
-              "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
-            ).run(fsPath, member.id);
-            db.prepare<[string, number]>(
-              "UPDATE app_groups SET icon_cache_path = ? WHERE id = ?",
-            ).run(fsPath, groupId);
-            return readFileAsDataUrl(fsPath);
-          }
+  ipcMain.handle(
+    CHANNELS.ICONS_GET_BATCH,
+    async (
+      _e,
+      requests: Array<{ id: number; isGroup: boolean }>,
+    ): Promise<Record<string, string | null>> => {
+      const result: Record<string, string | null> = {};
+      for (const req of requests) {
+        const key = `${req.isGroup ? "g" : "a"}:${req.id}`;
+        try {
+          result[key] = req.isGroup
+            ? await resolveGroupIcon(req.id)
+            : await resolveAppIcon(req.id);
+        } catch {
+          result[key] = null;
         }
       }
-      return null;
+      return result;
     },
   );
 
