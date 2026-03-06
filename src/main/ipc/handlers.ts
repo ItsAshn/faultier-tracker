@@ -829,16 +829,17 @@ export function registerIpcHandlers(): void {
   // ── Window control ────────────────────────────────────────────────────────
 
   ipcMain.on(CHANNELS.WINDOW_CONTROL, (_e, action: WindowControlAction) => {
+    // Restart doesn't need a window reference — handle it first.
+    if (action === "restart") {
+      app.relaunch();
+      app.quit();
+      return;
+    }
     const win = getMainWindow();
     if (!win) return;
     if (action === "minimize") win.minimize();
     else if (action === "maximize")
       win.isMaximized() ? win.unmaximize() : win.maximize();
     else if (action === "close") win.hide();
-    else if (action === "restart") {
-      const { app } = require('electron');
-      app.relaunch();
-      app.quit();
-    }
   });
 }

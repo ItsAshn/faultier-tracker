@@ -3,6 +3,11 @@ import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
 let mainWindow: BrowserWindow | null = null
+let isQuitting = false
+
+export function setQuitting(): void {
+  isQuitting = true
+}
 
 export function createWindow(): BrowserWindow {
   mainWindow = new BrowserWindow({
@@ -22,9 +27,11 @@ export function createWindow(): BrowserWindow {
     }
   })
 
-  // Hide to tray instead of closing
+  // Hide to tray instead of closing, but allow the window to close when the
+  // app is actually quitting (e.g. via tray menu, restart, or uncaughtException).
+  // Without the isQuitting guard, e.preventDefault() would block app.quit() forever.
   mainWindow.on('close', (e) => {
-    if (!mainWindow?.isDestroyed()) {
+    if (!isQuitting && !mainWindow?.isDestroyed()) {
       e.preventDefault()
       mainWindow?.hide()
     }

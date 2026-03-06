@@ -16,7 +16,12 @@ function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element
   const [hasError, setHasError] = useState(false)
 
   useEffect(() => {
-    const handleError = () => setHasError(true)
+    const handleError = (event: ErrorEvent) => {
+      // Ignore resource load errors (broken image/script src) — those set event.error to null
+      // and are not fatal JS crashes. Only treat real exceptions as fatal.
+      if (event.error === null) return
+      setHasError(true)
+    }
     const handleUnhandled = (event: PromiseRejectionEvent) => {
       console.error('Unhandled promise rejection:', event.reason)
       setHasError(true)
@@ -40,7 +45,9 @@ function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element
               The app encountered an unexpected error. Please restart the application.
             </p>
             <button
-              onClick={() => api.windowControl('restart')}
+              onClick={() => {
+                try { api.windowControl('restart') } catch { window.location.reload() }
+              }}
               style={{
                 padding: '0.5rem 1rem',
                 background: 'var(--color-accent)',

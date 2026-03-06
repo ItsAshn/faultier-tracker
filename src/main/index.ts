@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog } from "electron";
 import { openDb, closeDb, getSetting, wasDbCorrupted } from "./db/client";
-import { createWindow } from "./window";
+import { createWindow, setQuitting } from "./window";
 import { createTray, destroyTray } from "./tray";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { startTracker, stopTracker } from "./tracking/tracker";
@@ -80,9 +80,12 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => {
+  // Allow the window's close event to proceed — without this, e.preventDefault()
+  // in the hide-to-tray handler would permanently block app.quit().
+  setQuitting();
   try { closeAllSessions(Date.now()) } catch { /* DB may not be initialised if startup failed */ }
   try { stopTracker() } catch { /* ignore */ }
-  destroyTray();
+  try { destroyTray() } catch { /* ignore */ }
   try { closeDb() } catch { /* ignore */ }
 });
 
@@ -105,10 +108,8 @@ app.on("activate", () => {
 // Global exception handlers to prevent silent crashes
 process.on("uncaughtException", (err) => {
   console.error("[Main] Uncaught exception:", err);
-  dialog.showErrorBox(
-    "Faultier Tracker — Unexpected Error",
-    `An unexpected error occurred:\n\n${err.message}`,
-  );
+  // Relaunch before quitting so the app self-heals instead of just dying.
+  app.relaunch();
   app.quit();
 });
 

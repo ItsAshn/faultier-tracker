@@ -6,8 +6,14 @@ type PsListFn = () => Promise<Array<{ name: string; pid: number; ppid: number }>
 let _psList: PsListFn | null = null
 
 export async function initPsList(): Promise<void> {
-  const mod = await import('ps-list')
-  _psList = mod.default as PsListFn
+  try {
+    const mod = await import('ps-list')
+    _psList = mod.default as PsListFn
+    console.log('[Tracker] ps-list loaded')
+  } catch {
+    console.warn('[Tracker] ps-list not available — process tracking disabled')
+    _psList = null
+  }
 }
 
 export interface RunningProcess {
