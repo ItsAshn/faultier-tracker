@@ -12,7 +12,7 @@ export default function AppFilterRow({ app }: Props): JSX.Element {
   const [iconSrc, setIconSrc] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getIconForApp(app.id).then(setIconSrc)
+    api.getIconForApp(app.id).then(setIconSrc).catch(() => {})
   }, [app.id])
 
   return (

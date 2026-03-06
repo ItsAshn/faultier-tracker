@@ -21,7 +21,7 @@ function AppIcon({ appId, size = 40 }: AppIconProps): JSX.Element {
   const [src, setSrc] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getIconForApp(appId).then(setSrc)
+    api.getIconForApp(appId).then(setSrc).catch(() => {})
   }, [appId])
 
   if (src) {
@@ -79,7 +79,7 @@ export function GroupTimeRow({ group, summaries, apps }: GroupRowProps): JSX.Ele
   const totalRunning = summaries.reduce((acc, s) => acc + s.running_ms, 0)
 
   useEffect(() => {
-    api.getIconForGroup(group.id).then(setIconSrc)
+    api.getIconForGroup(group.id).then(setIconSrc).catch(() => {})
   }, [group.id])
 
   return (

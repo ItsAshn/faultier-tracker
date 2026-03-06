@@ -51,7 +51,7 @@ function MemberRow({ appId, displayName, activeMs, maxMs }: MemberRowProps): JSX
   const [icon, setIcon] = useState<string | null>(null)
 
   useEffect(() => {
-    api.getIconForApp(appId).then(setIcon)
+    api.getIconForApp(appId).then(setIcon).catch(() => {})
   }, [appId])
 
   return (
@@ -144,9 +144,9 @@ export default function AppDetailPage(): JSX.Element {
     if (src) {
       setIconSrc(src)
     } else if (isGroup) {
-      api.getIconForGroup(numId).then(setIconSrc)
+      api.getIconForGroup(numId).then(setIconSrc).catch(() => {})
     } else {
-      api.getIconForApp(numId).then(setIconSrc)
+      api.getIconForApp(numId).then(setIconSrc).catch(() => {})
     }
   }, [numId, isGroup, item?.custom_image_path, item?.icon_cache_path])
 
@@ -157,8 +157,9 @@ export default function AppDetailPage(): JSX.Element {
     setLoading(true)
     api.getAppSessionRange(numId, from, to, groupBy, isGroup)
       .then(setRangeData)
+      .catch(() => {})
       .finally(() => setLoading(false))
-    api.getSessionTitles(numId, from, to, isGroup).then(setTitles)
+    api.getSessionTitles(numId, from, to, isGroup).then(setTitles).catch(() => {})
   }, [numId, isGroup, preset, item?.id])
 
   function addTag(): void {

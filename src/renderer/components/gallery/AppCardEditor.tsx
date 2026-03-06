@@ -28,9 +28,9 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
   useEffect(() => {
     if (!item.custom_image_path) {
       if (isGroup) {
-        api.getIconForGroup(item.id).then(setIconSrc)
+        api.getIconForGroup(item.id).then(setIconSrc).catch(() => {})
       } else {
-        api.getIconForApp(item.id).then(setIconSrc)
+        api.getIconForApp(item.id).then(setIconSrc).catch(() => {})
       }
     }
   }, [item.id])

@@ -26,7 +26,7 @@ export default function Gallery(): JSX.Element {
   const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(null)
 
   useEffect(() => {
-    api.getSessionRange(0, Date.now()).then(setAllTimeSummary)
+    api.getSessionRange(0, Date.now()).then(setAllTimeSummary).catch(() => {})
   }, [])
 
   const navigate = useNavigate()

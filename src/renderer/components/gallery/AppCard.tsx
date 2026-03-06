@@ -38,9 +38,9 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
         if (entry.isIntersecting) {
           observer.disconnect()
           if (isGroup) {
-            api.getIconForGroup(item.id).then(setIconSrc)
+            api.getIconForGroup(item.id).then(setIconSrc).catch(() => {})
           } else {
-            api.getIconForApp(item.id).then(setIconSrc)
+            api.getIconForApp(item.id).then(setIconSrc).catch(() => {})
           }
         }
       },
