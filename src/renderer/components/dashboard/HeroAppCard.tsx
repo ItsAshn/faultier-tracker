@@ -69,7 +69,7 @@ export default function HeroAppCard({ summary, loading, period }: Props): JSX.El
   return (
     <button
       className="hero-card"
-      onClick={() => navigate(`/gallery/app/${topApp.app_id}`)}
+      onClick={() => navigate(`/app/${topApp.app_id}`)}
     >
       <div className="hero-card__label">
         <Trophy size={13} />

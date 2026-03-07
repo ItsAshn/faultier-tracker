@@ -195,6 +195,8 @@ export function registerIpcHandlers(): void {
       tags: [],
       is_manual: true,
       created_at: now,
+      daily_goal_ms: null,
+      category: null,
     };
   });
 
@@ -513,19 +515,19 @@ export function registerIpcHandlers(): void {
     CHANNELS.SESSIONS_GET_DAILY_TOTALS,
     (_e, from: number, to: number): DayTotal[] => {
       console.log(`[IPC] getDailyTotals from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
+      const now = Date.now();
       const rows = db
-        .prepare<[number, number], { date: string; active_ms: number }>(
+        .prepare<[number, number, number, number], { date: string; active_ms: number }>(
           `SELECT strftime('%Y-%m-%d', started_at/1000, 'unixepoch', 'localtime') AS date,
-                  SUM(ended_at - started_at) AS active_ms
+                  SUM(MIN(COALESCE(ended_at, ?), ?) - started_at) AS active_ms
            FROM sessions
            WHERE session_type = 'active'
              AND started_at >= ?
-             AND ended_at IS NOT NULL
-             AND ended_at <= ?
+             AND started_at < ?
            GROUP BY date
            ORDER BY date`,
         )
-        .all(from, to);
+        .all(now, to, from, to);
       console.log(`[IPC] getDailyTotals -> ${rows.length} day(s) returned`);
       return rows;
     },
@@ -535,25 +537,25 @@ export function registerIpcHandlers(): void {
     CHANNELS.SESSIONS_GET_BUCKET_APPS,
     (_e, from: number, to: number): BucketApp[] => {
       console.log(`[IPC] getBucketApps from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
+      const now = Date.now();
       const rows = db
         .prepare<
-          [number, number],
+          [number, number, number, number],
           { app_id: number; display_name: string; active_ms: number }
         >(
           `SELECT s.app_id,
                   a.display_name,
-                  SUM(s.ended_at - s.started_at) AS active_ms
+                  SUM(MIN(COALESCE(s.ended_at, ?), ?) - s.started_at) AS active_ms
            FROM sessions s
            JOIN apps a ON a.id = s.app_id
            WHERE s.session_type = 'active'
              AND s.started_at >= ?
-             AND s.ended_at IS NOT NULL
-             AND s.ended_at <= ?
+             AND s.started_at < ?
            GROUP BY s.app_id
            ORDER BY active_ms DESC
            LIMIT 5`,
         )
-        .all(from, to);
+        .all(now, to, from, to);
       console.log(`[IPC] getBucketApps -> ${rows.length} app(s):`, rows.map(r => `${r.display_name}=${Math.round(r.active_ms/60000)}m`).join(', '));
       return rows;
     },

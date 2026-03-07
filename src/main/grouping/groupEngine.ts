@@ -190,23 +190,19 @@ export async function reanalyzeGroups(): Promise<void> {
     'UPDATE apps SET group_id = ? WHERE id = ?'
   )
 
-  const updateAll = db.transaction(async () => {
-    for (const app of apps) {
-      // Only re-analyze if not a manual rule
-      const hasManualRule = db
-        .prepare<[number], { count: number }>(
-          `SELECT COUNT(*) as count FROM group_rules gr
-           JOIN app_groups ag ON ag.id = gr.group_id
-           WHERE gr.is_manual = 1 AND ag.id = ?`
-        )
-        .get(app.group_id ?? -1)
+  for (const app of apps) {
+    // Only re-analyze if not a manual rule
+    const hasManualRule = db
+      .prepare<[number], { count: number }>(
+        `SELECT COUNT(*) as count FROM group_rules gr
+         JOIN app_groups ag ON ag.id = gr.group_id
+         WHERE gr.is_manual = 1 AND ag.id = ?`
+      )
+      .get(app.group_id ?? -1)
 
-      if (!hasManualRule || hasManualRule.count === 0) {
-        const groupId = await resolveGroup(app.exe_name, app.exe_path)
-        updateGroup.run(groupId, app.id)
-      }
+    if (!hasManualRule || hasManualRule.count === 0) {
+      const groupId = await resolveGroup(app.exe_name, app.exe_path)
+      updateGroup.run(groupId, app.id)
     }
-  })
-
-  await updateAll()
+  }
 }
