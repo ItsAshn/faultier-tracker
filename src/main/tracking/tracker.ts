@@ -1,5 +1,5 @@
 import { BrowserWindow, powerMonitor, Notification } from "electron";
-import { getDb, getSetting, upsertApp } from "../db/client";
+import { getDb, getSetting, upsertApp, type RawApp } from "../db/client";
 import { getActiveApp, initActiveWin } from "./activeWindow";
 import { getRunningProcesses, initPsList } from "./processScanner";
 import {
@@ -12,6 +12,18 @@ import { resolveGroup } from "../grouping/groupEngine";
 import { updateTrayTooltip } from "../tray";
 import { CHANNELS } from "@shared/channels";
 import type { AppRecord, TickPayload } from "@shared/types";
+
+// Convert a raw DB row to a renderer-safe AppRecord (mirrors mapApp in handlers.ts)
+function toAppRecord(raw: RawApp): AppRecord {
+  return {
+    ...raw,
+    is_tracked: raw.is_tracked !== 0,
+    tags: (() => { try { return JSON.parse(raw.tags ?? "[]"); } catch { return []; } })(),
+    icon_cache_path: null,
+    custom_image_path: null,
+    daily_goal_ms: raw.daily_goal_ms ?? null,
+  };
+}
 
 let pollTimer: NodeJS.Timeout | null = null;
 let isRunning = false;
@@ -126,12 +138,12 @@ async function pollTick(): Promise<void> {
         }
         // Notify renderer of the newly discovered app (with group_id now populated)
         const newApp = db
-          .prepare<[number], AppRecord>("SELECT * FROM apps WHERE id = ?")
+          .prepare<[number], RawApp>("SELECT * FROM apps WHERE id = ?")
           .get(appId);
         if (newApp) {
           BrowserWindow.getAllWindows().forEach((win) => {
             if (!win.isDestroyed())
-              win.webContents.send(CHANNELS.TRACKING_APP_SEEN, newApp);
+              win.webContents.send(CHANNELS.TRACKING_APP_SEEN, toAppRecord(newApp));
           });
         }
         // Add to knownApps so duplicates in runningProcesses skip re-discovery
@@ -190,12 +202,12 @@ async function pollTick(): Promise<void> {
         // Notify renderer of the newly discovered app (if not already sent from process scan)
         if (!currentRunningIds.has(appId)) {
           const newApp = db
-            .prepare<[number], AppRecord>("SELECT * FROM apps WHERE id = ?")
+            .prepare<[number], RawApp>("SELECT * FROM apps WHERE id = ?")
             .get(appId);
           if (newApp) {
             BrowserWindow.getAllWindows().forEach((win) => {
               if (!win.isDestroyed())
-                win.webContents.send(CHANNELS.TRACKING_APP_SEEN, newApp);
+                win.webContents.send(CHANNELS.TRACKING_APP_SEEN, toAppRecord(newApp));
             });
           }
         }
@@ -217,7 +229,7 @@ async function pollTick(): Promise<void> {
         appId = appRow.id;
       }
 
-      if (appRow && appRow.is_tracked === 1 && !isIdle) {
+      if (appRow && appRow.is_tracked !== 0 && !isIdle) {
         tickActive(appId, activeApp.windowTitle, now);
         // If the focused app wasn't detected in the process scan (e.g. UWP/system
         // processes), still record it as running so focused ≤ running always holds.
@@ -249,7 +261,7 @@ async function pollTick(): Promise<void> {
           }
         }
       } else if (appRow) {
-        console.log(`[Tracker] active window ${activeApp.exeName} not ticked: is_tracked=${appRow.is_tracked} isIdle=${isIdle}`);
+        console.log(`[Tracker] active window ${activeApp.exeName} not ticked: is_tracked=${appRow.is_tracked} (type=${typeof appRow.is_tracked}) isIdle=${isIdle}`);
       }
     }
 

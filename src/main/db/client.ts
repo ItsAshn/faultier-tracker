@@ -271,6 +271,7 @@ export interface RawApp {
   tags: string;
   first_seen: number;
   last_seen: number;
+  daily_goal_ms: number | null;
 }
 
 export function upsertApp(
