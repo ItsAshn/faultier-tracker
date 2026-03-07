@@ -93,9 +93,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary?.active_ms ?? 0
-  const runningMs = summary?.running_ms ?? 0
-  const displayMs = activeMs > 0 ? activeMs : runningMs
-  const hasTime = displayMs > 0
+  const hasTime = activeMs > 0
 
   return (
     <div
@@ -126,7 +124,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       {/* Time badge — top left, always visible when there's data */}
       {hasTime && (
         <div className="app-card__time-badge">
-          {fmtMs(displayMs)}
+          {fmtMs(activeMs)}
         </div>
       )}
 

@@ -133,8 +133,6 @@ interface Props {
 }
 
 export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.Element {
-  const [showActive, setShowActive] = useState(true)
-  const [showRunning, setShowRunning] = useState(true)
   const [drilldown, setDrilldown] = useState<DrilldownPopover | null>(null)
   const [activeBucket, setActiveBucket] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -172,22 +170,6 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
     <div className="chart-container" ref={containerRef} style={{ position: 'relative' }}>
       <div className="chart-header">
         <span className="chart-title">Time Overview</span>
-        <div className="chart-legend">
-          <button
-            className={`chart-legend__item${!showActive ? ' chart-legend__item--hidden' : ''}`}
-            onClick={() => setShowActive((v) => !v)}
-          >
-            <span className="chart-legend__dot" style={{ background: '#f59e0b' }} />
-            Active
-          </button>
-          <button
-            className={`chart-legend__item${!showRunning ? ' chart-legend__item--hidden' : ''}`}
-            onClick={() => setShowRunning((v) => !v)}
-          >
-            <span className="chart-legend__dot" style={{ background: '#888888' }} />
-            Running
-          </button>
-        </div>
       </div>
 
       <ResponsiveContainer width="100%" height={160}>
@@ -208,28 +190,23 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
             width={52}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
-          {showActive && (
-            <Bar
-              dataKey="active_ms"
-              name="Active"
-              fill="#f59e0b"
-              radius={[3, 3, 0, 0]}
-              maxBarSize={40}
-              style={{ cursor: 'pointer' }}
-              onClick={(barData: ChartDataPoint, index: number, e: React.MouseEvent) => handleBarClick(barData, index, e)}
-            >
-              {data.map((entry) => (
-                <Cell
-                  key={entry.date}
-                  fill={activeBucket === entry.date ? '#fbbf24' : '#f59e0b'}
-                  opacity={activeBucket && activeBucket !== entry.date ? 0.55 : 1}
-                />
-              ))}
-            </Bar>
-          )}
-          {showRunning && (
-            <Bar dataKey="running_ms" name="Running" fill="#888888" radius={[3, 3, 0, 0]} maxBarSize={40} />
-          )}
+          <Bar
+            dataKey="active_ms"
+            name="Focused"
+            fill="#f59e0b"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={40}
+            style={{ cursor: 'pointer' }}
+            onClick={(barData: ChartDataPoint, index: number, e: React.MouseEvent) => handleBarClick(barData, index, e)}
+          >
+            {data.map((entry) => (
+              <Cell
+                key={entry.date}
+                fill={activeBucket === entry.date ? '#fbbf24' : '#f59e0b'}
+                opacity={activeBucket && activeBucket !== entry.date ? 0.55 : 1}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
 

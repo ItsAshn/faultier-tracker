@@ -25,9 +25,11 @@ export default function Gallery(): JSX.Element {
   const groups = useAppStore((s) => s.groups)
   const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(null)
 
+  // Refresh all-time summary whenever the app list changes (new apps discovered,
+  // Steam import, etc.) so the "Most time" sort stays accurate.
   useEffect(() => {
     api.getSessionRange(0, Date.now()).then(setAllTimeSummary).catch(() => {})
-  }, [])
+  }, [apps.length])
 
   const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)
@@ -109,7 +111,7 @@ export default function Gallery(): JSX.Element {
 
   function getItemTotalMs(item: GalleryItem): number {
     const s = getAllTimeSummary(item)
-    return s ? s.active_ms + s.running_ms : 0
+    return s ? s.active_ms : 0
   }
 
   function getItemLastSeen(item: GalleryItem): number {

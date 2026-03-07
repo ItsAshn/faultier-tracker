@@ -46,9 +46,6 @@ function ChildRow({ summary, app }: RowProps): JSX.Element {
       <span className={`time-row__duration${summary.active_ms > 0 ? ' time-row__duration--active' : ''}`}>
         {fmtMs(summary.active_ms)}
       </span>
-      <span className={`time-row__duration${summary.running_ms > 0 ? ' time-row__duration--running' : ''}`}>
-        {fmtMs(summary.running_ms)}
-      </span>
       <div className="time-row__actions">
         <label className="toggle" title={app.is_tracked ? 'Stop tracking' : 'Start tracking'}>
           <input
@@ -76,7 +73,6 @@ export function GroupTimeRow({ group, summaries, apps }: GroupRowProps): JSX.Ele
   const [iconSrc, setIconSrc] = useState<string | null>(null)
 
   const totalActive = summaries.reduce((acc, s) => acc + s.active_ms, 0)
-  const totalRunning = summaries.reduce((acc, s) => acc + s.running_ms, 0)
 
   useEffect(() => {
     api.getIconForGroup(group.id).then(setIconSrc).catch(() => {})
@@ -103,9 +99,6 @@ export function GroupTimeRow({ group, summaries, apps }: GroupRowProps): JSX.Ele
         </div>
         <span className={`time-row__duration${totalActive > 0 ? ' time-row__duration--active' : ''}`}>
           {fmtMs(totalActive)}
-        </span>
-        <span className={`time-row__duration${totalRunning > 0 ? ' time-row__duration--running' : ''}`}>
-          {fmtMs(totalRunning)}
         </span>
         <div className="time-row__actions" onClick={(e) => e.stopPropagation()}>
           <span className="badge">{summaries.length}</span>
@@ -136,9 +129,6 @@ export function UngroupedTimeRow({ summary, app }: UngroupedRowProps): JSX.Eleme
       </div>
       <span className={`time-row__duration${summary.active_ms > 0 ? ' time-row__duration--active' : ''}`}>
         {fmtMs(summary.active_ms)}
-      </span>
-      <span className={`time-row__duration${summary.running_ms > 0 ? ' time-row__duration--running' : ''}`}>
-        {fmtMs(summary.running_ms)}
       </span>
       <div className="time-row__actions">
         <label className="toggle">

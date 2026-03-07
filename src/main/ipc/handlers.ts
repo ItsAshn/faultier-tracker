@@ -288,7 +288,7 @@ export function registerIpcHandlers(): void {
         : "%Y-%m-%d";
       const chartPoints = db
         .prepare<
-          [number, number, number, number, number, number, number, number, number],
+          [string, number, number, number, number, number, number, number, number, number],
           { date: string; active_ms: number; running_ms: number }
         >(
           `SELECT strftime(?, MAX(s.started_at, ?) / 1000, 'unixepoch', 'localtime') AS date,
@@ -515,12 +515,11 @@ export function registerIpcHandlers(): void {
       console.log(`[IPC] getDailyTotals from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
       const rows = db
         .prepare<[number, number], { date: string; active_ms: number }>(
-          // Include both 'active' and 'running' session types so that Steam
-          // imports (which create 'running' sessions) appear in the heatmap.
           `SELECT strftime('%Y-%m-%d', started_at/1000, 'unixepoch', 'localtime') AS date,
                   SUM(ended_at - started_at) AS active_ms
            FROM sessions
-           WHERE started_at >= ?
+           WHERE session_type = 'active'
+             AND started_at >= ?
              AND ended_at IS NOT NULL
              AND ended_at <= ?
            GROUP BY date
@@ -536,8 +535,6 @@ export function registerIpcHandlers(): void {
     CHANNELS.SESSIONS_GET_BUCKET_APPS,
     (_e, from: number, to: number): BucketApp[] => {
       console.log(`[IPC] getBucketApps from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
-      // Use MAX(active_ms, running_ms) per app so Steam-imported games
-      // (which only have 'running' sessions) still appear in the leaderboard.
       const rows = db
         .prepare<
           [number, number],
@@ -545,13 +542,11 @@ export function registerIpcHandlers(): void {
         >(
           `SELECT s.app_id,
                   a.display_name,
-                  MAX(
-                    SUM(CASE WHEN s.session_type = 'active' THEN s.ended_at - s.started_at ELSE 0 END),
-                    SUM(CASE WHEN s.session_type = 'running' THEN s.ended_at - s.started_at ELSE 0 END)
-                  ) AS active_ms
+                  SUM(s.ended_at - s.started_at) AS active_ms
            FROM sessions s
            JOIN apps a ON a.id = s.app_id
-           WHERE s.started_at >= ?
+           WHERE s.session_type = 'active'
+             AND s.started_at >= ?
              AND s.ended_at IS NOT NULL
              AND s.ended_at <= ?
            GROUP BY s.app_id
