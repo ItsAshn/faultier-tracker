@@ -50,4 +50,9 @@ export function initUpdater(): void {
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {})
   }, 10_000)
+
+  // Periodic check every hour
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {})
+  }, 60 * 60_000)
 }

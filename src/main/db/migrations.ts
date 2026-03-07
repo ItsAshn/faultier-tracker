@@ -8,6 +8,84 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    // Merge duplicate apps rows that share the same exe_name but differ only in
+    // exe_path (NULL vs real path), then rebuild the apps table with a
+    // UNIQUE(exe_name) constraint instead of UNIQUE(exe_name, exe_path) so that
+    // the process-scanner (null path) and active-window (real path) always
+    // resolve to the same app_id.
+    version: 5,
+    up(db) {
+      db.exec(`
+        -- 1. For every group of duplicate exe_names, pick the canonical row:
+        --    prefer the one with a non-null exe_path; on ties take the lowest id.
+        CREATE TEMP TABLE _canon AS
+          SELECT
+            exe_name,
+            MIN(CASE WHEN exe_path IS NOT NULL THEN id ELSE NULL END) AS best_with_path,
+            MIN(id) AS best_any
+          FROM apps
+          GROUP BY exe_name
+          HAVING COUNT(*) > 1;
+
+        -- 2. Re-point sessions from duplicate rows to the canonical row.
+        UPDATE sessions
+          SET app_id = COALESCE(
+            (SELECT best_with_path FROM _canon WHERE _canon.exe_name =
+              (SELECT exe_name FROM apps WHERE apps.id = sessions.app_id)),
+            (SELECT best_any FROM _canon WHERE _canon.exe_name =
+              (SELECT exe_name FROM apps WHERE apps.id = sessions.app_id))
+          )
+          WHERE app_id IN (
+            SELECT id FROM apps WHERE exe_name IN (SELECT exe_name FROM _canon)
+          )
+          AND app_id NOT IN (
+            SELECT COALESCE(best_with_path, best_any) FROM _canon
+          );
+
+        -- 3. Delete the non-canonical duplicate rows.
+        DELETE FROM apps
+          WHERE exe_name IN (SELECT exe_name FROM _canon)
+          AND id NOT IN (SELECT COALESCE(best_with_path, best_any) FROM _canon);
+
+        -- 4. Fill in exe_path on the canonical row from any deleted sibling
+        --    (already removed above, so just ensure canonical row has its path).
+        --    (Nothing to do — canonical row was the one with path, if any existed.)
+
+        DROP TABLE _canon;
+
+        -- 5. Rebuild the apps table with UNIQUE(exe_name) replacing UNIQUE(exe_name, exe_path).
+        CREATE TABLE apps_new (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          exe_name          TEXT NOT NULL UNIQUE,
+          exe_path          TEXT,
+          display_name      TEXT NOT NULL,
+          group_id          INTEGER REFERENCES app_groups(id) ON DELETE SET NULL,
+          is_tracked        INTEGER NOT NULL DEFAULT 1,
+          icon_cache_path   TEXT,
+          custom_image_path TEXT,
+          description       TEXT NOT NULL DEFAULT '',
+          notes             TEXT NOT NULL DEFAULT '',
+          tags              TEXT NOT NULL DEFAULT '[]',
+          first_seen        INTEGER NOT NULL,
+          last_seen         INTEGER NOT NULL,
+          daily_goal_ms     INTEGER
+        );
+
+        INSERT INTO apps_new SELECT * FROM apps;
+
+        DROP TABLE apps;
+        ALTER TABLE apps_new RENAME TO apps;
+
+        -- Re-create indexes that were on the old table.
+        CREATE INDEX IF NOT EXISTS idx_apps_exe_name        ON apps(exe_name);
+        CREATE INDEX IF NOT EXISTS idx_sessions_time_range  ON sessions(started_at, ended_at);
+        CREATE INDEX IF NOT EXISTS idx_sessions_app_id      ON sessions(app_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_started_at  ON sessions(started_at);
+        CREATE INDEX IF NOT EXISTS idx_sessions_type        ON sessions(session_type);
+      `);
+    },
+  },
+  {
     version: 4,
     up(db) {
       // Covering index for the session range query used by SESSIONS_GET_RANGE every 30s

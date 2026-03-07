@@ -1,24 +1,19 @@
 import { Download, Minus, RefreshCw, Square, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useUpdateStore } from '../../store/updateStore'
 import { api } from '../../api/bridge'
 
 export default function TitleBar(): JSX.Element {
+  const navigate = useNavigate()
   const status = useUpdateStore((s) => s.status)
   const info = useUpdateStore((s) => s.info)
-  const downloadUpdate = useUpdateStore((s) => s.downloadUpdate)
-  const quitAndInstall = useUpdateStore((s) => s.quitAndInstall)
 
   const showUpdate = status === 'available' || status === 'downloading' || status === 'downloaded'
   const updateTitle =
-    status === 'available' && info ? `Download v${info.version}`
+    status === 'available' && info ? `Update available: v${info.version} — click to view`
     : status === 'downloading' ? 'Downloading update…'
-    : status === 'downloaded' && info ? `Restart to install v${info.version}`
+    : status === 'downloaded' && info ? `v${info.version} ready to install — click to view`
     : undefined
-
-  const handleUpdateClick = () => {
-    if (status === 'available') downloadUpdate()
-    else if (status === 'downloaded') quitAndInstall()
-  }
 
   return (
     <header className="titlebar">
@@ -32,9 +27,8 @@ export default function TitleBar(): JSX.Element {
         {showUpdate && (
           <button
             className={`titlebar__control titlebar__control--update${status === 'downloaded' ? ' titlebar__control--update-ready' : ''}`}
-            onClick={handleUpdateClick}
+            onClick={() => navigate('/settings?tab=about')}
             title={updateTitle}
-            disabled={status === 'downloading'}
           >
             {status === 'downloaded' ? <RefreshCw size={14} /> : <Download size={14} />}
           </button>

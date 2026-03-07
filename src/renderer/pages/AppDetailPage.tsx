@@ -1,6 +1,6 @@
 import { useState, useEffect, KeyboardEvent } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Clock, Activity, AppWindow, X, Target } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Activity, AppWindow, X, Target } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import '../styles/app-detail.css'
 import { useAppStore } from '../store/appStore'
@@ -318,15 +318,6 @@ export default function AppDetailPage(): JSX.Element {
           <div className="summary-card__label">Active Time</div>
           <div className="summary-card__value">
             {loading ? '—' : rangeData ? fmtMs(rangeData.active_ms) : '—'}
-          </div>
-        </div>
-        <div className="summary-card">
-          <div className="summary-card__icon">
-            <Clock size={16} />
-          </div>
-          <div className="summary-card__label">Running Time</div>
-          <div className="summary-card__value">
-            {loading ? '—' : rangeData ? fmtMs(rangeData.running_ms) : '—'}
           </div>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Fuse from 'fuse.js'
 import { Search, ExternalLink } from 'lucide-react'
 import '../styles/settings.css'
@@ -11,7 +12,9 @@ import AboutUpdates from '../components/settings/AboutUpdates'
 type Tab = 'tracking' | 'groups' | 'data' | 'artwork' | 'about'
 
 export default function Settings(): JSX.Element {
-  const [tab, setTab] = useState<Tab>('tracking')
+  const [searchParams] = useSearchParams()
+  const initialTab = (searchParams.get('tab') as Tab) ?? 'tracking'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [filterSearch, setFilterSearch] = useState('')
   const [sgdbKey, setSgdbKey] = useState<string | null>(null)
   const [sgdbKeySaved, setSgdbKeySaved] = useState(false)

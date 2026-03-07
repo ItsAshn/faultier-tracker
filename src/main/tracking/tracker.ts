@@ -75,7 +75,7 @@ async function pollTick(): Promise<void> {
       getRunningProcesses(),
     ]);
 
-    console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} runningCount=${runningProcesses.length}`);
+    console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} pid=${activeApp?.pid ?? '-'} runningCount=${runningProcesses.length}`);
 
     // ── Tracked apps lookup ──────────────────────────────────────────
     const db = getDb();

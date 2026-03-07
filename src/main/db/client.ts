@@ -280,18 +280,28 @@ export function upsertApp(
   now: number,
 ): number {
   const db = getDb();
+  // Match on exe_name only — exe_path may arrive as null from process scanner
+  // and non-null from active window. We must not create duplicate rows.
   const existing = db
-    .prepare<
-      [string, string | null, string | null],
-      { id: number }
-    >("SELECT id FROM apps WHERE exe_name = ? AND (exe_path = ? OR (exe_path IS NULL AND ? IS NULL))")
-    .get(exeName, exePath, exePath);
+    .prepare<[string], { id: number; exe_path: string | null }>(
+      "SELECT id, exe_path FROM apps WHERE exe_name = ?",
+    )
+    .get(exeName);
 
   if (existing) {
-    db.prepare("UPDATE apps SET last_seen = ? WHERE id = ?").run(
-      now,
-      existing.id,
-    );
+    // If we now have the exe_path and the row doesn't, fill it in
+    if (exePath && !existing.exe_path) {
+      db.prepare("UPDATE apps SET exe_path = ?, last_seen = ? WHERE id = ?").run(
+        exePath,
+        now,
+        existing.id,
+      );
+    } else {
+      db.prepare("UPDATE apps SET last_seen = ? WHERE id = ?").run(
+        now,
+        existing.id,
+      );
+    }
     return existing.id;
   }
 
