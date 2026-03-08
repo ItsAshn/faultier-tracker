@@ -121,6 +121,21 @@ export function tickRunning(appId: number, now: number): void {
   }
 }
 
+// Called when the active window switches to an untracked app or disappears,
+// so the previously active session is closed instead of leaking open.
+export function endActiveSession(now: number): void {
+  try {
+    const interval = getPollInterval()
+    for (const [appId, session] of activeSessions.entries()) {
+      console.log(`[SessionManager] endActiveSession: closing active session id=${session.dbId} for app=${appId}`)
+      closeSession(session.dbId, session.lastTick + interval)
+      activeSessions.delete(appId)
+    }
+  } catch (err) {
+    console.error("[SessionManager] endActiveSession error:", err)
+  }
+}
+
 // Called when a process is no longer running
 export function endRunningSession(appId: number, now: number): void {
   _lastTickTime = now

@@ -6,6 +6,7 @@ import {
   tickActive,
   tickRunning,
   endRunningSession,
+  endActiveSession,
   initSessionManager,
 } from "./sessionManager";
 import { resolveGroup } from "../grouping/groupEngine";
@@ -260,9 +261,15 @@ async function pollTick(): Promise<void> {
             }
           }
         }
-      } else if (appRow) {
-        console.log(`[Tracker] active window ${activeApp.exeName} not ticked: is_tracked=${appRow.is_tracked} (type=${typeof appRow.is_tracked}) isIdle=${isIdle}`);
+      } else {
+        // Active window is untracked or we're idle — close any open active session
+        // so it doesn't leak time onto the previously focused app.
+        console.log(`[Tracker] active window ${activeApp.exeName} not ticked: is_tracked=${appRow?.is_tracked} isIdle=${isIdle} — ending active session`);
+        endActiveSession(now);
       }
+    } else {
+      // No focused window detected — close any open active session.
+      endActiveSession(now);
     }
 
     // ── Build tick payload ────────────────────────────────────────────
