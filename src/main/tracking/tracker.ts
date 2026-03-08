@@ -123,7 +123,7 @@ async function pollTick(): Promise<void> {
 
         if (shouldTrack) {
           currentRunningIds.add(appRow.id);
-          tickRunning(appRow.id, now);
+          if (!isIdle) tickRunning(appRow.id, now);
         }
       } else if (trackedMode === "blacklist") {
         // Auto-discover new apps in blacklist mode
@@ -149,7 +149,7 @@ async function pollTick(): Promise<void> {
         // Add to knownApps so duplicates in runningProcesses skip re-discovery
         knownApps.set(proc.exeName, { id: appId, is_tracked: 1 });
         currentRunningIds.add(appId);
-        tickRunning(appId, now);
+        if (!isIdle) tickRunning(appId, now);
       }
     }
 

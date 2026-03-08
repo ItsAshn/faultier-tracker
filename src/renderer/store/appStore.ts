@@ -126,9 +126,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async setSetting(key, value) {
+    // Update local state immediately so sliders and toggles feel instant
+    set((s) => ({ settings: { ...s.settings, [key]: value } }))
     try {
       await api.setSetting(key, value)
-      set((s) => ({ settings: { ...s.settings, [key]: value } }))
     } catch (err) {
       set({ error: String(err) })
     }
