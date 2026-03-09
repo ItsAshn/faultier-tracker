@@ -93,13 +93,24 @@ export function registerIpcHandlers(): void {
   // ── Apps ─────────────────────────────────────────────────────────────────
 
   ipcMain.handle(CHANNELS.APPS_GET_ALL, (): AppRecord[] => {
-    return db
-      .prepare<
-        [],
-        ReturnType<typeof mapApp>
-      >("SELECT * FROM apps ORDER BY display_name COLLATE NOCASE")
-      .all()
-      .map(mapApp);
+    interface RawAppRow {
+      id: number;
+      exe_name: string;
+      exe_path: string | null;
+      display_name: string;
+      group_id: number | null;
+      is_tracked: number;
+      icon_cache_path: string | null;
+      custom_image_path: string | null;
+      description: string;
+      notes: string;
+      tags: string;
+      first_seen: number;
+      last_seen: number;
+      daily_goal_ms: number | null;
+    }
+    const rows = db.prepare<[], RawAppRow>("SELECT * FROM apps ORDER BY display_name COLLATE NOCASE").all();
+    return rows.map(mapApp);
   });
 
   ipcMain.handle(
@@ -169,13 +180,20 @@ export function registerIpcHandlers(): void {
   // ── Groups ────────────────────────────────────────────────────────────────
 
   ipcMain.handle(CHANNELS.GROUPS_GET_ALL, (): AppGroup[] => {
-    return db
-      .prepare<
-        [],
-        ReturnType<typeof mapGroup>
-      >("SELECT * FROM app_groups ORDER BY name COLLATE NOCASE")
-      .all()
-      .map(mapGroup);
+    interface RawGroupRow {
+      id: number;
+      name: string;
+      description: string;
+      icon_cache_path: string | null;
+      custom_image_path: string | null;
+      tags: string;
+      is_manual: number;
+      created_at: number;
+      daily_goal_ms: number | null;
+      category: string | null;
+    }
+    const rows = db.prepare<[], RawGroupRow>("SELECT * FROM app_groups ORDER BY name COLLATE NOCASE").all();
+    return rows.map(mapGroup);
   });
 
   ipcMain.handle(CHANNELS.GROUPS_CREATE, (_e, name: string): AppGroup => {
@@ -562,7 +580,9 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.SESSIONS_CLEAR_ALL, (): void => {
+    console.log('[IPC] SESSIONS_CLEAR_ALL: deleting all sessions from database');
     db.prepare("DELETE FROM sessions").run();
+    console.log('[IPC] SESSIONS_CLEAR_ALL: complete');
   });
 
   // ── Settings ──────────────────────────────────────────────────────────────
@@ -849,9 +869,11 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.DATA_RESET_ALL, async (): Promise<void> => {
+    console.log('[IPC] DATA_RESET_ALL: stopping tracker, resetting all data, restarting tracker');
     stopTracker();
     resetDbData();
     await startTracker();
+    console.log('[IPC] DATA_RESET_ALL: complete');
   });
 
   // ── Window control ────────────────────────────────────────────────────────
