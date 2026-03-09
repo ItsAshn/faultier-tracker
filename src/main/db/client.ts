@@ -173,38 +173,27 @@ export async function openDb(): Promise<DbCompat> {
   seedDefaults(_db);
 
   // Auto-save every 30 seconds using async I/O to avoid blocking the main thread
-  // DEBUG: Reduced to 5 seconds for debugging tracking issues
-  const AUTO_SAVE_INTERVAL = 5_000; // 5 seconds (change back to 30_000 for production)
   _saveTimer = setInterval(async () => {
-    if (!_rawDb || !_dbPath || _isSaving) {
-      console.log("[DB] Auto-save skipped: _rawDb=", !!_rawDb, "_dbPath=", !!_dbPath, "_isSaving=", _isSaving);
-      return;
-    }
+    if (!_rawDb || !_dbPath || _isSaving) return;
     _isSaving = true;
-    console.log("[DB] Auto-save: starting...");
     try {
       const data = _rawDb.export();
       await fs.promises.writeFile(_dbPath, Buffer.from(data));
-      console.log("[DB] Auto-save: complete, size=", Buffer.from(data).length, "bytes");
     } catch (err) {
       console.error("[DB] Auto-save failed:", err);
     } finally {
       _isSaving = false;
     }
-  }, AUTO_SAVE_INTERVAL);
+  }, 30_000);
 
   console.log("[DB] Opened:", _dbPath);
   return _db;
 }
 
 export function persistDb(): void {
-  if (!_rawDb || !_dbPath) {
-    console.log("[DB] persistDb: skipped, _rawDb=", !!_rawDb, "_dbPath=", !!_dbPath);
-    return;
-  }
+  if (!_rawDb || !_dbPath) return;
   const data = _rawDb.export();
   fs.writeFileSync(_dbPath, Buffer.from(data));
-  console.log("[DB] persistDb: written", Buffer.from(data).length, "bytes to", _dbPath);
 }
 
 export function closeDb(): void {

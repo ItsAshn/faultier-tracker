@@ -43,12 +43,17 @@ export default function Gallery(): JSX.Element {
   const setSetting = useAppStore((s) => s.setSetting)
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
   const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(null)
+  const lastSummaryFetchRef = useRef<number>(0)
 
-  // Refresh all-time summary whenever the app list changes (new apps discovered,
-  // Steam import, etc.) so the "Most time" sort stays accurate.
+  // Refresh all-time summary on mount, when the app list changes, and when new
+  // tracking ticks arrive — throttled to at most once per 30s so we don't hammer
+  // the DB on every 5-second poll tick.
   useEffect(() => {
+    const now = Date.now()
+    if (lastSummaryFetchRef.current > 0 && now - lastSummaryFetchRef.current < 30_000) return
+    lastSummaryFetchRef.current = now
     api.getSessionRange(0, Date.now()).then(setAllTimeSummary).catch(() => {})
-  }, [apps.length])
+  }, [apps.length, lastTickAt])
 
   const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)
