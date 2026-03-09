@@ -290,6 +290,7 @@ export function upsertApp(
   exePath: string | null,
   displayName: string,
   now: number,
+  isTracked: 0 | 1 = 1,
 ): number {
   const db = getDb();
   // Match on exe_name only — exe_path may arrive as null from process scanner
@@ -319,9 +320,9 @@ export function upsertApp(
 
   const result = db
     .prepare(
-      "INSERT INTO apps (exe_name, exe_path, display_name, first_seen, last_seen) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO apps (exe_name, exe_path, display_name, is_tracked, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?)",
     )
-    .run(exeName, exePath, displayName, now, now);
+    .run(exeName, exePath, displayName, isTracked, now, now);
 
   return result.lastInsertRowid as number;
 }

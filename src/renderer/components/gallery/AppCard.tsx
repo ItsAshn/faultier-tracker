@@ -60,9 +60,15 @@ interface AppCardProps {
 export default function AppCard({ item, isGroup, memberCount, summary, onClick }: AppCardProps): JSX.Element {
   const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
   const setAppTracked = useAppStore((s) => s.setAppTracked)
+  // Read is_tracked from the live Zustand store to avoid stale-prop bugs on rapid toggling.
+  // Falls back to the prop for groups (which are always "tracked") or if the store entry
+  // hasn't loaded yet.
+  const liveIsTracked = useAppStore((s) =>
+    isGroup ? null : (s.apps.find((a) => a.id === item.id)?.is_tracked ?? null)
+  )
   const cardRef = useRef<HTMLDivElement>(null)
 
-  const isTracked = isGroup ? true : (item as AppRecord).is_tracked
+  const isTracked = isGroup ? true : (liveIsTracked ?? (item as AppRecord).is_tracked)
 
   useEffect(() => {
     if (item.custom_image_path) return
@@ -87,7 +93,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   function handleTrackedToggle(e: React.MouseEvent): void {
     e.stopPropagation()
     if (!isGroup) {
-      setAppTracked(item.id, !(item as AppRecord).is_tracked)
+      setAppTracked(item.id, !isTracked)
     }
   }
 

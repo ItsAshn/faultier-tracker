@@ -37,7 +37,7 @@ import type {
 } from "@shared/types";
 import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
-import { resetSessionState } from "../tracking/sessionManager";
+import { resetSessionState, endRunningSession, endActiveSession } from "../tracking/sessionManager";
 import { persistDb } from "../db/client";
 
 function mapApp(raw: {
@@ -167,6 +167,14 @@ export function registerIpcHandlers(): void {
       db.prepare<[number, number]>(
         "UPDATE apps SET is_tracked = ? WHERE id = ?",
       ).run(tracked ? 1 : 0, id);
+      // When an app is disabled, close any open running/active sessions
+      // immediately so time stops accruing — don't wait for the next poll tick.
+      if (!tracked) {
+        const now = Date.now();
+        console.log(`[IPC] APPS_SET_TRACKED: app id=${id} disabled — closing open sessions`);
+        endRunningSession(id, now);
+        endActiveSession(now);
+      }
     },
   );
 

@@ -127,10 +127,11 @@ async function pollTick(): Promise<void> {
           if (!isIdle) tickRunning(appRow.id, now);
         }
       } else if (trackedMode === "blacklist") {
-        // Auto-discover new apps in blacklist mode
+        // Auto-discover new apps in blacklist mode — default tracked=1 so they
+        // are immediately included. In whitelist mode we never auto-discover.
         const displayName = deriveDisplayName(proc.exeName);
         console.log(`[Tracker] auto-discovering new app: ${proc.exeName} -> "${displayName}"`);
-        const appId = upsertApp(proc.exeName, null, displayName, now);
+        const appId = upsertApp(proc.exeName, null, displayName, now, 1);
         const groupId = await resolveGroup(proc.exeName, null);
         if (groupId !== null) {
           db.prepare<[number, number], void>(
@@ -188,11 +189,15 @@ async function pollTick(): Promise<void> {
       if (!appRow) {
         const displayName = deriveDisplayName(activeApp.exeName);
         console.log(`[Tracker] active window new app: ${activeApp.exeName} -> "${displayName}"`);
+        // In whitelist mode new apps start untracked (is_tracked=0); in blacklist mode they
+        // start tracked (is_tracked=1) so they are immediately included.
+        const isTrackedDefault: 0 | 1 = trackedMode === "whitelist" ? 0 : 1;
         appId = upsertApp(
           activeApp.exeName,
           activeApp.exePath,
           displayName,
           now,
+          isTrackedDefault,
         );
         const groupId = await resolveGroup(activeApp.exeName, activeApp.exePath);
         if (groupId !== null) {
