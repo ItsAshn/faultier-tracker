@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Zap, X, ExternalLink } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/dashboard.css'
@@ -25,6 +25,7 @@ export default function Dashboard(): JSX.Element {
   const setSetting = useAppStore((s) => s.setSetting)
   const navigate = useNavigate()
 
+  const hasAutoSwitched = useRef(false)
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const showOnboarding = lastTickAt === null && !bannerDismissed
   const steamPromptDismissed = settings['steam_prompt_dismissed'] === 'true' || settings['steam_prompt_dismissed'] === true
@@ -33,13 +34,12 @@ export default function Dashboard(): JSX.Element {
   const period: GridPeriod = preset === 'all' ? 'all' : preset === 'month' ? 'month' : 'week'
 
   useEffect(() => {
-    if (!lastTickAt) return
-    const timer = setTimeout(() => {
-      if (preset === 'today') {
-        setPreset('week')
-      }
-    }, 100)
-    return () => clearTimeout(timer)
+    if (!lastTickAt || hasAutoSwitched.current) return
+    hasAutoSwitched.current = true
+    if (preset === 'today') {
+      const timer = setTimeout(() => setPreset('week'), 100)
+      return () => clearTimeout(timer)
+    }
   }, [lastTickAt])
 
   function handleHeatmapDayClick(dateStr: string): void {

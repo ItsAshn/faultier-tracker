@@ -6,7 +6,7 @@ import { api } from '../../api/bridge'
 import type { GridPeriod } from './TopAppsLeaderboard'
 
 function fmtMs(ms: number): string {
-  if (ms < 60_000) return '0m'
+  if (ms < 60_000) return '<1m'
   const h = Math.floor(ms / 3_600_000)
   const m = Math.floor((ms % 3_600_000) / 60_000)
   if (h > 0) return `${h}h ${m}m`
@@ -33,7 +33,7 @@ interface Props {
 
 export default function HeroAppCard({ summary, loading, period }: Props): JSX.Element {
   const navigate = useNavigate()
-  const topApp = summary?.top_app ?? null
+  const topApp = summary?.top_app?.active_ms ? summary.top_app : null
   const [icon, setIcon] = useState<string | null>(null)
 
   useEffect(() => {
