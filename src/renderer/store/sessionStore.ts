@@ -23,6 +23,8 @@ interface SessionStore {
   setCustomRange: (from: number, to: number) => void
   loadRange: () => Promise<void>
   onTick: (payload: TickPayload) => void
+  // Called when main process clears/resets all data so the next tick forces a reload
+  onDataCleared: () => void
 }
 
 function getPresetRange(preset: DateRangePreset): { from: number; to: number } {
@@ -106,5 +108,12 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     if (!lastLoad || Date.now() - lastLoad > 30_000) {
       get().loadRange()
     }
-  }
+  },
+
+  onDataCleared() {
+    // Wipe summary so the UI shows a loading state, and clear the throttle
+    // timestamp so the very next tick (or immediate loadRange call) fires.
+    set({ summary: null, _lastLoadAt: null })
+    get().loadRange()
+  },
 }))

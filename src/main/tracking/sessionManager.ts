@@ -151,6 +151,15 @@ export function endRunningSession(appId: number, now: number): void {
   }
 }
 
+// Called after a hard session wipe (DELETE FROM sessions) to discard stale
+// in-memory session state.  The DB rows are already gone so we must NOT try to
+// UPDATE them — just drop the maps so the next tick opens fresh sessions.
+export function resetSessionState(): void {
+  console.log(`[SessionManager] resetSessionState: discarding ${activeSessions.size} active + ${runningSessions.size} running in-memory session(s)`)
+  activeSessions.clear()
+  runningSessions.clear()
+}
+
 // Called on app quit to close all open sessions
 export function closeAllSessions(now: number): void {
   try {

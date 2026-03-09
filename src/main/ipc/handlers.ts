@@ -37,6 +37,8 @@ import type {
 } from "@shared/types";
 import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
+import { resetSessionState } from "../tracking/sessionManager";
+import { persistDb } from "../db/client";
 
 function mapApp(raw: {
   id: number;
@@ -582,6 +584,14 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(CHANNELS.SESSIONS_CLEAR_ALL, (): void => {
     console.log('[IPC] SESSIONS_CLEAR_ALL: deleting all sessions from database');
     db.prepare("DELETE FROM sessions").run();
+    // Discard stale in-memory sessions so the tracker starts fresh next tick
+    resetSessionState();
+    // Flush the now-empty sessions table to disk immediately
+    persistDb();
+    // Tell the renderer to reload all data
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) win.webContents.send(CHANNELS.DATA_CLEARED);
+    });
     console.log('[IPC] SESSIONS_CLEAR_ALL: complete');
   });
 
@@ -871,8 +881,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(CHANNELS.DATA_RESET_ALL, async (): Promise<void> => {
     console.log('[IPC] DATA_RESET_ALL: stopping tracker, resetting all data, restarting tracker');
     stopTracker();
+    // Clear in-memory session state BEFORE wiping the DB so closeAllSessions
+    // (called inside stopTracker path) doesn't try to UPDATE now-gone rows
+    resetSessionState();
     resetDbData();
+    // Flush the freshly-seeded empty DB to disk immediately
+    persistDb();
     await startTracker();
+    // Tell the renderer to reload apps, groups, settings, and session data
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) win.webContents.send(CHANNELS.DATA_CLEARED);
+    });
     console.log('[IPC] DATA_RESET_ALL: complete');
   });
 

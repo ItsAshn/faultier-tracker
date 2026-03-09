@@ -51,6 +51,7 @@ export const CHANNELS = {
   TRACKING_APP_SEEN: "tracking:appSeen",
   TRACKING_TICK: "tracking:tick",
   APPS_ARTWORK_UPDATED: "apps:artworkUpdated",
+  DATA_CLEARED: "data:cleared",   // sent after sessions clear or full reset
 
   // Updater — invoke (renderer → main)
   UPDATE_CHECK: "update:check",

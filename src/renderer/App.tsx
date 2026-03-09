@@ -92,6 +92,7 @@ export default function App(): JSX.Element {
   const loadAll = useAppStore((s) => s.loadAll)
   const loadRange = useSessionStore((s) => s.loadRange)
   const onTick = useSessionStore((s) => s.onTick)
+  const onDataCleared = useSessionStore((s) => s.onDataCleared)
   const setAvailable = useUpdateStore((s) => s.setAvailable)
   const setNotAvailable = useUpdateStore((s) => s.setNotAvailable)
   const setProgress = useUpdateStore((s) => s.setProgress)
@@ -116,6 +117,11 @@ export default function App(): JSX.Element {
     const unsubArtwork = api.onArtworkUpdated(() => {
       useAppStore.getState().loadAll()
     })
+    const unsubDataCleared = api.onDataCleared(() => {
+      // Main process wiped the DB — reload apps/groups and reset session summary
+      useAppStore.getState().loadAll()
+      useSessionStore.getState().onDataCleared()
+    })
     const unsubAvailable = api.onUpdateAvailable(setAvailable)
     const unsubNotAvailable = api.onUpdateNotAvailable(setNotAvailable)
     const unsubProgress = api.onUpdateDownloadProgress(setProgress)
@@ -126,13 +132,14 @@ export default function App(): JSX.Element {
       unsubTick()
       unsubAppSeen()
       unsubArtwork()
+      unsubDataCleared()
       unsubAvailable()
       unsubNotAvailable()
       unsubProgress()
       unsubDownloaded()
       unsubError()
     }
-  }, [loadAll, loadRange, onTick, setAvailable, setNotAvailable, setProgress, setDownloaded, setError])
+  }, [loadAll, loadRange, onTick, onDataCleared, setAvailable, setNotAvailable, setProgress, setDownloaded, setError])
 
   return (
     <ErrorBoundary>

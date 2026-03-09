@@ -186,6 +186,13 @@ const api = {
       ipcRenderer.removeListener(CHANNELS.APPS_ARTWORK_UPDATED, handler);
   },
 
+  // Fired after a full session clear or data reset — renderer should reload all stores
+  onDataCleared: (cb: () => void): (() => void) => {
+    const handler = (): void => cb();
+    ipcRenderer.on(CHANNELS.DATA_CLEARED, handler);
+    return () => ipcRenderer.removeListener(CHANNELS.DATA_CLEARED, handler);
+  },
+
   // Auto-updater — invoke commands
   checkForUpdates: (): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.UPDATE_CHECK),

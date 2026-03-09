@@ -232,6 +232,7 @@ const stub: ApiType = {
   onTick: () => () => {},
   onAppSeen: () => () => {},
   onArtworkUpdated: () => () => {},
+  onDataCleared: () => () => {},
   checkForUpdates: () => Promise.resolve(),
   downloadUpdate: () => Promise.resolve(),
   quitAndInstall: () => {},
