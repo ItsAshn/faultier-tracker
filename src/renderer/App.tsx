@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import TitleBar from './components/layout/TitleBar'
 import NavPills from './components/layout/NavPills'
 import UpdateBanner from './components/layout/UpdateBanner'
-import Dashboard from './pages/Dashboard'
 import Gallery from './pages/Gallery'
 import Settings from './pages/Settings'
 import AppDetailPage from './pages/AppDetailPage'
@@ -151,8 +150,7 @@ export default function App(): JSX.Element {
           <NavPills />
           <div className="main-content">
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<Navigate to="/gallery" replace />} />
               <Route path="/gallery" element={<Gallery />} />
               <Route path="/app/:id" element={<AppDetailPage />} />
               <Route path="/group/:id" element={<AppDetailPage />} />

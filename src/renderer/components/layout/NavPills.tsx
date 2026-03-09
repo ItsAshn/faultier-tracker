@@ -4,9 +4,8 @@ import { useSessionStore } from '../../store/sessionStore'
 import '../../styles/nav-pills.css'
 
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Dashboard' },
-  { path: '/gallery',   label: 'Gallery'   },
-  { path: '/settings',  label: 'Settings'  },
+  { path: '/gallery',  label: 'Gallery'  },
+  { path: '/settings', label: 'Settings' },
 ]
 
 export default function NavPills(): JSX.Element {
@@ -57,6 +56,7 @@ export default function NavPills(): JSX.Element {
           const isActive =
             path === '/gallery'
               ? location.pathname === '/gallery' ||
+                location.pathname === '/' ||
                 location.pathname.startsWith('/app/') ||
                 location.pathname.startsWith('/group/')
               : location.pathname === path
