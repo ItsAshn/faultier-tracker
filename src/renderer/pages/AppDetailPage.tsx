@@ -153,13 +153,17 @@ export default function AppDetailPage(): JSX.Element {
   // Load range data
   useEffect(() => {
     if (!item) return
+    let cancelled = false
     const { from, to, groupBy } = computeRange(preset)
     setLoading(true)
     api.getAppSessionRange(numId, from, to, groupBy, isGroup)
-      .then(setRangeData)
+      .then((data) => { if (!cancelled) setRangeData(data) })
       .catch(() => {})
-      .finally(() => setLoading(false))
-    api.getSessionTitles(numId, from, to, isGroup).then(setTitles).catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false) })
+    api.getSessionTitles(numId, from, to, isGroup)
+      .then((data) => { if (!cancelled) setTitles(data) })
+      .catch(() => {})
+    return () => { cancelled = true }
   }, [numId, isGroup, preset, item?.id])
 
   function addTag(): void {

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { AppWindow } from 'lucide-react'
 import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
 import { api } from '../../api/bridge'
-import { useAppStore } from '../../store/appStore'
 
 // ── Module-level icon batch queue ────────────────────────────────────────────
 // Collects icon requests from all visible cards within a 50ms window and fires
@@ -59,16 +58,7 @@ interface AppCardProps {
 
 export default function AppCard({ item, isGroup, memberCount, summary, onClick }: AppCardProps): JSX.Element {
   const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
-  const setAppTracked = useAppStore((s) => s.setAppTracked)
-  // Read is_tracked from the live Zustand store to avoid stale-prop bugs on rapid toggling.
-  // Falls back to the prop for groups (which are always "tracked") or if the store entry
-  // hasn't loaded yet.
-  const liveIsTracked = useAppStore((s) =>
-    isGroup ? null : (s.apps.find((a) => a.id === item.id)?.is_tracked ?? null)
-  )
   const cardRef = useRef<HTMLDivElement>(null)
-
-  const isTracked = isGroup ? true : (liveIsTracked ?? (item as AppRecord).is_tracked)
 
   useEffect(() => {
     if (item.custom_image_path) return
@@ -90,13 +80,6 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
     return () => observer.disconnect()
   }, [item.id, item.custom_image_path, isGroup])
 
-  function handleTrackedToggle(e: React.MouseEvent): void {
-    e.stopPropagation()
-    if (!isGroup) {
-      setAppTracked(item.id, !isTracked)
-    }
-  }
-
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary ? summary.active_ms : 0
   const hasTime = activeMs > 0
@@ -104,7 +87,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   return (
     <div
       ref={cardRef}
-      className={`app-card${!isTracked ? ' app-card--ignored' : ''}`}
+      className="app-card"
       onClick={onClick}
     >
       {/* Blurred backdrop — fills the whole card */}
@@ -144,16 +127,6 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
         )}
       </div>
 
-      {/* Track toggle — top-right */}
-      {!isGroup && (
-        <button
-          className={`app-card__track-btn${isTracked ? ' app-card__track-btn--on' : ''}`}
-          onClick={handleTrackedToggle}
-          title={isTracked ? 'Stop tracking' : 'Start tracking'}
-        >
-          {isTracked ? 'Tracking' : 'Ignored'}
-        </button>
-      )}
     </div>
   )
 }
