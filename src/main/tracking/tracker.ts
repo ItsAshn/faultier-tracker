@@ -70,11 +70,6 @@ function schedulePoll(): void {
 async function pollTick(): Promise<void> {
   const now = Date.now();
 
-  // Persist the current tick time so repairOrphanedSessions can use it on
-  // the next startup after a crash. Written before the try block so it is
-  // always recorded even when the tracking logic throws.
-  setSetting("last_track_time", now);
-
   // Default payload sent even when the poll body throws, so the renderer
   // always receives a heartbeat and never gets stuck on "Connecting…".
   let payload: TickPayload = {
@@ -84,6 +79,11 @@ async function pollTick(): Promise<void> {
   };
 
   try {
+    // Persist the current tick time so repairOrphanedSessions can use it on
+    // the next startup after a crash. Inside the try so a transient DB error
+    // doesn't stop the polling loop.
+    setSetting("last_track_time", now);
+
     const idleThreshold = (getSetting("idle_threshold_ms") as number) ?? 300000;
     const idleSecs = powerMonitor.getSystemIdleTime();
     const isIdle = idleSecs * 1000 >= idleThreshold;
