@@ -49,8 +49,11 @@ function intensityLevel(ms: number, maxMs: number): number {
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const DAY_LABELS = ['S','M','T','W','T','F','S']
 
+// Module-level cache so heatmap data survives Heatmap unmount/remount (Gallery navigation).
+let _cachedTotalsMap: Map<string, number> | null = null
+
 export default function Heatmap({ onDayClick }: Props): JSX.Element {
-  const [totalsMap, setTotalsMap] = useState<Map<string, number>>(new Map())
+  const [totalsMap, setTotalsMap] = useState<Map<string, number>>(_cachedTotalsMap ?? new Map())
   const [tooltip, setTooltip] = useState<{ date: string; ms: number; x: number; y: number } | null>(null)
 
   useEffect(() => {
@@ -60,6 +63,7 @@ export default function Heatmap({ onDayClick }: Props): JSX.Element {
       api.getDailyTotals(oneYearAgo, Date.now()).then((rows: DayTotal[]) => {
         const m = new Map<string, number>()
         for (const r of rows) m.set(r.date, r.active_ms)
+        _cachedTotalsMap = m
         setTotalsMap(m)
       }).catch(() => {})
     }, 150)

@@ -16,6 +16,10 @@ type SortMode = 'time' | 'name' | 'last_seen'
 
 const SCROLL_KEY = 'gallery-scroll'
 
+// Module-level cache so allTimeSummary survives Gallery unmount/remount (navigation).
+// Without this, every back-navigation causes a blank flash while the IPC fetch completes.
+let _cachedAllTimeSummary: RangeSummary | null = null
+
 interface GalleryItem {
   id: number
   isGroup: boolean
@@ -42,7 +46,8 @@ export default function Gallery(): JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const setSetting = useAppStore((s) => s.setSetting)
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
-  const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(null)
+  // Initialise from cache so remounting after navigation shows data immediately.
+  const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(_cachedAllTimeSummary)
   const lastSummaryFetchRef = useRef<number>(0)
 
   // Refresh all-time summary on mount, when the app list changes, and when new
@@ -52,7 +57,10 @@ export default function Gallery(): JSX.Element {
     const now = Date.now()
     if (lastSummaryFetchRef.current > 0 && now - lastSummaryFetchRef.current < 30_000) return
     lastSummaryFetchRef.current = now
-    api.getSessionRange(0, Date.now()).then(setAllTimeSummary).catch(() => {})
+    api.getSessionRange(0, Date.now()).then((data) => {
+      _cachedAllTimeSummary = data
+      setAllTimeSummary(data)
+    }).catch(() => {})
   }, [apps.length, lastTickAt])
 
   const navigate = useNavigate()
@@ -171,7 +179,10 @@ export default function Gallery(): JSX.Element {
 
   function getItemTotalMs(item: GalleryItem): number {
     const s = getAllTimeSummary(item)
-    return s ? s.active_ms : 0
+    if (!s) return 0
+    // Prefer active_ms (focused time); fall back to running_ms for apps that only
+    // have running sessions (e.g. Steam-imported games stored as session_type='running').
+    return s.active_ms > 0 ? s.active_ms : s.running_ms
   }
 
   function getItemLastSeen(item: GalleryItem): number {

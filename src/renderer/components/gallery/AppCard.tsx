@@ -98,7 +98,9 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   }
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
-  const activeMs = summary?.active_ms ?? 0
+  // Prefer active_ms (focused time); fall back to running_ms for apps that only have
+  // running sessions (e.g. Steam-imported games stored as session_type='running').
+  const activeMs = summary ? (summary.active_ms > 0 ? summary.active_ms : summary.running_ms) : 0
   const hasTime = activeMs > 0
 
   return (
