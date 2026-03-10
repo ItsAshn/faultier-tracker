@@ -1,5 +1,5 @@
 import { BrowserWindow, powerMonitor, Notification } from "electron";
-import { getDb, getSetting, upsertApp, type RawApp } from "../db/client";
+import { getDb, getSetting, setSetting, upsertApp, type RawApp } from "../db/client";
 import { getActiveApp, initActiveWin } from "./activeWindow";
 import { getRunningProcesses, initPsList } from "./processScanner";
 import {
@@ -69,6 +69,11 @@ function schedulePoll(): void {
 
 async function pollTick(): Promise<void> {
   const now = Date.now();
+
+  // Persist the current tick time so repairOrphanedSessions can use it on
+  // the next startup after a crash. Written before the try block so it is
+  // always recorded even when the tracking logic throws.
+  setSetting("last_track_time", now);
 
   // Default payload sent even when the poll body throws, so the renderer
   // always receives a heartbeat and never gets stuck on "Connecting…".
