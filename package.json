@@ -1,6 +1,6 @@
 {
   "name": "faultier-tracker",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Application time tracker — know where your hours go",
   "license": "UNLICENSED",
   "private": true,
