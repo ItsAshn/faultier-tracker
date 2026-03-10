@@ -1,11 +1,8 @@
 import { BrowserWindow, powerMonitor, Notification } from "electron";
 import { getDb, getSetting, setSetting, upsertApp, type RawApp } from "../db/client";
 import { getActiveApp, initActiveWin } from "./activeWindow";
-import { getRunningProcesses, initPsList } from "./processScanner";
 import {
   tickActive,
-  tickRunning,
-  endRunningSession,
   endActiveSession,
   initSessionManager,
 } from "./sessionManager";
@@ -29,9 +26,6 @@ function toAppRecord(raw: RawApp): AppRecord {
 let pollTimer: NodeJS.Timeout | null = null;
 let isRunning = false;
 
-// Track which app_ids were running in the previous tick
-const prevRunningAppIds = new Set<number>();
-
 // Break reminder tracking
 let continuousActiveMs = 0;
 let lastBreakNotifAt = 0;
@@ -41,7 +35,6 @@ export async function startTracker(): Promise<void> {
   initSessionManager(machineId);
 
   await initActiveWin();
-  await initPsList();
 
   isRunning = true;
   await pollTick(); // fire immediately so renderer exits "Connecting…" on launch
@@ -88,87 +81,12 @@ async function pollTick(): Promise<void> {
     const idleSecs = powerMonitor.getSystemIdleTime();
     const isIdle = idleSecs * 1000 >= idleThreshold;
 
-    const [activeApp, runningProcesses] = await Promise.all([
-      getActiveApp(),
-      getRunningProcesses(),
-    ]);
+    const activeApp = await getActiveApp();
 
-    console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} pid=${activeApp?.pid ?? '-'} runningCount=${runningProcesses.length}`);
+    console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} pid=${activeApp?.pid ?? '-'}`);
 
-    // ── Tracked apps lookup ──────────────────────────────────────────
     const db = getDb();
     const trackedMode = (getSetting("tracking_mode") as string) ?? "blacklist";
-
-    // Build a map of exe_name → app record for running processes
-    const currentRunningIds = new Set<number>();
-
-    // Batch query: one DB round-trip for all running processes instead of N
-    const uniqueExeNames = [...new Set(runningProcesses.map((p) => p.exeName))];
-    const knownApps = new Map<string, { id: number; is_tracked: number }>();
-    if (uniqueExeNames.length > 0) {
-      const placeholders = uniqueExeNames.map(() => "?").join(",");
-      const rows = db
-        .prepare<
-          string[],
-          { id: number; exe_name: string; is_tracked: number }
-        >(`SELECT id, exe_name, is_tracked FROM apps WHERE exe_name IN (${placeholders})`)
-        .all(...uniqueExeNames);
-      for (const row of rows) knownApps.set(row.exe_name, row);
-    }
-
-    for (const proc of runningProcesses) {
-      // For blacklist mode: track everything not explicitly excluded
-      // For whitelist mode: track only explicitly included apps
-      const appRow = knownApps.get(proc.exeName);
-
-      if (appRow) {
-        const shouldTrack =
-          trackedMode === "blacklist"
-            ? appRow.is_tracked !== 0
-            : appRow.is_tracked === 1;
-
-        if (shouldTrack) {
-          currentRunningIds.add(appRow.id);
-          if (!isIdle) tickRunning(appRow.id, now);
-        }
-      } else if (trackedMode === "blacklist") {
-        // Auto-discover new apps in blacklist mode — default tracked=1 so they
-        // are immediately included. In whitelist mode we never auto-discover.
-        const displayName = deriveDisplayName(proc.exeName);
-        console.log(`[Tracker] auto-discovering new app: ${proc.exeName} -> "${displayName}"`);
-        const appId = upsertApp(proc.exeName, null, displayName, now, 1);
-        const groupId = await resolveGroup(proc.exeName, null);
-        if (groupId !== null) {
-          db.prepare<[number, number], void>(
-            "UPDATE apps SET group_id = ? WHERE id = ?",
-          ).run(groupId, appId);
-        }
-        // Notify renderer of the newly discovered app (with group_id now populated)
-        const newApp = db
-          .prepare<[number], RawApp>("SELECT * FROM apps WHERE id = ?")
-          .get(appId);
-        if (newApp) {
-          BrowserWindow.getAllWindows().forEach((win) => {
-            if (!win.isDestroyed())
-              win.webContents.send(CHANNELS.TRACKING_APP_SEEN, toAppRecord(newApp));
-          });
-        }
-        // Add to knownApps so duplicates in runningProcesses skip re-discovery
-        knownApps.set(proc.exeName, { id: appId, is_tracked: 1 });
-        currentRunningIds.add(appId);
-        if (!isIdle) tickRunning(appId, now);
-      }
-    }
-
-    // Close sessions for processes that stopped running
-    for (const prevId of prevRunningAppIds) {
-      if (!currentRunningIds.has(prevId)) {
-        console.log(`[Tracker] app id=${prevId} stopped running — closing running session`);
-        endRunningSession(prevId, now);
-      }
-    }
-    prevRunningAppIds.clear();
-    for (const id of currentRunningIds) prevRunningAppIds.add(id);
 
     // ── Active window ────────────────────────────────────────────────
     let activeAppId: number | null = null;
@@ -210,17 +128,15 @@ async function pollTick(): Promise<void> {
             "UPDATE apps SET group_id = ? WHERE id = ?",
           ).run(groupId, appId);
         }
-        // Notify renderer of the newly discovered app (if not already sent from process scan)
-        if (!currentRunningIds.has(appId)) {
-          const newApp = db
-            .prepare<[number], RawApp>("SELECT * FROM apps WHERE id = ?")
-            .get(appId);
-          if (newApp) {
-            BrowserWindow.getAllWindows().forEach((win) => {
-              if (!win.isDestroyed())
-                win.webContents.send(CHANNELS.TRACKING_APP_SEEN, toAppRecord(newApp));
-            });
-          }
+        // Notify renderer of the newly discovered app
+        const newApp = db
+          .prepare<[number], RawApp>("SELECT * FROM apps WHERE id = ?")
+          .get(appId);
+        if (newApp) {
+          BrowserWindow.getAllWindows().forEach((win) => {
+            if (!win.isDestroyed())
+              win.webContents.send(CHANNELS.TRACKING_APP_SEEN, toAppRecord(newApp));
+          });
         }
         // Re-fetch so we have a full record for the logic below
         appRow = db
@@ -242,14 +158,6 @@ async function pollTick(): Promise<void> {
 
       if (appRow && appRow.is_tracked !== 0 && !isIdle) {
         tickActive(appId, activeApp.windowTitle, now);
-        // If the focused app wasn't detected in the process scan (e.g. UWP/system
-        // processes), still record it as running so focused ≤ running always holds.
-        if (!currentRunningIds.has(appId)) {
-          tickRunning(appId, now);
-          // Track it in prevRunningAppIds so endRunningSession fires next tick
-          // if it's still not in the process list, rather than waiting for gap detection.
-          prevRunningAppIds.add(appId);
-        }
         activeAppId = appId;
         activeDisplayName = appRow.display_name;
 

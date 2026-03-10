@@ -37,7 +37,7 @@ import type {
 } from "@shared/types";
 import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
-import { resetSessionState, endRunningSession, endActiveSession } from "../tracking/sessionManager";
+import { resetSessionState, endActiveSession } from "../tracking/sessionManager";
 import { persistDb } from "../db/client";
 
 function mapApp(raw: {
@@ -167,12 +167,11 @@ export function registerIpcHandlers(): void {
       db.prepare<[number, number]>(
         "UPDATE apps SET is_tracked = ? WHERE id = ?",
       ).run(tracked ? 1 : 0, id);
-      // When an app is disabled, close any open running/active sessions
-      // immediately so time stops accruing — don't wait for the next poll tick.
+      // When an app is disabled, close any open active sessions immediately
+      // so time stops accruing — don't wait for the next poll tick.
       if (!tracked) {
         const now = Date.now();
         console.log(`[IPC] APPS_SET_TRACKED: app id=${id} disabled — closing open sessions`);
-        endRunningSession(id, now);
         endActiveSession(now);
       }
     },
@@ -286,31 +285,26 @@ export function registerIpcHandlers(): void {
       // and eliminates the separate full apps-table fetch.
       const appSummaries = db
         .prepare<
-          [number, number, number, number, number, number, number, number],
+          [number, number, number, number, number],
           {
             app_id: number;
             exe_name: string;
             display_name: string;
             group_id: number | null;
             active_ms: number;
-            running_ms: number;
           }
         >(
           `SELECT a.id AS app_id, a.exe_name, a.display_name, a.group_id,
-                  SUM(CASE WHEN s.session_type = 'active'
-                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
-                       ELSE 0 END) AS active_ms,
-                  SUM(CASE WHEN s.session_type = 'running'
-                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
-                       ELSE 0 END) AS running_ms
+                  SUM(MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))) AS active_ms
            FROM sessions s
            JOIN apps a ON a.id = s.app_id
-           WHERE s.started_at < ?
+           WHERE s.session_type = 'active'
+             AND s.started_at < ?
              AND (s.ended_at IS NULL OR s.ended_at > ?)
            GROUP BY s.app_id
            ORDER BY active_ms DESC`,
         )
-        .all(now, to, from, now, to, from, to, from);
+        .all(now, to, from, to, from);
 
       // Query B: chart points bucketed in SQL — no JS date-formatting loop
       const dateFmt = groupBy === "hour"
@@ -318,32 +312,26 @@ export function registerIpcHandlers(): void {
         : "%Y-%m-%d";
       const chartPoints = db
         .prepare<
-          [string, number, number, number, number, number, number, number, number, number],
-          { date: string; active_ms: number; running_ms: number }
+          [string, number, number, number, number, number],
+          { date: string; active_ms: number }
         >(
           `SELECT strftime(?, MAX(s.started_at, ?) / 1000, 'unixepoch', 'localtime') AS date,
-                  SUM(CASE WHEN s.session_type = 'active'
-                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
-                       ELSE 0 END) AS active_ms,
-                  SUM(CASE WHEN s.session_type = 'running'
-                       THEN MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))
-                       ELSE 0 END) AS running_ms
+                  SUM(MAX(0, MIN(COALESCE(s.ended_at, ?), ?) - MAX(s.started_at, ?))) AS active_ms
            FROM sessions s
-           WHERE s.started_at < ?
+           WHERE s.session_type = 'active'
+             AND s.started_at < ?
              AND (s.ended_at IS NULL OR s.ended_at > ?)
            GROUP BY date
            ORDER BY date`,
         )
-        .all(dateFmt, from, now, to, from, now, to, from, to, from);
+        .all(dateFmt, from, now, to, from, to, from);
 
       const totalActive = appSummaries.reduce((acc, a) => acc + a.active_ms, 0);
-      const totalRunning = appSummaries.reduce((acc, a) => acc + a.running_ms, 0);
 
       return {
         from,
         to,
         total_active_ms: totalActive,
-        total_running_ms: totalRunning,
         top_app: appSummaries[0] ?? null,
         apps: appSummaries,
         chart_points: chartPoints,
@@ -368,16 +356,16 @@ export function registerIpcHandlers(): void {
               [number, number, number, number, number, number],
               {
                 app_id: number;
-                session_type: string;
                 started_at: number;
                 ended_at: number;
               }
             >(
-              `SELECT s.app_id, s.session_type,
+              `SELECT s.app_id,
                       MAX(s.started_at, ?) AS started_at,
                       MIN(COALESCE(s.ended_at, ?), ?) AS ended_at
                FROM sessions s
-               WHERE s.app_id IN (SELECT id FROM apps WHERE group_id = ?)
+               WHERE s.session_type = 'active'
+                 AND s.app_id IN (SELECT id FROM apps WHERE group_id = ?)
                  AND s.started_at < ?
                  AND (s.ended_at IS NULL OR s.ended_at > ?)`,
             )
@@ -387,27 +375,24 @@ export function registerIpcHandlers(): void {
               [number, number, number, number, number, number],
               {
                 app_id: number;
-                session_type: string;
                 started_at: number;
                 ended_at: number;
               }
             >(
-              `SELECT app_id, session_type,
+              `SELECT app_id,
                       MAX(started_at, ?) AS started_at,
                       MIN(COALESCE(ended_at, ?), ?) AS ended_at
                FROM sessions
-               WHERE app_id = ?
+               WHERE session_type = 'active'
+                 AND app_id = ?
                  AND started_at < ?
                  AND (ended_at IS NULL OR ended_at > ?)`,
             )
             .all(from, now, to, id, to, from);
 
       let active_ms = 0;
-      let running_ms = 0;
       for (const s of sessions) {
-        const dur = s.ended_at - s.started_at;
-        if (s.session_type === "active") active_ms += dur;
-        else running_ms += dur;
+        active_ms += s.ended_at - s.started_at;
       }
 
       const fmt = (ts: number): string => {
@@ -422,11 +407,8 @@ export function registerIpcHandlers(): void {
       for (const s of sessions) {
         const key = fmt(s.started_at);
         if (!chartMap.has(key))
-          chartMap.set(key, { date: key, active_ms: 0, running_ms: 0 });
-        const pt = chartMap.get(key)!;
-        const dur = s.ended_at - s.started_at;
-        if (s.session_type === "active") pt.active_ms += dur;
-        else pt.running_ms += dur;
+          chartMap.set(key, { date: key, active_ms: 0 });
+        chartMap.get(key)!.active_ms += s.ended_at - s.started_at;
       }
 
       let member_summaries: SessionSummary[] = [];
@@ -445,15 +427,11 @@ export function registerIpcHandlers(): void {
             display_name: m.display_name,
             group_id: id,
             active_ms: 0,
-            running_ms: 0,
           });
         }
         for (const s of sessions) {
           const entry = memberMap.get(s.app_id);
-          if (!entry) continue;
-          const dur = s.ended_at - s.started_at;
-          if (s.session_type === "active") entry.active_ms += dur;
-          else entry.running_ms += dur;
+          if (entry) entry.active_ms += s.ended_at - s.started_at;
         }
         member_summaries = Array.from(memberMap.values()).sort(
           (a, b) => b.active_ms - a.active_ms,
@@ -462,7 +440,6 @@ export function registerIpcHandlers(): void {
 
       return {
         active_ms,
-        running_ms,
         chart_points: Array.from(chartMap.values()).sort((a, b) =>
           a.date.localeCompare(b.date),
         ),

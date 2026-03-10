@@ -116,7 +116,7 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
         continue
       }
 
-      insertSession.run(appId, 'running', startedAt, endedAt, 'steam-import')
+      insertSession.run(appId, 'active', startedAt, endedAt, 'steam-import')
       result.sessionsAdded++
       console.log(`[SteamImport] inserted session for app id=${appId} name="${game.name}" playtime=${Math.round(playtimeMs/60000)}m startedAt=${new Date(startedAt).toISOString()}`)
     }

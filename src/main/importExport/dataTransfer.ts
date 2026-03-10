@@ -152,37 +152,31 @@ export async function exportDataCsv(): Promise<{ success: boolean; filePath?: st
   const appMap = new Map(apps.map((a) => [a.id, a]))
 
   const sessions = db.prepare<[], {
-    app_id: number; session_type: string; started_at: number; ended_at: number
+    app_id: number; started_at: number; ended_at: number
   }>(
-    'SELECT app_id, session_type, started_at, ended_at FROM sessions WHERE ended_at IS NOT NULL ORDER BY started_at'
+    "SELECT app_id, started_at, ended_at FROM sessions WHERE session_type = 'active' AND ended_at IS NOT NULL ORDER BY started_at"
   ).all()
 
   // Aggregate per day per app
-  const agg = new Map<string, Map<number, { active_ms: number; running_ms: number }>>()
+  const agg = new Map<string, Map<number, number>>()
 
   for (const s of sessions) {
     const d = new Date(s.started_at)
     const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     if (!agg.has(day)) agg.set(day, new Map())
     const dayMap = agg.get(day)!
-    if (!dayMap.has(s.app_id)) dayMap.set(s.app_id, { active_ms: 0, running_ms: 0 })
-    const entry = dayMap.get(s.app_id)!
-    const dur = s.ended_at - s.started_at
-    if (s.session_type === 'active') entry.active_ms += dur
-    else entry.running_ms += dur
+    dayMap.set(s.app_id, (dayMap.get(s.app_id) ?? 0) + (s.ended_at - s.started_at))
   }
 
-  const rows: string[] = ['date,app_name,group_name,active_minutes,running_minutes']
+  const rows: string[] = ['date,app_name,group_name,focus_minutes']
 
   for (const [day, dayMap] of Array.from(agg.entries()).sort()) {
-    for (const [appId, { active_ms, running_ms }] of dayMap) {
+    for (const [appId, active_ms] of dayMap) {
       const appInfo = appMap.get(appId)
       if (!appInfo) continue
       const appName = appInfo.display_name.replace(/"/g, '""')
       const groupName = appInfo.group_id ? (groupMap.get(appInfo.group_id) ?? '').replace(/"/g, '""') : ''
-      const activeMins = (active_ms / 60000).toFixed(2)
-      const runningMins = (running_ms / 60000).toFixed(2)
-      rows.push(`${day},"${appName}","${groupName}",${activeMins},${runningMins}`)
+      rows.push(`${day},"${appName}","${groupName}",${(active_ms / 60000).toFixed(2)}`)
     }
   }
 

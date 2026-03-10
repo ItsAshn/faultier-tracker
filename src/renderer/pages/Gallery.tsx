@@ -171,7 +171,6 @@ export default function Gallery(): JSX.Element {
         display_name: (item.item as AppGroup).name,
         group_id: null,
         active_ms: sums.reduce((acc, s) => acc + s.active_ms, 0),
-        running_ms: sums.reduce((acc, s) => acc + s.running_ms, 0)
       }
     }
     return allTimeSummary.apps.find((s) => s.app_id === item.id) ?? null
@@ -180,9 +179,7 @@ export default function Gallery(): JSX.Element {
   function getItemTotalMs(item: GalleryItem): number {
     const s = getAllTimeSummary(item)
     if (!s) return 0
-    // Prefer active_ms (focused time); fall back to running_ms for apps that only
-    // have running sessions (e.g. Steam-imported games stored as session_type='running').
-    return s.active_ms > 0 ? s.active_ms : s.running_ms
+    return s.active_ms
   }
 
   function getItemLastSeen(item: GalleryItem): number {

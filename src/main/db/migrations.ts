@@ -8,6 +8,20 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    // Steam-imported sessions were incorrectly stored as session_type='running'.
+    // Steam's playtime_forever is actual play time, not background-running time,
+    // so it should be 'active'. This also fixes the display bug where playing a
+    // Steam-imported game causes the card to flip from showing 47h (running_ms)
+    // to <1m (active_ms), because active_ms > 0 triggers the fallback to stop.
+    version: 6,
+    up(db) {
+      db.exec(`
+        UPDATE sessions SET session_type = 'active'
+        WHERE machine_id = 'steam-import' AND session_type = 'running';
+      `);
+    },
+  },
+  {
     // Merge duplicate apps rows that share the same exe_name but differ only in
     // exe_path (NULL vs real path), then rebuild the apps table with a
     // UNIQUE(exe_name) constraint instead of UNIQUE(exe_name, exe_path) so that

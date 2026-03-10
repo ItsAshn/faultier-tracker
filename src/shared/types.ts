@@ -38,20 +38,17 @@ export interface SessionSummary {
   display_name: string
   group_id: number | null
   active_ms: number
-  running_ms: number
 }
 
 export interface ChartDataPoint {
   date: string        // 'YYYY-MM-DD' or 'HH:00'
   active_ms: number
-  running_ms: number
 }
 
 export interface RangeSummary {
   from: number
   to: number
   total_active_ms: number
-  total_running_ms: number
   top_app: SessionSummary | null
   apps: SessionSummary[]
   chart_points: ChartDataPoint[]
@@ -59,7 +56,6 @@ export interface RangeSummary {
 
 export interface AppRangeSummary {
   active_ms: number
-  running_ms: number
   chart_points: ChartDataPoint[]
   member_summaries: SessionSummary[]
 }
