@@ -1,6 +1,6 @@
 import { useState, useEffect, KeyboardEvent } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Activity, AppWindow, X, Target } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Activity, AppWindow, X, Target, Settings } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import '../styles/app-detail.css'
 import { useAppStore } from '../store/appStore'
@@ -103,7 +103,7 @@ export default function AppDetailPage(): JSX.Element {
   const [iconSrc, setIconSrc] = useState<string | null>(null)
 
   // Edit section
-  const [editOpen, setEditOpen] = useState(false)
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const [artworkModalOpen, setArtworkModalOpen] = useState(false)
 
   // Form state
@@ -187,7 +187,7 @@ export default function AppDetailPage(): JSX.Element {
         await setAppGroup(numId, groupId)
       }
     }
-    setEditOpen(false)
+    setSettingsModalOpen(false)
   }
 
   function handleCancel(): void {
@@ -208,7 +208,7 @@ export default function AppDetailPage(): JSX.Element {
       setGroupId(a.group_id)
       setDailyGoalHours(a.daily_goal_ms ? String(a.daily_goal_ms / 3_600_000) : '')
     }
-    setEditOpen(false)
+    setSettingsModalOpen(false)
   }
 
   // Not found
@@ -251,6 +251,13 @@ export default function AppDetailPage(): JSX.Element {
             <img src={iconSrc} alt="" aria-hidden />
           </div>
         )}
+        <button
+          className="app-detail__hero-cog"
+          onClick={() => setSettingsModalOpen(true)}
+          title="App settings"
+        >
+          <Settings size={15} />
+        </button>
         <div className="app-detail__hero-art">
           {iconSrc
             ? <img src={iconSrc} alt={name} />
@@ -392,150 +399,148 @@ export default function AppDetailPage(): JSX.Element {
         </div>
       )}
 
-      {/* Edit section */}
-      <div className="app-detail__edit">
-        <button
-          className="app-detail__edit-header"
-          onClick={() => setEditOpen((v) => !v)}
-        >
-          <span className="app-detail__edit-header-title">Settings</span>
-          <ChevronDown
-            size={16}
-            className={`app-detail__edit-chevron${editOpen ? ' app-detail__edit-chevron--open' : ''}`}
-          />
-        </button>
-
-        {editOpen && (
-          <div className="app-detail__edit-body">
-            <ImageUploader
-              id={numId}
-              isGroup={isGroup}
-              currentSrc={iconSrc}
-              onUpdated={(url) => setIconSrc(url)}
-              onSearchOnline={() => setArtworkModalOpen(true)}
-            />
-
-            <div className="field">
-              <label className="field__label">{isGroup ? 'Group Name' : 'Display Name'}</label>
-              <input
-                className="input"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder={isGroup ? 'Group name' : 'App name'}
-              />
+      {settingsModalOpen && (
+        <div className="modal-overlay" onClick={() => setSettingsModalOpen(false)}>
+          <div
+            className="modal app-detail__settings-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal__header">
+              <h2 className="modal__title">Settings</h2>
+              <button className="btn--icon" onClick={() => setSettingsModalOpen(false)}><X size={18} /></button>
             </div>
 
-            <div className="field">
-              <label className="field__label">Description</label>
-              <textarea
-                className="input"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional description..."
-                rows={2}
-                style={{ resize: 'vertical' }}
+            <div className="app-detail__settings-body">
+              <ImageUploader
+                id={numId}
+                isGroup={isGroup}
+                currentSrc={iconSrc}
+                onUpdated={(url) => setIconSrc(url)}
+                onSearchOnline={() => setArtworkModalOpen(true)}
               />
-            </div>
 
-            {!isGroup && (
               <div className="field">
-                <label className="field__label">Notes</label>
+                <label className="field__label">{isGroup ? 'Group Name' : 'Display Name'}</label>
+                <input
+                  className="input"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder={isGroup ? 'Group name' : 'App name'}
+                />
+              </div>
+
+              <div className="field">
+                <label className="field__label">Description</label>
                 <textarea
                   className="input"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Personal notes..."
-                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optional description..."
+                  rows={2}
                   style={{ resize: 'vertical' }}
                 />
               </div>
-            )}
 
-            <div className="field">
-              <label className="field__label">Tags (press Enter or comma to add)</label>
-              <div
-                className="tags-input"
-                onClick={() => document.getElementById('detail-tag-field')?.focus()}
-              >
-                {tags.map((tag) => (
-                  <span key={tag} className="tags-input__tag">
-                    {tag}
-                    <button
-                      className="tags-input__tag-remove"
-                      onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
-                    >
-                      <X size={10} />
-                    </button>
-                  </span>
-                ))}
+              {!isGroup && (
+                <div className="field">
+                  <label className="field__label">Notes</label>
+                  <textarea
+                    className="input"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Personal notes..."
+                    rows={3}
+                    style={{ resize: 'vertical' }}
+                  />
+                </div>
+              )}
+
+              <div className="field">
+                <label className="field__label">Tags (press Enter or comma to add)</label>
+                <div
+                  className="tags-input"
+                  onClick={() => document.getElementById('detail-tag-field')?.focus()}
+                >
+                  {tags.map((tag) => (
+                    <span key={tag} className="tags-input__tag">
+                      {tag}
+                      <button
+                        className="tags-input__tag-remove"
+                        onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                      >
+                        <X size={10} />
+                      </button>
+                    </span>
+                  ))}
+                  <input
+                    id="detail-tag-field"
+                    className="tags-input__field"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagKey}
+                    onBlur={addTag}
+                    placeholder={tags.length === 0 ? 'Add tags...' : ''}
+                  />
+                </div>
+              </div>
+
+              {!isGroup && groups.length > 0 && (
+                <div className="field">
+                  <label className="field__label">Group</label>
+                  <select
+                    className="input"
+                    value={groupId ?? ''}
+                    onChange={(e) => setGroupId(e.target.value === '' ? null : Number(e.target.value))}
+                  >
+                    <option value="">— No group —</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isGroup && (
+                <div className="field">
+                  <label className="field__label">Category</label>
+                  <select
+                    className="input"
+                    value={category ?? ''}
+                    onChange={(e) => setCategory((e.target.value as AppCategory) || null)}
+                  >
+                    <option value="">— None —</option>
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="gaming">Gaming</option>
+                    <option value="creative">Creative</option>
+                    <option value="system">System</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+              )}
+
+              <div className="field">
+                <label className="field__label">Daily Goal (hours, e.g. 2.5)</label>
                 <input
-                  id="detail-tag-field"
-                  className="tags-input__field"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={handleTagKey}
-                  onBlur={addTag}
-                  placeholder={tags.length === 0 ? 'Add tags...' : ''}
+                  className="input"
+                  type="number"
+                  min="0"
+                  max="24"
+                  step="0.5"
+                  value={dailyGoalHours}
+                  onChange={(e) => setDailyGoalHours(e.target.value)}
+                  placeholder="No goal set"
                 />
               </div>
             </div>
 
-            {!isGroup && groups.length > 0 && (
-              <div className="field">
-                <label className="field__label">Group</label>
-                <select
-                  className="input"
-                  value={groupId ?? ''}
-                  onChange={(e) => setGroupId(e.target.value === '' ? null : Number(e.target.value))}
-                >
-                  <option value="">— No group —</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>{g.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {isGroup && (
-              <div className="field">
-                <label className="field__label">Category</label>
-                <select
-                  className="input"
-                  value={category ?? ''}
-                  onChange={(e) => setCategory((e.target.value as AppCategory) || null)}
-                >
-                  <option value="">— None —</option>
-                  <option value="work">Work</option>
-                  <option value="personal">Personal</option>
-                  <option value="gaming">Gaming</option>
-                  <option value="creative">Creative</option>
-                  <option value="system">System</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            )}
-
-            <div className="field">
-              <label className="field__label">Daily Goal (hours, e.g. 2.5)</label>
-              <input
-                className="input"
-                type="number"
-                min="0"
-                max="24"
-                step="0.5"
-                value={dailyGoalHours}
-                onChange={(e) => setDailyGoalHours(e.target.value)}
-                placeholder="No goal set"
-              />
-            </div>
-
-            <div className="app-detail__edit-actions">
+            <div className="modal__footer">
               <button className="btn btn--ghost" onClick={handleCancel}>Cancel</button>
               <button className="btn btn--primary" onClick={handleSave}>Save</button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {artworkModalOpen && (
         <ArtworkSearchModal

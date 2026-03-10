@@ -796,11 +796,34 @@ export function registerIpcHandlers(): void {
       isGroup = false,
     ): Promise<string | null> => {
       try {
-        const res = await net.fetch(imgUrl);
+        const res = await net.fetch(imgUrl, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept: "image/webp,image/apng,image/*,*/*;q=0.8",
+            Referer: (() => { try { return new URL(imgUrl).origin } catch { return '' } })(),
+          },
+        });
         if (!res.ok) return null;
 
-        const contentType = res.headers.get("content-type") ?? "image/png";
-        const mime = contentType.split(";")[0].trim();
+        const contentType = res.headers.get("content-type") ?? "";
+        const mimeFromHeader = contentType.split(";")[0].trim();
+
+        // Fallback: detect MIME from URL extension when CDN omits Content-Type
+        const urlExt = imgUrl.split("?")[0].split(".").pop()?.toLowerCase() ?? "";
+        const extMimeMap: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          gif: "image/gif",
+          webp: "image/webp",
+          svg: "image/svg+xml",
+          png: "image/png",
+        };
+        const mime =
+          mimeFromHeader && mimeFromHeader.startsWith("image/")
+            ? mimeFromHeader
+            : extMimeMap[urlExt] ?? "image/png";
+
         const extMap: Record<string, string> = {
           "image/jpeg": "jpg",
           "image/gif": "gif",

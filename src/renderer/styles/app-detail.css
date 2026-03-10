@@ -280,14 +280,53 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Edit section ─────────────────────────────────────────────────────────── */
+/* ── Hero cog button ──────────────────────────────────────────────────────── */
 
-.app-detail__edit {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+.app-detail__hero-cog {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
 }
+
+.app-detail__hero-cog:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+/* ── Settings modal ───────────────────────────────────────────────────────── */
+
+.app-detail__settings-modal {
+  width: 520px;
+  max-width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-detail__settings-body {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Edit section (retained for collapsible title history header) ──────────── */
 
 .app-detail__edit-header {
   display: flex;
@@ -320,21 +359,6 @@
 
 .app-detail__edit-chevron--open {
   transform: rotate(180deg);
-}
-
-.app-detail__edit-body {
-  padding: var(--space-5);
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.app-detail__edit-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
 }
 
 /* ── Window title history ─────────────────────────────────────────────────── */
