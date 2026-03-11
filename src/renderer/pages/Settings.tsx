@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Search, ExternalLink, Download, Upload } from 'lucide-react'
 import '../styles/settings.css'
 import { useAppStore } from '../store/appStore'
 import AppFilterRow from '../components/settings/AppFilterRow'
 import GroupEditor from '../components/settings/GroupEditor'
+import AboutUpdates from '../components/settings/AboutUpdates'
 
 // Add import/export API
 import { api } from '../api/bridge'
 
-type Tab = 'general' | 'apps' | 'data'
+type Tab = 'general' | 'apps' | 'data' | 'about'
 
 const IDLE_OPTIONS = [
   { label: '5 min', value: 300000 },
@@ -36,6 +37,13 @@ export default function Settings(): JSX.Element {
   const steamApiKeyStored = (settings['steam_api_key'] as string) ?? ''
   const steamIdStored = (settings['steam_id'] as string) ?? ''
   const gridDbKeyStored = (settings['steamgriddb_api_key'] as string) ?? ''
+
+  // Initialize input values from stored settings
+  useEffect(() => {
+    setSteamApiKey(steamApiKeyStored)
+    setSteamId(steamIdStored)
+    setGridDbKey(gridDbKeyStored)
+  }, [steamApiKeyStored, steamIdStored, gridDbKeyStored])
 
   function handleIdleOption(value: number) {
     setSetting('idle_threshold_ms', value)
@@ -98,7 +106,8 @@ export default function Settings(): JSX.Element {
         {[
           ['general', 'General'],
           ['apps', 'Apps'],
-          ['data', 'Data & Steam']
+          ['data', 'Data & Steam'],
+          ['about', 'About']
         ].map(([key, label]) => (
           <button
             key={key}
@@ -339,6 +348,15 @@ export default function Settings(): JSX.Element {
           {importStatus && (
             <div className="settings-status">{importStatus}</div>
           )}
+        </div>
+      )}
+
+      {/* About Tab */}
+      {tab === 'about' && (
+        <div className="settings-section">
+          <div className="settings-card">
+            <AboutUpdates />
+          </div>
         </div>
       )}
     </main>
