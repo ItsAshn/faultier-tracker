@@ -332,7 +332,7 @@ export function registerIpcHandlers(): void {
         : "%Y-%m-%d";
       const chartPoints = db
         .prepare<
-          [string, number, number, number, number, number],
+          [string, number, number, number, number, number, number],
           { date: string; active_ms: number }
         >(
           `SELECT strftime(?, MAX(s.started_at, ?) / 1000, 'unixepoch', 'localtime') AS date,
@@ -412,7 +412,7 @@ export function registerIpcHandlers(): void {
 
       let active_ms = 0;
       for (const s of sessions) {
-        active_ms += s.ended_at - s.started_at;
+        active_ms += Math.max(0, s.ended_at - s.started_at);
       }
 
       const fmt = (ts: number): string => {
@@ -428,7 +428,7 @@ export function registerIpcHandlers(): void {
         const key = fmt(s.started_at);
         if (!chartMap.has(key))
           chartMap.set(key, { date: key, active_ms: 0 });
-        chartMap.get(key)!.active_ms += s.ended_at - s.started_at;
+        chartMap.get(key)!.active_ms += Math.max(0, s.ended_at - s.started_at);
       }
 
       let member_summaries: SessionSummary[] = [];
@@ -451,7 +451,7 @@ export function registerIpcHandlers(): void {
         }
         for (const s of sessions) {
           const entry = memberMap.get(s.app_id);
-          if (entry) entry.active_ms += s.ended_at - s.started_at;
+          if (entry) entry.active_ms += Math.max(0, s.ended_at - s.started_at);
         }
         member_summaries = Array.from(memberMap.values()).sort(
           (a, b) => b.active_ms - a.active_ms,
