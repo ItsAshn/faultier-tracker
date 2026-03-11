@@ -105,7 +105,11 @@
       "Bash(git add src/renderer/components/dashboard/AppGrid.tsx src/renderer/components/dashboard/Heatmap.tsx src/renderer/components/dashboard/HeroAppCard.tsx src/renderer/components/dashboard/TopAppsLeaderboard.tsx src/renderer/pages/Dashboard.tsx src/renderer/styles/dashboard.css .claude/settings.local.json)",
       "Bash(git push origin v0.5.2)",
       "Bash(git add src/main/db/client.ts src/main/db/migrations.ts src/main/index.ts src/main/ipc/handlers.ts src/renderer/pages/Dashboard.tsx src/renderer/pages/Settings.tsx)",
-      "Bash(git push origin v0.5.3)"
+      "Bash(git push origin v0.5.3)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\phoen\\\\Documents\\\\sloth-tracker\\\\src\\\\renderer\\\\pages\\\\Dashboard.tsx\" -Force)",
+      "Bash(sed -i 's/\"\"version\"\": \"\"0.6.1\"\"/\"\"version\"\": \"\"0.6.2\"\"/' package.json)",
+      "Bash(grep '\"\"version\"\"' package.json)",
+      "Bash(npx tsc --noEmit --project tsconfig.node.json)"
     ]
   }
 }
