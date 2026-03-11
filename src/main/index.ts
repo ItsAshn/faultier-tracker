@@ -1,4 +1,7 @@
 import { app, BrowserWindow, dialog } from "electron";
+import * as path from "path";
+import * as fs from "fs";
+import { execSync } from "child_process";
 import { openDb, closeDb, getSetting, wasDbCorrupted } from "./db/client";
 import { createWindow, setQuitting } from "./window";
 import { createTray, destroyTray } from "./tray";
@@ -10,6 +13,23 @@ import {
 } from "./tracking/sessionManager";
 import { initUpdater } from "./updater";
 import { autoFetchSteamArtwork } from "./artwork/autoFetch";
+
+function createShortcut(targetPath: string, shortcutPath: string): void {
+  const vbscript = `
+Set WshShell = CreateObject("WScript.Shell")
+Set shortcut = WshShell.CreateShortcut("${shortcutPath.replace(/\\/g, "\\\\")}")
+shortcut.TargetPath = "${targetPath.replace(/\\/g, "\\\\")}"
+shortcut.WorkingDirectory = "${path.dirname(targetPath).replace(/\\/g, "\\\\")}"
+shortcut.Save
+`;
+  const tempVbs = path.join(app.getPath("temp"), "create_shortcut.vbs");
+  fs.writeFileSync(tempVbs, vbscript);
+  try {
+    execSync(`cscript //Nologo "${tempVbs}"`, { windowsHide: true });
+  } finally {
+    try { fs.unlinkSync(tempVbs); } catch { /* ignore */ }
+  }
+}
 
 // Prevent multiple instances
 const gotLock = app.requestSingleInstanceLock();
@@ -46,9 +66,18 @@ app.whenReady().then(async () => {
     // Sync startup login item with stored preference (packaged app only)
     if (app.isPackaged) {
       const launchAtStartup = getSetting("launch_at_startup");
-      app.setLoginItemSettings({
-        openAtLogin: launchAtStartup === true || launchAtStartup === "true",
-      });
+      const enable = launchAtStartup === true || launchAtStartup === "true";
+      const exePath = process.execPath;
+      const startupFolder = path.join(app.getPath("home"), "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
+      const shortcutPath = path.join(startupFolder, "Faultier Tracker.lnk");
+
+      if (enable) {
+        createShortcut(exePath, shortcutPath);
+      } else {
+        try {
+          fs.unlinkSync(shortcutPath);
+        } catch { /* ignore if doesn't exist */ }
+      }
     }
 
     const win = createWindow();
