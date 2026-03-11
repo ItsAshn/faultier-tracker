@@ -69,43 +69,38 @@ function mapApp(raw: {
   is_tracked: number;
   icon_cache_path: string | null;
   custom_image_path: string | null;
-  description: string;
-  notes: string;
-  tags: string;
   first_seen: number;
   last_seen: number;
-  daily_goal_ms: number | null;
 }): AppRecord {
   return {
-    ...raw,
+    id: raw.id,
+    exe_name: raw.exe_name,
+    exe_path: raw.exe_path,
+    display_name: raw.display_name,
+    group_id: raw.group_id,
     is_tracked: raw.is_tracked === 1,
-    tags: JSON.parse(raw.tags ?? "[]"),
-    daily_goal_ms: raw.daily_goal_ms ?? null,
-    // Never send raw file:// paths to the renderer — AppCard fetches icons
-    // via getIconForApp which returns safe base64 data URLs.
     icon_cache_path: null,
     custom_image_path: null,
+    first_seen: raw.first_seen,
+    last_seen: raw.last_seen,
   };
 }
 
 function mapGroup(raw: {
   id: number;
   name: string;
-  description: string;
   icon_cache_path: string | null;
   custom_image_path: string | null;
-  tags: string;
   is_manual: number;
   created_at: number;
-  daily_goal_ms: number | null;
-  category: string | null;
 }): AppGroup {
   return {
-    ...raw,
+    id: raw.id,
+    name: raw.name,
+    icon_cache_path: raw.icon_cache_path,
+    custom_image_path: raw.custom_image_path,
     is_manual: raw.is_manual === 1,
-    tags: JSON.parse(raw.tags ?? "[]"),
-    daily_goal_ms: raw.daily_goal_ms ?? null,
-    category: (raw.category as AppGroup["category"]) ?? null,
+    created_at: raw.created_at,
   };
 }
 
@@ -124,14 +119,10 @@ export function registerIpcHandlers(): void {
       is_tracked: number;
       icon_cache_path: string | null;
       custom_image_path: string | null;
-      description: string;
-      notes: string;
-      tags: string;
       first_seen: number;
       last_seen: number;
-      daily_goal_ms: number | null;
     }
-    const rows = db.prepare<[], RawAppRow>("SELECT * FROM apps ORDER BY display_name COLLATE NOCASE").all();
+    const rows = db.prepare<[], RawAppRow>("SELECT id, exe_name, exe_path, display_name, group_id, is_tracked, icon_cache_path, custom_image_path, first_seen, last_seen FROM apps ORDER BY display_name COLLATE NOCASE").all();
     return rows.map(mapApp);
   });
 
@@ -141,11 +132,7 @@ export function registerIpcHandlers(): void {
       const {
         id,
         display_name,
-        description,
-        notes,
-        tags,
         group_id,
-        daily_goal_ms,
       } = patch;
       const setClauses: string[] = [];
       const params: unknown[] = [];
@@ -153,25 +140,9 @@ export function registerIpcHandlers(): void {
         setClauses.push("display_name = ?");
         params.push(display_name);
       }
-      if (description !== undefined) {
-        setClauses.push("description = ?");
-        params.push(description);
-      }
-      if (notes !== undefined) {
-        setClauses.push("notes = ?");
-        params.push(notes);
-      }
-      if (tags !== undefined) {
-        setClauses.push("tags = ?");
-        params.push(JSON.stringify(tags));
-      }
       if (group_id !== undefined) {
         setClauses.push("group_id = ?");
         params.push(group_id);
-      }
-      if ("daily_goal_ms" in patch) {
-        setClauses.push("daily_goal_ms = ?");
-        params.push(daily_goal_ms ?? null);
       }
       if (setClauses.length === 0) return;
       params.push(id);
@@ -218,16 +189,12 @@ export function registerIpcHandlers(): void {
     interface RawGroupRow {
       id: number;
       name: string;
-      description: string;
       icon_cache_path: string | null;
       custom_image_path: string | null;
-      tags: string;
       is_manual: number;
       created_at: number;
-      daily_goal_ms: number | null;
-      category: string | null;
     }
-    const rows = db.prepare<[], RawGroupRow>("SELECT * FROM app_groups ORDER BY name COLLATE NOCASE").all();
+    const rows = db.prepare<[], RawGroupRow>("SELECT id, name, icon_cache_path, custom_image_path, is_manual, created_at FROM app_groups ORDER BY name COLLATE NOCASE").all();
     return rows.map(mapGroup);
   });
 
@@ -242,42 +209,22 @@ export function registerIpcHandlers(): void {
     return {
       id,
       name,
-      description: "",
       icon_cache_path: null,
       custom_image_path: null,
-      tags: [],
       is_manual: true,
       created_at: now,
-      daily_goal_ms: null,
-      category: null,
     };
   });
 
   ipcMain.handle(
     CHANNELS.GROUPS_UPDATE,
     (_e, patch: Partial<AppGroup> & { id: number }): void => {
-      const { id, name, description, tags, daily_goal_ms, category } = patch;
+      const { id, name } = patch;
       const setClauses: string[] = [];
       const params: unknown[] = [];
       if (name !== undefined) {
         setClauses.push("name = ?");
         params.push(name);
-      }
-      if (description !== undefined) {
-        setClauses.push("description = ?");
-        params.push(description);
-      }
-      if (tags !== undefined) {
-        setClauses.push("tags = ?");
-        params.push(JSON.stringify(tags));
-      }
-      if ("daily_goal_ms" in patch) {
-        setClauses.push("daily_goal_ms = ?");
-        params.push(daily_goal_ms ?? null);
-      }
-      if ("category" in patch) {
-        setClauses.push("category = ?");
-        params.push(category ?? null);
       }
       if (setClauses.length === 0) return;
       params.push(id);

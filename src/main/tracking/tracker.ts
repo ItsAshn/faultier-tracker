@@ -1,4 +1,4 @@
-import { BrowserWindow, powerMonitor, Notification } from "electron";
+import { BrowserWindow, powerMonitor } from "electron";
 import { getDb, getSetting, setSetting, upsertApp, type RawApp } from "../db/client";
 import { getActiveApp, initActiveWin } from "./activeWindow";
 import {
@@ -10,25 +10,26 @@ import { resolveGroup } from "../grouping/groupEngine";
 import { updateTrayTooltip } from "../tray";
 import { CHANNELS } from "@shared/channels";
 import type { AppRecord, TickPayload } from "@shared/types";
+import { getDisplayNameFromExe } from "../utils/exeNameResolver";
 
 // Convert a raw DB row to a renderer-safe AppRecord (mirrors mapApp in handlers.ts)
 function toAppRecord(raw: RawApp): AppRecord {
   return {
-    ...raw,
+    id: raw.id,
+    exe_name: raw.exe_name,
+    exe_path: raw.exe_path,
+    display_name: raw.display_name,
+    group_id: raw.group_id,
     is_tracked: raw.is_tracked !== 0,
-    tags: (() => { try { return JSON.parse(raw.tags ?? "[]"); } catch { return []; } })(),
-    icon_cache_path: null,
-    custom_image_path: null,
-    daily_goal_ms: raw.daily_goal_ms ?? null,
+    icon_cache_path: raw.icon_cache_path,
+    custom_image_path: raw.custom_image_path,
+    first_seen: raw.first_seen,
+    last_seen: raw.last_seen,
   };
 }
 
 let pollTimer: NodeJS.Timeout | null = null;
 let isRunning = false;
-
-// Break reminder tracking
-let continuousActiveMs = 0;
-let lastBreakNotifAt = 0;
 
 export async function startTracker(): Promise<void> {
   const machineId = getSetting("machine_id") as string;
@@ -86,7 +87,6 @@ async function pollTick(): Promise<void> {
     console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} pid=${activeApp?.pid ?? '-'}`);
 
     const db = getDb();
-    const trackedMode = (getSetting("tracking_mode") as string) ?? "blacklist";
 
     // ── Active window ────────────────────────────────────────────────
     let activeAppId: number | null = null;
@@ -110,17 +110,15 @@ async function pollTick(): Promise<void> {
 
       let appId: number;
       if (!appRow) {
-        const displayName = deriveDisplayName(activeApp.exeName);
+        const displayName = getDisplayNameFromExe(activeApp.exeName);
         console.log(`[Tracker] active window new app: ${activeApp.exeName} -> "${displayName}"`);
-        // In whitelist mode new apps start untracked (is_tracked=0); in blacklist mode they
-        // start tracked (is_tracked=1) so they are immediately included.
-        const isTrackedDefault: 0 | 1 = trackedMode === "whitelist" ? 0 : 1;
+        // All new apps start tracked by default (is_tracked=1)
         appId = upsertApp(
           activeApp.exeName,
           activeApp.exePath,
           displayName,
           now,
-          isTrackedDefault,
+          1,
         );
         const groupId = await resolveGroup(activeApp.exeName, activeApp.exePath);
         if (groupId !== null) {
@@ -157,7 +155,7 @@ async function pollTick(): Promise<void> {
       }
 
       if (appRow && appRow.is_tracked !== 0 && !isIdle) {
-        tickActive(appId, activeApp.windowTitle, now);
+        tickActive(appId, now);
         activeAppId = appId;
         activeDisplayName = appRow.display_name;
 
@@ -205,35 +203,6 @@ async function pollTick(): Promise<void> {
     };
 
     updateTrayTooltip(activeDisplayName, isIdle);
-
-    // ── Break reminder ───────────────────────────────────────────────
-    const breakReminderMins =
-      (getSetting("break_reminder_mins") as number) ?? 0;
-    const interval = (getSetting("poll_interval_ms") as number) ?? 5000;
-    if (breakReminderMins > 0) {
-      if (activeAppId && !isIdle) {
-        continuousActiveMs += interval;
-        const breakThresholdMs = breakReminderMins * 60_000;
-        if (
-          continuousActiveMs >= breakThresholdMs &&
-          Date.now() - lastBreakNotifAt > breakThresholdMs
-        ) {
-          lastBreakNotifAt = Date.now();
-          const h = Math.floor(continuousActiveMs / 3_600_000);
-          const m = Math.floor((continuousActiveMs % 3_600_000) / 60_000);
-          const timeStr = h > 0 ? `${h}h ${m}m` : `${m}m`;
-          new Notification({
-            title: "Time for a break!",
-            body: `You've been active for ${timeStr}. Consider taking a short break.`,
-          }).show();
-        }
-      } else {
-        // Reset when idle or no active app
-        continuousActiveMs = 0;
-      }
-    } else {
-      continuousActiveMs = 0;
-    }
   } catch (err) {
     console.error("[Tracker] Poll error:", err);
   }
@@ -246,11 +215,4 @@ async function pollTick(): Promise<void> {
       win.webContents.send(CHANNELS.TRACKING_TICK, payload);
     }
   });
-}
-
-function deriveDisplayName(exeName: string): string {
-  return exeName
-    .replace(/\.exe$/i, "")
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
 }

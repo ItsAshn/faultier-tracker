@@ -1,16 +1,17 @@
-import { useState, useEffect, KeyboardEvent } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, Activity, AppWindow, X, Target, Settings } from 'lucide-react'
+import { ArrowLeft, Activity, AppWindow, X, Settings } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import '../styles/app-detail.css'
 import { useAppStore } from '../store/appStore'
 import { api } from '../api/bridge'
-import type { AppRecord, AppGroup, AppRangeSummary, TitleSummary, AppCategory } from '@shared/types'
+import type { AppRecord, AppGroup, AppRangeSummary } from '@shared/types'
 import TimeBarChart from '../components/dashboard/TimeBarChart'
+import AppHeatmap from '../components/dashboard/AppHeatmap'
 import ImageUploader from '../components/gallery/ImageUploader'
 import ArtworkSearchModal from '../components/gallery/ArtworkSearchModal'
 
-type Preset = 'today' | 'week' | 'month'
+type Preset = 'today' | 'week' | 'month' | 'all'
 
 function computeRange(preset: Preset): { from: number; to: number; groupBy: 'hour' | 'day' } {
   const now = new Date()
@@ -25,6 +26,8 @@ function computeRange(preset: Preset): { from: number; to: number; groupBy: 'hou
       }
     case 'month':
       return { from: startOfMonth(now).getTime(), to: endOfMonth(now).getTime(), groupBy: 'day' }
+    case 'all':
+      return { from: 0, to: Date.now(), groupBy: 'day' }
   }
 }
 
@@ -38,40 +41,6 @@ function fmtMs(ms: number): string {
 
 function fmtDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
-
-interface MemberRowProps {
-  appId: number
-  displayName: string
-  activeMs: number
-  maxMs: number
-}
-
-function MemberRow({ appId, displayName, activeMs, maxMs }: MemberRowProps): JSX.Element {
-  const [icon, setIcon] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.getIconForApp(appId).then(setIcon).catch(() => {})
-  }, [appId])
-
-  return (
-    <div className="app-detail__member-row">
-      <div className="app-detail__member-icon">
-        {icon
-          ? <img src={icon} alt={displayName} />
-          : <AppWindow size={14} />
-        }
-      </div>
-      <span className="app-detail__member-name" title={displayName}>{displayName}</span>
-      <div className="app-detail__member-bar-wrap">
-        <div
-          className="app-detail__member-bar"
-          style={{ width: maxMs > 0 ? `${(activeMs / maxMs) * 100}%` : '0%' }}
-        />
-      </div>
-      <span className="app-detail__member-time">{fmtMs(activeMs)}</span>
-    </div>
-  )
 }
 
 export default function AppDetailPage(): JSX.Element {
@@ -96,8 +65,6 @@ export default function AppDetailPage(): JSX.Element {
   const [preset, setPreset] = useState<Preset>('week')
   const [rangeData, setRangeData] = useState<AppRangeSummary | null>(null)
   const [loading, setLoading] = useState(false)
-  const [titles, setTitles] = useState<TitleSummary[]>([])
-  const [titlesOpen, setTitlesOpen] = useState(false)
 
   // Hero icon
   const [iconSrc, setIconSrc] = useState<string | null>(null)
@@ -108,13 +75,7 @@ export default function AppDetailPage(): JSX.Element {
 
   // Form state
   const [displayName, setDisplayName] = useState('')
-  const [description, setDescription] = useState('')
-  const [notes, setNotes] = useState('')
-  const [tags, setTags] = useState<string[]>([])
-  const [tagInput, setTagInput] = useState('')
   const [groupId, setGroupId] = useState<number | null>(null)
-  const [dailyGoalHours, setDailyGoalHours] = useState('')
-  const [category, setCategory] = useState<AppCategory | null>(null)
 
   // Sync form state when item loads
   useEffect(() => {
@@ -122,18 +83,10 @@ export default function AppDetailPage(): JSX.Element {
     if (isGroup) {
       const g = item as AppGroup
       setDisplayName(g.name)
-      setDescription(g.description)
-      setTags(g.tags)
-      setDailyGoalHours(g.daily_goal_ms ? String(g.daily_goal_ms / 3_600_000) : '')
-      setCategory(g.category)
     } else {
       const a = item as AppRecord
       setDisplayName(a.display_name)
-      setDescription(a.description)
-      setNotes(a.notes)
-      setTags(a.tags)
       setGroupId(a.group_id)
-      setDailyGoalHours(a.daily_goal_ms ? String(a.daily_goal_ms / 3_600_000) : '')
     }
   }, [item?.id])
 
@@ -160,33 +113,14 @@ export default function AppDetailPage(): JSX.Element {
       .then((data) => { if (!cancelled) setRangeData(data) })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false) })
-    api.getSessionTitles(numId, from, to, isGroup)
-      .then((data) => { if (!cancelled) setTitles(data) })
-      .catch(() => {})
     return () => { cancelled = true }
   }, [numId, isGroup, preset, item?.id])
 
-  function addTag(): void {
-    const t = tagInput.trim().toLowerCase()
-    if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
-    setTagInput('')
-  }
-
-  function handleTagKey(e: KeyboardEvent<HTMLInputElement>): void {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag()
-    } else if (e.key === 'Backspace' && !tagInput) {
-      setTags((prev) => prev.slice(0, -1))
-    }
-  }
-
   async function handleSave(): Promise<void> {
-    const goalMs = dailyGoalHours.trim() ? Math.round(parseFloat(dailyGoalHours) * 3_600_000) : null
     if (isGroup) {
-      await updateGroup({ id: numId, name: displayName, description, tags, daily_goal_ms: goalMs, category })
+      await updateGroup({ id: numId, name: displayName })
     } else {
-      await updateApp({ id: numId, display_name: displayName, description, notes, tags, daily_goal_ms: goalMs })
+      await updateApp({ id: numId, display_name: displayName })
       if (groupId !== (item as AppRecord).group_id) {
         await setAppGroup(numId, groupId)
       }
@@ -199,21 +133,16 @@ export default function AppDetailPage(): JSX.Element {
     if (isGroup) {
       const g = item as AppGroup
       setDisplayName(g.name)
-      setDescription(g.description)
-      setTags(g.tags)
-      setDailyGoalHours(g.daily_goal_ms ? String(g.daily_goal_ms / 3_600_000) : '')
-      setCategory(g.category)
     } else {
       const a = item as AppRecord
       setDisplayName(a.display_name)
-      setDescription(a.description)
-      setNotes(a.notes)
-      setTags(a.tags)
       setGroupId(a.group_id)
-      setDailyGoalHours(a.daily_goal_ms ? String(a.daily_goal_ms / 3_600_000) : '')
     }
     setSettingsModalOpen(false)
   }
+
+  // Check if this is a Steam game
+  const isSteamGame = !isGroup && (item as AppRecord)?.exe_name?.startsWith('steam:')
 
   // Not found
   if (!item) {
@@ -232,11 +161,6 @@ export default function AppDetailPage(): JSX.Element {
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const isTracked = !isGroup && (item as AppRecord).is_tracked
   const memberCount = isGroup ? apps.filter((a) => a.group_id === numId).length : 0
-  const maxMemberMs = rangeData?.member_summaries[0]?.active_ms ?? 0
-
-  const itemGoalMs = isGroup ? (item as AppGroup).daily_goal_ms : (item as AppRecord).daily_goal_ms
-  const activeMs = rangeData?.active_ms ?? 0
-  const goalPct = itemGoalMs && itemGoalMs > 0 ? Math.min(100, Math.round((activeMs / itemGoalMs) * 100)) : null
 
   return (
     <main className="page-content app-detail">
@@ -283,14 +207,7 @@ export default function AppDetailPage(): JSX.Element {
               )
             }
           </div>
-          {item.tags.length > 0 && (
-            <div className="app-detail__hero-tags">
-              {item.tags.map((tag) => (
-                <span key={tag} className="app-detail__tag">{tag}</span>
-              ))}
-            </div>
-          )}
-          {!isGroup && (
+          {!isGroup && !isSteamGame && (
             <div className="app-detail__hero-track">
               <label className="app-detail__track-label">
                 <span>Tracked</span>
@@ -302,19 +219,33 @@ export default function AppDetailPage(): JSX.Element {
               </label>
             </div>
           )}
+          {!isGroup && isSteamGame && (
+            <div className="app-detail__hero-track">
+              <span className="app-detail__steam-badge">Steam</span>
+              <span className="app-detail__steam-note">Tracked by Steam</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Total time - Hero stat */}
+      <div className="app-detail__total-time">
+        <div className="app-detail__total-time-label">Total Time</div>
+        <div className="app-detail__total-time-value">
+          {loading ? '—' : rangeData ? fmtMs(rangeData.active_ms) : '—'}
         </div>
       </div>
 
       {/* Date range */}
       <div className="app-detail__range-row">
         <div className="date-range-picker">
-          {(['today', 'week', 'month'] as Preset[]).map((p) => (
+          {(['today', 'week', 'month', 'all'] as Preset[]).map((p) => (
             <button
               key={p}
               className={`date-range-picker__tab${preset === p ? ' date-range-picker__tab--active' : ''}`}
               onClick={() => setPreset(p)}
             >
-              {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : 'This Month'}
+              {p === 'today' ? 'Today' : p === 'week' ? 'This Week' : p === 'month' ? 'This Month' : 'All Time'}
             </button>
           ))}
         </div>
@@ -333,26 +264,6 @@ export default function AppDetailPage(): JSX.Element {
         </div>
       </div>
 
-      {/* Daily goal progress */}
-      {goalPct !== null && (
-        <div className="app-detail__goal">
-          <div className="app-detail__goal-header">
-            <Target size={14} />
-            <span>Daily Goal Progress</span>
-            <span className="app-detail__goal-pct">{goalPct}%</span>
-            <span className="app-detail__goal-sub">
-              {fmtMs(activeMs)} of {fmtMs(itemGoalMs!)} goal
-            </span>
-          </div>
-          <div className="app-detail__goal-bar-wrap">
-            <div
-              className={`app-detail__goal-bar${goalPct >= 100 ? ' app-detail__goal-bar--done' : ''}`}
-              style={{ width: `${goalPct}%` }}
-            />
-          </div>
-        </div>
-      )}
-
       {/* Chart */}
       {rangeData && rangeData.chart_points.length > 0 && (
         <TimeBarChart data={rangeData.chart_points} />
@@ -361,48 +272,10 @@ export default function AppDetailPage(): JSX.Element {
         <div className="app-detail__empty-chart">No activity in this period.</div>
       )}
 
-      {/* Window title history */}
-      {titles.length > 0 && (
-        <div className="app-detail__titles">
-          <button
-            className="app-detail__edit-header"
-            onClick={() => setTitlesOpen((v) => !v)}
-          >
-            <span className="app-detail__edit-header-title">Window Titles ({titles.length})</span>
-            <ChevronDown
-              size={16}
-              className={`app-detail__edit-chevron${titlesOpen ? ' app-detail__edit-chevron--open' : ''}`}
-            />
-          </button>
-          {titlesOpen && (
-            <div className="app-detail__titles-list">
-              {titles.map((t) => (
-                <div key={t.window_title} className="app-detail__title-row">
-                  <span className="app-detail__title-text" title={t.window_title}>{t.window_title}</span>
-                  <span className="app-detail__title-time">{fmtMs(t.duration_ms)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Per-app heatmap */}
+      <AppHeatmap appId={numId} isGroup={isGroup} />
 
-      {/* Member apps (groups only) */}
-      {isGroup && rangeData && rangeData.member_summaries.length > 0 && (
-        <div className="app-detail__members">
-          <div className="app-detail__section-title">Member Apps</div>
-          {rangeData.member_summaries.map((m) => (
-            <MemberRow
-              key={m.app_id}
-              appId={m.app_id}
-              displayName={m.display_name}
-              activeMs={m.active_ms}
-              maxMs={maxMemberMs}
-            />
-          ))}
-        </div>
-      )}
-
+      {/* Settings Modal */}
       {settingsModalOpen && (
         <div className="modal-overlay" onClick={() => setSettingsModalOpen(false)}>
           <div
@@ -433,61 +306,6 @@ export default function AppDetailPage(): JSX.Element {
                 />
               </div>
 
-              <div className="field">
-                <label className="field__label">Description</label>
-                <textarea
-                  className="input"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Optional description..."
-                  rows={2}
-                  style={{ resize: 'vertical' }}
-                />
-              </div>
-
-              {!isGroup && (
-                <div className="field">
-                  <label className="field__label">Notes</label>
-                  <textarea
-                    className="input"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Personal notes..."
-                    rows={3}
-                    style={{ resize: 'vertical' }}
-                  />
-                </div>
-              )}
-
-              <div className="field">
-                <label className="field__label">Tags (press Enter or comma to add)</label>
-                <div
-                  className="tags-input"
-                  onClick={() => document.getElementById('detail-tag-field')?.focus()}
-                >
-                  {tags.map((tag) => (
-                    <span key={tag} className="tags-input__tag">
-                      {tag}
-                      <button
-                        className="tags-input__tag-remove"
-                        onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
-                      >
-                        <X size={10} />
-                      </button>
-                    </span>
-                  ))}
-                  <input
-                    id="detail-tag-field"
-                    className="tags-input__field"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagKey}
-                    onBlur={addTag}
-                    placeholder={tags.length === 0 ? 'Add tags...' : ''}
-                  />
-                </div>
-              </div>
-
               {!isGroup && groups.length > 0 && (
                 <div className="field">
                   <label className="field__label">Group</label>
@@ -503,39 +321,6 @@ export default function AppDetailPage(): JSX.Element {
                   </select>
                 </div>
               )}
-
-              {isGroup && (
-                <div className="field">
-                  <label className="field__label">Category</label>
-                  <select
-                    className="input"
-                    value={category ?? ''}
-                    onChange={(e) => setCategory((e.target.value as AppCategory) || null)}
-                  >
-                    <option value="">— None —</option>
-                    <option value="work">Work</option>
-                    <option value="personal">Personal</option>
-                    <option value="gaming">Gaming</option>
-                    <option value="creative">Creative</option>
-                    <option value="system">System</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              )}
-
-              <div className="field">
-                <label className="field__label">Daily Goal (hours, e.g. 2.5)</label>
-                <input
-                  className="input"
-                  type="number"
-                  min="0"
-                  max="24"
-                  step="0.5"
-                  value={dailyGoalHours}
-                  onChange={(e) => setDailyGoalHours(e.target.value)}
-                  placeholder="No goal set"
-                />
-              </div>
             </div>
 
             <div className="modal__footer">

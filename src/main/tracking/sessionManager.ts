@@ -4,7 +4,6 @@ interface OpenSession {
   dbId: number
   startedAt: number
   lastTick: number
-  windowTitle: string | null
 }
 
 // In-memory map for the currently open active session
@@ -25,20 +24,18 @@ function getPollInterval(): number {
 
 function openSession(
   appId: number,
-  now: number,
-  windowTitle: string | null
+  now: number
 ): number {
   const db = getDb()
-  const recordTitles = getSetting('record_titles') !== false
   const result = db
-    .prepare<[number, string, number, string | null, string], { lastInsertRowid: number | bigint }>(
-      `INSERT INTO sessions (app_id, session_type, started_at, window_title, machine_id)
-       VALUES (?, 'active', ?, ?, ?)`
+    .prepare<[number, number, string], { lastInsertRowid: number | bigint }>(
+      `INSERT INTO sessions (app_id, started_at, machine_id)
+       VALUES (?, ?, ?)`
     )
-    .run(appId, now, recordTitles ? windowTitle : null, machineId)
+    .run(appId, now, machineId)
 
   const dbId = result.lastInsertRowid as number
-  console.log(`[SessionManager] opened active session id=${dbId} for app=${appId}${windowTitle ? ` title="${windowTitle}"` : ''}`)
+  console.log(`[SessionManager] opened active session id=${dbId} for app=${appId}`)
   return dbId
 }
 
@@ -50,7 +47,7 @@ function closeSession(dbId: number, endedAt: number): void {
   console.log(`[SessionManager] closed session id=${dbId} endedAt=${new Date(endedAt).toISOString()}`)
 }
 
-export function tickActive(appId: number, windowTitle: string, now: number): void {
+export function tickActive(appId: number, now: number): void {
   _lastTickTime = now
   try {
     const interval = getPollInterval()
@@ -69,8 +66,8 @@ export function tickActive(appId: number, windowTitle: string, now: number): voi
 
     if (!existing) {
       // No open session — start one
-      const dbId = openSession(appId, now, windowTitle)
-      activeSessions.set(appId, { dbId, startedAt: now, lastTick: now, windowTitle })
+      const dbId = openSession(appId, now)
+      activeSessions.set(appId, { dbId, startedAt: now, lastTick: now })
       return
     }
 
@@ -78,14 +75,13 @@ export function tickActive(appId: number, windowTitle: string, now: number): voi
       // Gap detected — close old session, start new one
       console.log(`[SessionManager] tickActive: gap detected for app=${appId} (gap=${now - existing.lastTick}ms > threshold=${gapThreshold}ms)`)
       closeSession(existing.dbId, existing.lastTick + interval)
-      const dbId = openSession(appId, now, windowTitle)
-      activeSessions.set(appId, { dbId, startedAt: now, lastTick: now, windowTitle })
+      const dbId = openSession(appId, now)
+      activeSessions.set(appId, { dbId, startedAt: now, lastTick: now })
       return
     }
 
     // Session still valid — update last tick in memory only (no DB write)
     existing.lastTick = now
-    existing.windowTitle = windowTitle
   } catch (err) {
     console.error("[SessionManager] tickActive error:", err)
   }
@@ -161,7 +157,7 @@ export function repairOrphanedSessions(machineId: string, now: number): void {
       endTime = row?.last_seen ?? now
     }
     const result = db.prepare<[number, string], void>(
-      "UPDATE sessions SET ended_at = ? WHERE ended_at IS NULL AND machine_id = ? AND session_type = 'active'"
+      "UPDATE sessions SET ended_at = ? WHERE ended_at IS NULL AND machine_id = ?"
     ).run(endTime, machineId)
     console.log(`[SessionManager] repairOrphanedSessions: closed ${(result as any).changes ?? '?'} orphaned session(s) using endTime=${new Date(endTime).toISOString()} (source: ${persisted ? 'last_track_time' : 'last_seen'})`)
   } catch (err) {

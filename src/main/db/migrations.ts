@@ -8,6 +8,84 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    // Clean up database for simplified v2.0 architecture:
+    // - Remove clutter columns (description, notes, tags, goals)
+    // - Remove window_title tracking (stop collecting)
+    // - Drop group_rules table (simplify grouping)
+    // - Clean old data
+    version: 7,
+    up(db) {
+      db.exec(`
+        -- Clean up old data
+        UPDATE sessions SET window_title = NULL;
+        UPDATE apps SET description = '', notes = '', tags = '[]', daily_goal_ms = NULL;
+        UPDATE app_groups SET description = '', category = NULL, daily_goal_ms = NULL;
+        DELETE FROM group_rules;
+
+        -- Drop group_rules table
+        DROP TABLE IF EXISTS group_rules;
+
+        -- Recreate apps table without clutter columns
+        CREATE TABLE apps_new (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          exe_name          TEXT NOT NULL UNIQUE,
+          exe_path          TEXT,
+          display_name      TEXT NOT NULL,
+          group_id          INTEGER REFERENCES app_groups(id) ON DELETE SET NULL,
+          is_tracked        INTEGER NOT NULL DEFAULT 1,
+          icon_cache_path   TEXT,
+          custom_image_path TEXT,
+          first_seen        INTEGER NOT NULL,
+          last_seen         INTEGER NOT NULL
+        );
+
+        INSERT INTO apps_new (id, exe_name, exe_path, display_name, group_id, is_tracked, icon_cache_path, custom_image_path, first_seen, last_seen)
+        SELECT id, exe_name, exe_path, display_name, group_id, is_tracked, icon_cache_path, custom_image_path, first_seen, last_seen FROM apps;
+
+        DROP TABLE apps;
+        ALTER TABLE apps_new RENAME TO apps;
+
+        -- Recreate app_groups table without clutter columns
+        CREATE TABLE app_groups_new (
+          id                INTEGER PRIMARY KEY AUTOINCREMENT,
+          name              TEXT NOT NULL UNIQUE,
+          icon_cache_path   TEXT,
+          custom_image_path TEXT,
+          is_manual         INTEGER NOT NULL DEFAULT 0,
+          created_at        INTEGER NOT NULL
+        );
+
+        INSERT INTO app_groups_new (id, name, icon_cache_path, custom_image_path, is_manual, created_at)
+        SELECT id, name, icon_cache_path, custom_image_path, is_manual, created_at FROM app_groups;
+
+        DROP TABLE app_groups;
+        ALTER TABLE app_groups_new RENAME TO app_groups;
+
+        -- Recreate sessions table without window_title
+        CREATE TABLE sessions_new (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          app_id       INTEGER NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+          session_type TEXT NOT NULL CHECK(session_type IN ('active')),
+          started_at   INTEGER NOT NULL,
+          ended_at     INTEGER,
+          machine_id   TEXT NOT NULL
+        );
+
+        INSERT INTO sessions_new (id, app_id, session_type, started_at, ended_at, machine_id)
+        SELECT id, app_id, 'active', started_at, ended_at, machine_id FROM sessions;
+
+        DROP TABLE sessions;
+        ALTER TABLE sessions_new RENAME TO sessions;
+
+        -- Recreate indexes
+        CREATE INDEX IF NOT EXISTS idx_apps_exe_name        ON apps(exe_name);
+        CREATE INDEX IF NOT EXISTS idx_sessions_time_range  ON sessions(started_at, ended_at);
+        CREATE INDEX IF NOT EXISTS idx_sessions_app_id      ON sessions(app_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_started_at  ON sessions(started_at);
+      `);
+    },
+  },
+  {
     // Steam-imported sessions were incorrectly stored as session_type='running'.
     // Steam's playtime_forever is actual play time, not background-running time,
     // so it should be 'active'. This also fixes the display bug where playing a
@@ -228,15 +306,12 @@ export function runMigrations(db: DbCompat): void {
 export function seedDefaults(db: DbCompat): void {
   const defaults: Array<[string, string]> = [
     ["poll_interval_ms", "5000"],
-    ["tracking_mode", '"blacklist"'],
     ["machine_id", JSON.stringify(uuidv4())],
-    ["record_titles", "true"],
     ["theme", '"system"'],
-    ["dashboard_default_range", '"today"'],
     ["idle_threshold_ms", "300000"],
-    ["break_reminder_mins", "0"],
     ["steam_prompt_dismissed", "false"],
     ["launch_at_startup", "false"],
+    ["first_run_completed", "false"],
   ];
 
   db.transaction(() => {

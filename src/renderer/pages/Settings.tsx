@@ -1,23 +1,30 @@
-import { useState, useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import Fuse from 'fuse.js'
-import { Search, ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { Search, ExternalLink, Download, Upload } from 'lucide-react'
 import '../styles/settings.css'
 import { useAppStore } from '../store/appStore'
 import AppFilterRow from '../components/settings/AppFilterRow'
 import GroupEditor from '../components/settings/GroupEditor'
-import ImportExport from '../components/settings/ImportExport'
-import AboutUpdates from '../components/settings/AboutUpdates'
 
-type Tab = 'tracking' | 'groups' | 'data' | 'artwork' | 'about'
+// Add import/export API
+import { api } from '../api/bridge'
+
+type Tab = 'general' | 'apps' | 'data'
+
+const IDLE_OPTIONS = [
+  { label: '5 min', value: 300000 },
+  { label: '10 min', value: 600000 },
+  { label: '15 min', value: 900000 },
+]
 
 export default function Settings(): JSX.Element {
-  const [searchParams] = useSearchParams()
-  const initialTab = (searchParams.get('tab') as Tab) ?? 'tracking'
-  const [tab, setTab] = useState<Tab>(initialTab)
+  const [tab, setTab] = useState<Tab>('general')
   const [filterSearch, setFilterSearch] = useState('')
-  const [sgdbKey, setSgdbKey] = useState<string | null>(null)
-  const [sgdbKeySaved, setSgdbKeySaved] = useState(false)
+  const [customIdleMinutes, setCustomIdleMinutes] = useState<string>('')
+  const [steamApiKey, setSteamApiKey] = useState('')
+  const [steamId, setSteamId] = useState('')
+  const [gridDbKey, setGridDbKey] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+  const [importStatus, setImportStatus] = useState<string | null>(null)
 
   const apps = useAppStore((s) => s.apps)
   const settings = useAppStore((s) => s.settings)
@@ -25,26 +32,61 @@ export default function Settings(): JSX.Element {
 
   const pollInterval = Number(settings['poll_interval_ms'] ?? 5000)
   const idleThreshold = Number(settings['idle_threshold_ms'] ?? 300000)
-  const breakReminderMins = Number(settings['break_reminder_mins'] ?? 0)
-  const trackingMode = (settings['tracking_mode'] as string) ?? 'blacklist'
   const launchAtStartup = settings['launch_at_startup'] === true || settings['launch_at_startup'] === 'true'
-  const storedSgdbKey = (settings['steamgriddb_api_key'] as string) ?? ''
+  const steamApiKeyStored = (settings['steam_api_key'] as string) ?? ''
+  const steamIdStored = (settings['steam_id'] as string) ?? ''
+  const gridDbKeyStored = (settings['steamgriddb_api_key'] as string) ?? ''
 
-  async function saveSgdbKey(): Promise<void> {
-    const key = sgdbKey ?? storedSgdbKey
-    await setSetting('steamgriddb_api_key', key)
-    setSgdbKeySaved(true)
-    setTimeout(() => setSgdbKeySaved(false), 2500)
+  function handleIdleOption(value: number) {
+    setSetting('idle_threshold_ms', value)
+    setCustomIdleMinutes('')
   }
 
-  const fuse = useMemo(
-    () => new Fuse(apps, { keys: ['display_name', 'exe_name'], threshold: 0.35 }),
-    [apps]
-  )
+  function handleCustomIdle() {
+    const minutes = parseInt(customIdleMinutes, 10)
+    if (!isNaN(minutes) && minutes >= 1 && minutes <= 60) {
+      setSetting('idle_threshold_ms', minutes * 60 * 1000)
+    }
+  }
 
-  const displayedApps = filterSearch.trim()
-    ? fuse.search(filterSearch).map((r) => r.item)
-    : apps
+  async function handleSteamImport() {
+    if (!steamApiKey || !steamId) return
+    setIsImporting(true)
+    setImportStatus('Importing...')
+    try {
+      const result = await api.importSteamData(steamApiKey, steamId)
+      await setSetting('steam_api_key', steamApiKey)
+      await setSetting('steam_id', steamId)
+      setImportStatus(`Imported ${result.gamesImported} games, ${result.sessionsAdded} sessions`)
+    } catch (err) {
+      setImportStatus('Import failed')
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  async function handleExport() {
+    try {
+      const result = await api.exportData()
+      if (result.success) {
+        setImportStatus(`Exported to ${result.filePath}`)
+      } else {
+        setImportStatus('Export failed')
+      }
+    } catch {
+      setImportStatus('Export failed')
+    }
+  }
+
+  async function handleSaveGridDbKey() {
+    if (gridDbKey) {
+      await setSetting('steamgriddb_api_key', gridDbKey)
+      setImportStatus('SteamGridDB key saved')
+    }
+  }
+
+  const currentIdleMinutes = Math.round(idleThreshold / 60000)
+  const isCustomIdle = !IDLE_OPTIONS.some(opt => opt.value === idleThreshold)
 
   return (
     <main className="page-content">
@@ -53,28 +95,28 @@ export default function Settings(): JSX.Element {
       </div>
 
       <div className="settings-tabs">
-        {([
-          ['tracking', 'Tracking'],
-          ['groups',   'Groups'],
-          ['data',     'Data'],
-          ['artwork',  'Artwork'],
-          ['about',    'About']
-        ] as [Tab, string][]).map(([key, label]) => (
+        {[
+          ['general', 'General'],
+          ['apps', 'Apps'],
+          ['data', 'Data & Steam']
+        ].map(([key, label]) => (
           <button
             key={key}
             className={`settings-tab${tab === key ? ' settings-tab--active' : ''}`}
-            onClick={() => setTab(key)}
+            onClick={() => setTab(key as Tab)}
           >
             {label}
           </button>
         ))}
       </div>
 
-      {tab === 'tracking' && (
+      {/* General Tab */}
+      {tab === 'general' && (
         <div className="settings-section">
+          {/* Launch at Startup */}
           <div className="settings-card">
             <div className="settings-card__title">Launch at Startup</div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
+            <p className="settings-card__description">
               Automatically start Faultier Tracker when you log in to Windows.
             </p>
             <div className="mode-toggle">
@@ -93,8 +135,12 @@ export default function Settings(): JSX.Element {
             </div>
           </div>
 
+          {/* Poll Interval */}
           <div className="settings-card">
             <div className="settings-card__title">Poll Interval</div>
+            <p className="settings-card__description">
+              How often to check for the active window. Lower = more accurate but slightly more CPU usage.
+            </p>
             <div className="polling-row">
               <span className="polling-row__label">Check every</span>
               <input
@@ -109,85 +155,78 @@ export default function Settings(): JSX.Element {
             </div>
           </div>
 
+          {/* Idle Detection */}
           <div className="settings-card">
             <div className="settings-card__title">Idle Detection</div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
-              If you step away from your desk, active tracking pauses after this period of inactivity.
+            <p className="settings-card__description">
+              When you step away from your computer, pause tracking after this period of inactivity.
             </p>
-            <div className="polling-row">
-              <span className="polling-row__label">Pause after</span>
-              <input
-                type="range"
-                min={60000}
-                max={1800000}
-                step={60000}
-                value={idleThreshold}
-                onChange={(e) => setSetting('idle_threshold_ms', Number(e.target.value))}
-              />
-              <span className="polling-row__value">{Math.round(idleThreshold / 60000)}m</span>
+            <div className="idle-options">
+              {IDLE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`idle-option${idleThreshold === opt.value ? ' idle-option--active' : ''}`}
+                  onClick={() => handleIdleOption(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+              <div className="idle-option-custom">
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  placeholder="Custom"
+                  value={isCustomIdle ? currentIdleMinutes : customIdleMinutes}
+                  onChange={(e) => setCustomIdleMinutes(e.target.value)}
+                  onBlur={handleCustomIdle}
+                  className="input input--small"
+                />
+                <span>min</span>
+              </div>
             </div>
           </div>
+        </div>
+      )}
 
+      {/* Apps Tab */}
+      {tab === 'apps' && (
+        <div className="settings-section">
+          {/* Group Management */}
           <div className="settings-card">
-            <div className="settings-card__title">Break Reminder</div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
-              Receive a desktop notification after this much continuous active time. Set to 0 to disable.
-            </p>
-            <div className="polling-row">
-              <span className="polling-row__label">Remind after</span>
-              <input
-                type="range"
-                min={0}
-                max={120}
-                step={5}
-                value={breakReminderMins}
-                onChange={(e) => setSetting('break_reminder_mins', Number(e.target.value))}
-              />
-              <span className="polling-row__value">
-                {breakReminderMins === 0 ? 'Off' : `${breakReminderMins}m`}
-              </span>
-            </div>
+            <div className="settings-card__title">Group Management</div>
+            <GroupEditor />
           </div>
 
-          <div className="settings-card">
-            <div className="settings-card__title">Tracking Mode</div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-3)' }}>
-              <b>Blacklist:</b> track all apps except those you disable.<br />
-              <b>Whitelist:</b> only track apps you explicitly enable.
-            </p>
-            <div className="mode-toggle">
-              <button
-                className={`mode-toggle__btn${trackingMode === 'blacklist' ? ' mode-toggle__btn--active' : ''}`}
-                onClick={() => setSetting('tracking_mode', 'blacklist')}
-              >
-                Blacklist
-              </button>
-              <button
-                className={`mode-toggle__btn${trackingMode === 'whitelist' ? ' mode-toggle__btn--active' : ''}`}
-                onClick={() => setSetting('tracking_mode', 'whitelist')}
-              >
-                Whitelist
-              </button>
-            </div>
-          </div>
-
+          {/* App List */}
           <div className="settings-card">
             <div className="settings-card__title">Applications</div>
-            <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-              <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dim)', pointerEvents: 'none' }} />
-              <input
-                className="input"
-                style={{ paddingLeft: 32 }}
-                placeholder="Search apps..."
-                value={filterSearch}
-                onChange={(e) => setFilterSearch(e.target.value)}
-              />
+            <p className="settings-card__description">
+              Toggle tracking for individual apps. Tracked apps appear in your gallery.
+            </p>
+            <div className="filter-list-header">
+              <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
+                <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dim)', pointerEvents: 'none' }} />
+                <input
+                  className="input"
+                  style={{ paddingLeft: 32 }}
+                  placeholder="Search apps..."
+                  value={filterSearch}
+                  onChange={(e) => setFilterSearch(e.target.value)}
+                />
+              </div>
             </div>
             <div className="filter-list">
-              {displayedApps.map((app) => (
-                <AppFilterRow key={app.id} app={app} />
-              ))}
-              {displayedApps.length === 0 && (
+              {apps
+                .filter((app) => 
+                  filterSearch === '' || 
+                  app.display_name.toLowerCase().includes(filterSearch.toLowerCase()) ||
+                  app.exe_name.toLowerCase().includes(filterSearch.toLowerCase())
+                )
+                .map((app) => (
+                  <AppFilterRow key={app.id} app={app} />
+                ))}
+              {apps.length === 0 && (
                 <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 'var(--text-sm)' }}>
                   No apps recorded yet. Use your computer — they'll appear here automatically.
                 </div>
@@ -197,77 +236,109 @@ export default function Settings(): JSX.Element {
         </div>
       )}
 
-      {tab === 'groups' && (
-        <div className="settings-section">
-          <div className="settings-card">
-            <div className="settings-card__title">Group Management</div>
-            <GroupEditor />
-          </div>
-        </div>
-      )}
-
+      {/* Data & Steam Tab */}
       {tab === 'data' && (
         <div className="settings-section">
+          {/* Data Export/Import */}
           <div className="settings-card">
-            <div className="settings-card__title">Import & Export</div>
-            <ImportExport />
-          </div>
-        </div>
-      )}
-
-      {tab === 'artwork' && (
-        <div className="settings-section">
-          <div className="settings-card">
-            <div className="settings-card__title">SteamGridDB Integration</div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
-              Connect to <b>SteamGridDB</b> to search and import community artwork for any game or app.
-              It's free — just create an account and generate an API key.
+            <div className="settings-card__title">Data Backup</div>
+            <p className="settings-card__description">
+              Export your data for backup or import from a previous export.
             </p>
-            <a
-              href="https://www.steamgriddb.com/profile/preferences/api"
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginBottom: 'var(--space-4)', textDecoration: 'none' }}
-            >
-              <ExternalLink size={13} /> Get your free API key
-            </a>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-              <input
-                className="input"
-                type="password"
-                placeholder={storedSgdbKey ? '••••••••••••••••' : 'Paste your API key here'}
-                value={sgdbKey ?? ''}
-                onChange={(e) => { setSgdbKey(e.target.value); setSgdbKeySaved(false) }}
-                style={{ flex: 1 }}
-              />
-              <button
-                className="btn btn--primary"
-                onClick={saveSgdbKey}
-                disabled={sgdbKey === null || sgdbKey.trim() === ''}
-              >
-                Save
+            <div className="data-actions">
+              <button className="btn btn--secondary" onClick={handleExport}>
+                <Download size={16} /> Export Data
+              </button>
+              <button className="btn btn--secondary" onClick={() => api.importData()}>
+                <Upload size={16} /> Import Data
               </button>
             </div>
-            {sgdbKeySaved && (
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginTop: 'var(--space-2)' }}>
-                API key saved.
-              </p>
-            )}
-            {storedSgdbKey && !sgdbKeySaved && (
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', marginTop: 'var(--space-2)' }}>
-                A key is already configured. Paste a new one above to replace it.
-              </p>
-            )}
           </div>
-        </div>
-      )}
 
-      {tab === 'about' && (
-        <div className="settings-section">
+          {/* Steam Import */}
           <div className="settings-card">
-            <div className="settings-card__title">About & Updates</div>
-            <AboutUpdates />
+            <div className="settings-card__title">Steam Import</div>
+            <p className="settings-card__description">
+              Import your Steam library and playtime history. Steam games are not tracked by Faultier — Steam handles that.
+            </p>
+            <div className="steam-import-form">
+              <div className="field">
+                <label className="field__label">Steam API Key</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={steamApiKey}
+                  onChange={(e) => setSteamApiKey(e.target.value)}
+                  placeholder={steamApiKeyStored ? '••••••••••••••••' : 'Paste your Steam API key'}
+                />
+                <a
+                  href="https://steamcommunity.com/dev/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="field__help-link"
+                >
+                  <ExternalLink size={12} /> Get your API key
+                </a>
+              </div>
+              <div className="field">
+                <label className="field__label">Steam ID</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={steamId}
+                  onChange={(e) => setSteamId(e.target.value)}
+                  placeholder={steamIdStored || 'Your Steam ID (e.g., 76561198...)'}
+                />
+              </div>
+              <button
+                className="btn btn--primary"
+                onClick={handleSteamImport}
+                disabled={isImporting || (!steamApiKey && !steamApiKeyStored) || (!steamId && !steamIdStored)}
+              >
+                {isImporting ? 'Importing...' : 'Import Steam Data'}
+              </button>
+            </div>
           </div>
+
+          {/* SteamGridDB */}
+          <div className="settings-card">
+            <div className="settings-card__title">SteamGridDB Artwork</div>
+            <p className="settings-card__description">
+              Get beautiful artwork for games automatically from SteamGridDB.
+            </p>
+            <div className="steam-import-form">
+              <div className="field">
+                <label className="field__label">API Key</label>
+                <input
+                  type="password"
+                  className="input"
+                  value={gridDbKey}
+                  onChange={(e) => setGridDbKey(e.target.value)}
+                  placeholder={gridDbKeyStored ? '••••••••••••••••' : 'Paste your SteamGridDB API key'}
+                />
+                <a
+                  href="https://www.steamgriddb.com/profile/preferences/api"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="field__help-link"
+                >
+                  <ExternalLink size={12} /> Get your free API key
+                </a>
+              </div>
+              <button
+                className="btn btn--primary"
+                onClick={handleSaveGridDbKey}
+                disabled={!gridDbKey}
+              >
+                Save Key
+              </button>
+            </div>
+          </div>
+
+          {/* Status Messages */}
+          {importStatus && (
+            <div className="settings-status">{importStatus}</div>
+          )}
         </div>
       )}
     </main>

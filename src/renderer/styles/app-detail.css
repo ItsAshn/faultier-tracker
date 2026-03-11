@@ -470,3 +470,95 @@
   padding: var(--space-6);
   text-align: center;
 }
+
+/* ── Per-app Heatmap ─────────────────────────────────────────────────────── */
+
+.app-heatmap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-top: var(--space-4);
+}
+
+.app-heatmap__title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+  color: var(--color-text);
+}
+
+.app-heatmap__grid {
+  margin-bottom: var(--space-4);
+}
+
+.app-heatmap__month {
+  font-size: 10px;
+}
+
+.app-heatmap__day {
+  font-size: 10px;
+}
+
+.app-heatmap__legend {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.app-heatmap__tooltip {
+  z-index: 10;
+}
+
+.app-heatmap-loading {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+/* ── Total Time Hero ─────────────────────────────────────────────────────── */
+
+.app-detail__total-time {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6) var(--space-5);
+  margin: var(--space-4) 0;
+  text-align: center;
+}
+
+.app-detail__total-time-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-2);
+}
+
+.app-detail__total-time-value {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+/* ── Steam Badge ─────────────────────────────────────────────────────────── */
+
+.app-detail__steam-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  background: #1b2838;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: #66c0f4;
+}
+
+.app-detail__steam-note {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-left: var(--space-2);
+}
+

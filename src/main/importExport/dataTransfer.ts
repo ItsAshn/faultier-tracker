@@ -11,23 +11,17 @@ const ExportedAppSchema = z.object({
   exe_name: z.string(),
   exe_path: z.string().nullable(),
   display_name: z.string(),
-  group_name: z.string().nullable(),
-  description: z.string().default(''),
-  notes: z.string().default(''),
-  tags: z.array(z.string()).default([])
+  group_name: z.string().nullable()
 })
 
 const ExportedGroupSchema = z.object({
   name: z.string(),
-  description: z.string().default(''),
-  tags: z.array(z.string()).default([]),
   is_manual: z.boolean().default(false)
 })
 
 const ExportedSessionSchema = z.object({
   app_exe: z.string(),
   app_path: z.string().nullable(),
-  type: z.enum(['active', 'running']),
   s: z.number(),
   e: z.number(),
   machine: z.string()
@@ -61,21 +55,22 @@ export async function exportData(): Promise<{ success: boolean; filePath?: strin
 
   const machineId = getSetting('machine_id') as string
   const settings = db.prepare<[], { key: string; value: string }>('SELECT key, value FROM settings').all()
+  
   const apps = db.prepare<[], {
     id: number; exe_name: string; exe_path: string | null; display_name: string;
-    group_id: number | null; description: string; notes: string; tags: string
-  }>('SELECT id, exe_name, exe_path, display_name, group_id, description, notes, tags FROM apps').all()
+    group_id: number | null
+  }>('SELECT id, exe_name, exe_path, display_name, group_id FROM apps').all()
 
-  const groups = db.prepare<[], { id: number; name: string; description: string; tags: string; is_manual: number }>(
-    'SELECT id, name, description, tags, is_manual FROM app_groups'
+  const groups = db.prepare<[], { id: number; name: string; is_manual: number }>(
+    'SELECT id, name, is_manual FROM app_groups'
   ).all()
 
   const groupIdToName = new Map(groups.map((g) => [g.id, g.name]))
 
   const sessions = db.prepare<[], {
-    app_id: number; session_type: string; started_at: number; ended_at: number | null; machine_id: string
+    app_id: number; started_at: number; ended_at: number | null; machine_id: string
   }>(
-    'SELECT app_id, session_type, started_at, ended_at, machine_id FROM sessions WHERE ended_at IS NOT NULL'
+    'SELECT app_id, started_at, ended_at, machine_id FROM sessions WHERE ended_at IS NOT NULL'
   ).all()
 
   const appIdToExe = new Map(apps.map((a) => [a.id, { exe_name: a.exe_name, exe_path: a.exe_path }]))
@@ -88,49 +83,37 @@ export async function exportData(): Promise<{ success: boolean; filePath?: strin
       exe_name: a.exe_name,
       exe_path: a.exe_path,
       display_name: a.display_name,
-      group_name: a.group_id ? (groupIdToName.get(a.group_id) ?? null) : null,
-      description: a.description,
-      notes: a.notes,
-      tags: JSON.parse(a.tags ?? '[]')
+      group_name: a.group_id ? (groupIdToName.get(a.group_id) ?? null) : null
     })),
     groups: groups.map((g) => ({
       name: g.name,
-      description: g.description,
-      tags: JSON.parse(g.tags ?? '[]'),
       is_manual: g.is_manual === 1
     })),
-    sessions: sessions
-      .filter((s) => s.ended_at !== null)
-      .map((s) => {
-        const appInfo = appIdToExe.get(s.app_id)
-        return {
-          app_exe: appInfo?.exe_name ?? '',
-          app_path: appInfo?.exe_path ?? null,
-          type: s.session_type as 'active' | 'running',
-          s: s.started_at,
-          e: s.ended_at!,
-          machine: s.machine_id
-        }
-      })
-      .filter((s) => s.app_exe !== ''),
-    settings: Object.fromEntries(
-      settings
-        .filter((s) => s.key !== 'machine_id')
-        .map((s) => [s.key, s.value])
-    )
+    sessions: sessions.map((s) => ({
+      app_exe: appIdToExe.get(s.app_id)?.exe_name ?? '',
+      app_path: appIdToExe.get(s.app_id)?.exe_path ?? null,
+      s: s.started_at,
+      e: s.ended_at ?? s.started_at,
+      machine: s.machine_id
+    })),
+    settings: Object.fromEntries(settings.map((s) => [s.key, s.value]))
   }
 
-  fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8')
-  return { success: true, filePath }
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2))
+    return { success: true, filePath }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
 }
 
-// ─── CSV Export ────────────────────────────────────────────────────────────
+// ─── CSV Export ───────────────────────────────────────────────────────────
 
 export async function exportDataCsv(): Promise<{ success: boolean; filePath?: string; error?: string }> {
   const db = getDb()
 
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Export Faultier Tracker Data as CSV',
+    title: 'Export Faultier Tracker Data (CSV)',
     defaultPath: path.join(
       app.getPath('documents'),
       `faultier-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`
@@ -140,53 +123,45 @@ export async function exportDataCsv(): Promise<{ success: boolean; filePath?: st
 
   if (canceled || !filePath) return { success: false }
 
-  const apps = db.prepare<[], { id: number; display_name: string; group_id: number | null }>(
-    'SELECT id, display_name, group_id FROM apps'
+  const apps = db.prepare<[], { id: number; display_name: string }>('SELECT id, display_name FROM apps').all()
+  const appIdToName = new Map(apps.map((a) => [a.id, a.display_name]))
+
+  const sessions = db.prepare<[], { app_id: number; started_at: number; ended_at: number | null }>(
+    'SELECT app_id, started_at, ended_at FROM sessions WHERE ended_at IS NOT NULL'
   ).all()
 
-  const groups = db.prepare<[], { id: number; name: string }>(
-    'SELECT id, name FROM app_groups'
-  ).all()
-
-  const groupMap = new Map(groups.map((g) => [g.id, g.name]))
-  const appMap = new Map(apps.map((a) => [a.id, a]))
-
-  const sessions = db.prepare<[], {
-    app_id: number; started_at: number; ended_at: number
-  }>(
-    "SELECT app_id, started_at, ended_at FROM sessions WHERE session_type = 'active' AND ended_at IS NOT NULL ORDER BY started_at"
-  ).all()
-
-  // Aggregate per day per app
-  const agg = new Map<string, Map<number, number>>()
+  const dayMap = new Map<string, Map<number, number>>()
 
   for (const s of sessions) {
-    const d = new Date(s.started_at)
-    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    if (!agg.has(day)) agg.set(day, new Map())
-    const dayMap = agg.get(day)!
-    dayMap.set(s.app_id, (dayMap.get(s.app_id) ?? 0) + (s.ended_at - s.started_at))
+    const dateKey = new Date(s.started_at).toISOString().slice(0, 10)
+    const ms = (s.ended_at ?? s.started_at) - s.started_at
+    if (!dayMap.has(dateKey)) dayMap.set(dateKey, new Map())
+    const dayApps = dayMap.get(dateKey)!
+    dayApps.set(s.app_id, (dayApps.get(s.app_id) ?? 0) + ms)
   }
 
-  const rows: string[] = ['date,app_name,group_name,focus_minutes']
+  const rows: string[] = ['date,app_id,app_name,minutes']
 
-  for (const [day, dayMap] of Array.from(agg.entries()).sort()) {
-    for (const [appId, active_ms] of dayMap) {
-      const appInfo = appMap.get(appId)
-      if (!appInfo) continue
-      const appName = appInfo.display_name.replace(/"/g, '""')
-      const groupName = appInfo.group_id ? (groupMap.get(appInfo.group_id) ?? '').replace(/"/g, '""') : ''
-      rows.push(`${day},"${appName}","${groupName}",${(active_ms / 60000).toFixed(2)}`)
+  for (const [date, appMap] of dayMap) {
+    for (const [appId, ms] of appMap) {
+      const minutes = Math.round(ms / 60_000)
+      if (minutes > 0) {
+        rows.push(`${date},${appId},${appIdToName.get(appId) ?? 'Unknown'},${minutes}`)
+      }
     }
   }
 
-  fs.writeFileSync(filePath, rows.join('\n'), 'utf-8')
-  return { success: true, filePath }
+  try {
+    fs.writeFileSync(filePath, rows.join('\n'))
+    return { success: true, filePath }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+  }
 }
 
-// ─── Import ────────────────────────────────────────────────────────────────
+// ─── Import ───────────────────────────────────────────────────────────────
 
-export async function importData(): Promise<ImportResult & { error?: string }> {
+export async function importData(): Promise<ImportResult> {
   const result: ImportResult = { appsAdded: 0, appsUpdated: 0, sessionsAdded: 0, duplicates: 0, errors: [] }
 
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -195,26 +170,29 @@ export async function importData(): Promise<ImportResult & { error?: string }> {
     properties: ['openFile']
   })
 
-  if (canceled || !filePaths[0]) return result
+  if (canceled || !filePaths || filePaths.length === 0) return result
 
-  let raw: unknown
+  const filePath = filePaths[0]
+
+  let payload: ExportPayload
   try {
-    raw = JSON.parse(fs.readFileSync(filePaths[0], 'utf-8'))
-  } catch {
-    return { ...result, errors: ['Failed to read or parse file.'] }
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const parsed = JSON.parse(content)
+    payload = ExportPayloadSchema.parse(parsed)
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      result.errors.push('Invalid export file format: ' + err.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', '))
+    } else {
+      result.errors.push('Failed to parse file: ' + (err instanceof Error ? err.message : String(err)))
+    }
+    return result
   }
 
-  const parsed = ExportPayloadSchema.safeParse(raw)
-  if (!parsed.success) {
-    return { ...result, errors: [`Invalid file format: ${parsed.error.message}`] }
-  }
-
-  const payload = parsed.data
   const db = getDb()
 
-  const groupNameToId = new Map<string, number>()
-
   db.transaction(() => {
+    const groupNameToId = new Map<string, number>()
+
     // Import groups
     for (const group of payload.groups) {
       const existing = db
@@ -225,14 +203,10 @@ export async function importData(): Promise<ImportResult & { error?: string }> {
 
       if (existing) {
         groupNameToId.set(group.name.toLowerCase(), existing.id)
-        // Update description if empty
-        db.prepare<[string, string, number], void>(
-          'UPDATE app_groups SET description = ? WHERE id = ? AND description = ?'
-        ).run(group.description, existing.id, '')
       } else {
-        const r = db.prepare<[string, string, string, number, number], { lastInsertRowid: number | bigint }>(
-          'INSERT INTO app_groups (name, description, tags, is_manual, created_at) VALUES (?, ?, ?, ?, ?)'
-        ).run(group.name, group.description, JSON.stringify(group.tags), group.is_manual ? 1 : 0, Date.now())
+        const r = db.prepare<[string, number, number], { lastInsertRowid: number | bigint }>(
+          'INSERT INTO app_groups (name, is_manual, created_at) VALUES (?, ?, ?)'
+        ).run(group.name, group.is_manual ? 1 : 0, Date.now())
         groupNameToId.set(group.name.toLowerCase(), r.lastInsertRowid as number)
       }
     }
@@ -240,39 +214,28 @@ export async function importData(): Promise<ImportResult & { error?: string }> {
     // Import apps
     for (const app of payload.apps) {
       const existing = db
-        .prepare<[string, string | null], { id: number; description: string; tags: string } | undefined>(
-          'SELECT id, description, tags FROM apps WHERE exe_name = ? AND (exe_path = ? OR (exe_path IS NULL AND ? IS NULL))'
+        .prepare<[string, string | null], { id: number } | undefined>(
+          'SELECT id FROM apps WHERE exe_name = ? AND (exe_path = ? OR (exe_path IS NULL AND ? IS NULL))'
         )
-        .get(app.exe_name, app.exe_path, app.exe_path)
+        .get(app.exe_name, app.exe_path)
 
       const groupId = app.group_name ? (groupNameToId.get(app.group_name.toLowerCase()) ?? null) : null
 
       if (existing) {
         result.appsUpdated++
-        // Merge tags (union)
-        const existingTags: string[] = JSON.parse(existing.tags ?? '[]')
-        const merged = Array.from(new Set([...existingTags, ...app.tags]))
-        db.prepare<[string, string, number], void>(
-          'UPDATE apps SET tags = ?, description = CASE WHEN description = "" THEN ? ELSE description END WHERE id = ?'
-        ).run(JSON.stringify(merged), app.description, existing.id)
         if (groupId !== null) {
           db.prepare<[number, number], void>('UPDATE apps SET group_id = ? WHERE id = ?').run(groupId, existing.id)
         }
       } else {
         result.appsAdded++
         const now = Date.now()
-        db.prepare<[string, string | null, string, number | null, string, string, string, number, number], void>(
-          `INSERT OR IGNORE INTO apps
-           (exe_name, exe_path, display_name, group_id, description, notes, tags, first_seen, last_seen)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        db.prepare<[string, string | null, string, number | null, number, number], void>(
+          'INSERT OR IGNORE INTO apps (exe_name, exe_path, display_name, group_id, first_seen, last_seen) VALUES (?, ?, ?, ?, ?, ?)'
         ).run(
           app.exe_name,
           app.exe_path,
           app.display_name,
           groupId,
-          app.description,
-          app.notes,
-          JSON.stringify(app.tags),
           now,
           now
         )
@@ -286,12 +249,12 @@ export async function importData(): Promise<ImportResult & { error?: string }> {
     const checkDuplicate = db.prepare<[number, number, string], { count: number }>(
       'SELECT COUNT(*) as count FROM sessions WHERE app_id = ? AND started_at = ? AND machine_id = ?'
     )
-    const insertSession = db.prepare<[number, string, number, number, string], void>(
-      'INSERT INTO sessions (app_id, session_type, started_at, ended_at, machine_id) VALUES (?, ?, ?, ?, ?)'
+    const insertSession = db.prepare<[number, number, number, string], void>(
+      'INSERT INTO sessions (app_id, started_at, ended_at, machine_id) VALUES (?, ?, ?, ?)'
     )
 
     for (const session of payload.sessions) {
-      const appRow = resolveAppId.get(session.app_exe, session.app_path, session.app_path)
+      const appRow = resolveAppId.get(session.app_exe, session.app_path)
       if (!appRow) {
         result.errors.push(`App not found for session: ${session.app_exe}`)
         continue
@@ -303,7 +266,7 @@ export async function importData(): Promise<ImportResult & { error?: string }> {
         continue
       }
 
-      insertSession.run(appRow.id, session.type, session.s, session.e, session.machine)
+      insertSession.run(appRow.id, session.s, session.e, session.machine)
       result.sessionsAdded++
     }
   })()

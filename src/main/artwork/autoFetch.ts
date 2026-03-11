@@ -4,7 +4,7 @@ import { saveCustomImage } from '../icons/iconExtractor'
 import { searchSteamGridDB } from './artworkProvider'
 import { CHANNELS } from '@shared/channels'
 
-export async function autoFetchSteamArtwork(): Promise<void> {
+export async function autoFetchArtwork(): Promise<void> {
   const apiKey = getSetting('steamgriddb_api_key') as string | null
   if (!apiKey) {
     console.log('[AutoFetch] skipping artwork fetch — no steamgriddb_api_key configured')
@@ -12,30 +12,37 @@ export async function autoFetchSteamArtwork(): Promise<void> {
   }
 
   const db = getDb()
+  
+  // Fetch for all apps without artwork, including both Steam and non-Steam
   const rows = db
     .prepare<[], { id: number; display_name: string }>(
-      "SELECT id, display_name FROM apps WHERE exe_name LIKE 'steam:%' AND custom_image_path IS NULL"
+      "SELECT id, display_name FROM apps WHERE custom_image_path IS NULL"
     )
     .all()
 
   if (!rows.length) {
-    console.log('[AutoFetch] no Steam apps without artwork found, nothing to fetch')
+    console.log('[AutoFetch] no apps without artwork found')
     return
   }
 
-  console.log(`[AutoFetch] fetching artwork for ${rows.length} Steam app(s):`, rows.map(r => `"${r.display_name}"`).join(', '))
+  console.log(`[AutoFetch] fetching artwork for ${rows.length} app(s)`)
 
   let anyFetched = false
 
   for (const row of rows) {
     try {
-      console.log(`[AutoFetch] searching SteamGridDB for "${row.display_name}" (id=${row.id})...`)
+      console.log(`[AutoFetch] searching SteamGridDB for "${row.display_name}"...`)
       const results = await searchSteamGridDB(row.display_name, apiKey, 'grids')
-      console.log(`[AutoFetch] "${row.display_name}": ${results.length} result(s) from SteamGridDB`)
+      
+      if (!results.length) {
+        console.log(`[AutoFetch] "${row.display_name}": no results found`)
+        continue
+      }
+
       // Prefer portrait (height > width); fall back to first result
       const pick = results.find((r) => r.height > r.width) ?? results[0]
       if (!pick) {
-        console.warn(`[AutoFetch] "${row.display_name}": no suitable image found, skipping`)
+        console.warn(`[AutoFetch] "${row.display_name}": no suitable image found`)
         continue
       }
 
@@ -62,10 +69,9 @@ export async function autoFetchSteamArtwork(): Promise<void> {
       ).run(fsPath, row.id)
 
       anyFetched = true
-      console.log(`[AutoFetch] saved artwork for "${row.display_name}" -> ${fsPath}`)
+      console.log(`[AutoFetch] saved artwork for "${row.display_name}"`)
     } catch (err) {
       console.warn(`[AutoFetch] failed for "${row.display_name}":`, err)
-      // Silently skip — don't let one failure block others
     }
 
     // Polite rate-limit: 300ms between requests
@@ -76,8 +82,11 @@ export async function autoFetchSteamArtwork(): Promise<void> {
     BrowserWindow.getAllWindows().forEach((win) => {
       if (!win.isDestroyed()) win.webContents.send(CHANNELS.APPS_ARTWORK_UPDATED)
     })
-    console.log('[AutoFetch] artwork update complete, notified renderer')
-  } else {
-    console.log('[AutoFetch] no new artwork was saved')
+    console.log('[AutoFetch] artwork update complete')
   }
+}
+
+// Legacy function for Steam-only fetch (keep for backwards compatibility)
+export async function autoFetchSteamArtwork(): Promise<void> {
+  await autoFetchArtwork()
 }

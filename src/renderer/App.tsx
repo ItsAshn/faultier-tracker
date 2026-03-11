@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import TitleBar from './components/layout/TitleBar'
 import NavPills from './components/layout/NavPills'
 import UpdateBanner from './components/layout/UpdateBanner'
+import SetupWalkthrough from './components/setup/SetupWalkthrough'
+import { ToastContainer } from './components/ui/Toast'
 import Gallery from './pages/Gallery'
 import Settings from './pages/Settings'
 import AppDetailPage from './pages/AppDetailPage'
@@ -97,6 +99,10 @@ export default function App(): JSX.Element {
   const setProgress = useUpdateStore((s) => s.setProgress)
   const setDownloaded = useUpdateStore((s) => s.setDownloaded)
   const setError = useUpdateStore((s) => s.setError)
+  const settings = useAppStore((s) => s.settings)
+  const setSetting = useAppStore((s) => s.setSetting)
+  
+  const [showSetup, setShowSetup] = useState(false)
 
   const initialized = useRef(false)
 
@@ -104,7 +110,13 @@ export default function App(): JSX.Element {
     if (initialized.current) return
     initialized.current = true
 
-    loadAll()
+    loadAll().then(() => {
+      // Check if first run after loading settings
+      const firstRunCompleted = settings['first_run_completed']
+      if (firstRunCompleted !== true && firstRunCompleted !== 'true') {
+        setShowSetup(true)
+      }
+    })
     loadRange()
 
     const unsubTick = api.onTick((payload) => {
@@ -140,12 +152,29 @@ export default function App(): JSX.Element {
     }
   }, [loadAll, loadRange, onTick, onDataCleared, setAvailable, setNotAvailable, setProgress, setDownloaded, setError])
 
+  const handleSetupComplete = () => {
+    setShowSetup(false)
+    setSetting('first_run_completed', true)
+  }
+
+  if (showSetup) {
+    return (
+      <ErrorBoundary>
+        <div className="app-shell">
+          <TitleBar />
+          <SetupWalkthrough onComplete={handleSetupComplete} />
+        </div>
+      </ErrorBoundary>
+    )
+  }
+
   return (
     <ErrorBoundary>
       <div className="app-shell">
         <LoadingOverlay />
         <TitleBar />
         <UpdateBanner />
+        <ToastContainer />
         <div className="main-layout">
           <NavPills />
           <div className="main-content">

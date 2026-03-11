@@ -1,23 +1,20 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Fuse from 'fuse.js'
-import { Search, Images, Zap, X, ExternalLink, ChevronDown } from 'lucide-react'
+import { Search, Images, Zap, X, Calendar, RefreshCw } from 'lucide-react'
 import '../styles/gallery.css'
-import '../styles/dashboard.css'
 import { useAppStore } from '../store/appStore'
 import { useSessionStore } from '../store/sessionStore'
 import AppCard from '../components/gallery/AppCard'
-import Heatmap from '../components/dashboard/Heatmap'
 import { api } from '../api/bridge'
-import type { AppRecord, AppGroup, RangeSummary, BucketApp } from '@shared/types'
+import type { AppRecord, AppGroup, RangeSummary } from '@shared/types'
+import GlobalHeatmapModal from '../components/heatmap/GlobalHeatmapModal'
 
-type FilterMode = 'tracked' | 'ignored'
 type SortMode = 'time' | 'name' | 'last_seen'
 
 const SCROLL_KEY = 'gallery-scroll'
 
 // Module-level cache so allTimeSummary survives Gallery unmount/remount (navigation).
-// Without this, every back-navigation causes a blank flash while the IPC fetch completes.
 let _cachedAllTimeSummary: RangeSummary | null = null
 
 interface GalleryItem {
@@ -35,18 +32,10 @@ function fmtMs(ms: number): string {
   return `${m}m`
 }
 
-function formatDayLabel(dateStr: string): string {
-  const date = new Date(dateStr + 'T00:00:00')
-  return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
-}
-
 export default function Gallery(): JSX.Element {
   const apps = useAppStore((s) => s.apps)
   const groups = useAppStore((s) => s.groups)
-  const settings = useAppStore((s) => s.settings)
-  const setSetting = useAppStore((s) => s.setSetting)
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
-  // Initialise from cache so remounting after navigation shows data immediately.
   const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(_cachedAllTimeSummary)
   const lastSummaryFetchRef = useRef<number>(0)
 
@@ -66,44 +55,14 @@ export default function Gallery(): JSX.Element {
   const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<FilterMode>('tracked')
   const [sort, setSort] = useState<SortMode>('time')
+  
+  // Modal states
+  const [heatmapOpen, setHeatmapOpen] = useState(false)
 
-  // Onboarding / steam banners
+  // Onboarding banner
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const showOnboarding = lastTickAt === null && !bannerDismissed
-  const steamPromptDismissed = settings['steam_prompt_dismissed'] === 'true' || settings['steam_prompt_dismissed'] === true
-  const showSteamPrompt = apps.length > 10 && !steamPromptDismissed && lastTickAt !== null
-
-  // Heatmap accordion
-  const [heatmapOpen, setHeatmapOpen] = useState(() => {
-    return localStorage.getItem('heatmap-expanded') !== 'false'
-  })
-  const [selectedDay, setSelectedDay] = useState<string | null>(null)
-  const [dayApps, setDayApps] = useState<BucketApp[]>([])
-
-  function toggleHeatmap(): void {
-    const next = !heatmapOpen
-    setHeatmapOpen(next)
-    localStorage.setItem('heatmap-expanded', String(next))
-    if (!next) setSelectedDay(null)
-  }
-
-  function handleHeatmapDayClick(dateStr: string): void {
-    if (!heatmapOpen) {
-      setHeatmapOpen(true)
-      localStorage.setItem('heatmap-expanded', 'true')
-    }
-    setSelectedDay(dateStr)
-    const from = new Date(dateStr + 'T00:00:00').getTime()
-    const to = from + 86_400_000 - 1
-    api.getBucketApps(from, to).then(setDayApps).catch(() => setDayApps([]))
-  }
-
-  function clearSelectedDay(): void {
-    setSelectedDay(null)
-    setDayApps([])
-  }
 
   // Restore scroll position when returning from a detail page
   useEffect(() => {
@@ -134,30 +93,14 @@ export default function Gallery(): JSX.Element {
     return items
   }, [apps, groups])
 
-  // Filter by tracked status
-  const filtered = useMemo(() => {
-    if (filter === 'tracked') {
-      return allItems.filter((item) => {
-        if (item.isGroup) return true
-        return (item.item as AppRecord).is_tracked
-      })
-    }
-    return allItems.filter((item) => {
-      if (item.isGroup) return false
-      return !(item.item as AppRecord).is_tracked
-    })
-  }, [allItems, filter])
-
   // Fuse.js search
-  const fuse = useMemo(() => new Fuse(filtered, {
+  const fuse = useMemo(() => new Fuse(allItems, {
     keys: [
       { name: 'item.display_name', weight: 2 },
       { name: 'item.name', weight: 2 },
-      { name: 'item.description', weight: 1 },
-      { name: 'item.tags', weight: 0.5 }
     ],
     threshold: 0.4
-  }), [filtered])
+  }), [allItems])
 
   function getAllTimeSummary(item: GalleryItem) {
     if (!allTimeSummary) return null
@@ -197,18 +140,23 @@ export default function Gallery(): JSX.Element {
 
   const displayed = useMemo(() => {
     if (search.trim()) return fuse.search(search).map((r) => r.item)
-    return [...filtered].sort((a, b) => {
+    return [...allItems].sort((a, b) => {
       if (sort === 'time') return getItemTotalMs(b) - getItemTotalMs(a)
       if (sort === 'name') return getItemName(a).localeCompare(getItemName(b), undefined, { sensitivity: 'base' })
       // last_seen
       return getItemLastSeen(b) - getItemLastSeen(a)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, filtered, fuse, sort, allTimeSummary])
+  }, [search, allItems, fuse, sort, allTimeSummary])
 
   function handleCardClick(item: GalleryItem): void {
     if (mainRef.current) sessionStorage.setItem(SCROLL_KEY, String(mainRef.current.scrollTop))
     navigate(item.isGroup ? `/group/${item.id}` : `/app/${item.id}`)
+  }
+
+  function handleSteamRefresh(): void {
+    // TODO: Implement steam refresh
+    console.log('[Gallery] Steam refresh requested')
   }
 
   return (
@@ -226,61 +174,25 @@ export default function Gallery(): JSX.Element {
         </div>
       )}
 
-      {showSteamPrompt && (
-        <div className="onboarding-banner onboarding-banner--steam">
-          <ExternalLink size={16} className="onboarding-banner__icon" />
-          <div className="onboarding-banner__text">
-            <strong>Using Steam?</strong>
-            {' '}Import your game library for better artwork and grouping.{' '}
-            <button
-              className="onboarding-banner__link"
-              onClick={() => navigate('/settings')}
-            >
-              Go to Settings → Data
-            </button>
-          </div>
+      {/* Toolbar */}
+      <div className="gallery-toolbar">
+        <div className="gallery-toolbar__left">
           <button
-            className="onboarding-banner__close"
-            onClick={() => setSetting('steam_prompt_dismissed', true)}
-            title="Dismiss"
+            className="gallery-toolbar__btn"
+            onClick={() => setHeatmapOpen(true)}
+            title="View activity heatmap"
           >
-            <X size={14} />
+            <Calendar size={16} />
+          </button>
+          <button
+            className="gallery-toolbar__btn"
+            onClick={handleSteamRefresh}
+            title="Refresh Steam data"
+          >
+            <RefreshCw size={16} />
           </button>
         </div>
-      )}
 
-      <div className="heatmap-accordion">
-        <button className="heatmap-accordion__toggle" onClick={toggleHeatmap}>
-          <span>Activity</span>
-          <ChevronDown
-            size={14}
-            style={{ transform: heatmapOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
-          />
-        </button>
-        {heatmapOpen && (
-          <div className="heatmap-accordion__body">
-            <Heatmap onDayClick={handleHeatmapDayClick} />
-            {selectedDay && (
-              <div className="heatmap-day-detail">
-                <span className="heatmap-day-detail__date">{formatDayLabel(selectedDay)}</span>
-                {dayApps.length === 0 ? (
-                  <span className="heatmap-day-detail__empty">No activity recorded</span>
-                ) : (
-                  dayApps.slice(0, 5).map((app) => (
-                    <div key={app.app_id} className="heatmap-day-detail__row">
-                      <span className="heatmap-day-detail__row-name">{app.display_name}</span>
-                      <span className="heatmap-day-detail__row-time">{fmtMs(app.active_ms)}</span>
-                    </div>
-                  ))
-                )}
-                <button className="heatmap-day-detail__clear" onClick={clearSelectedDay} title="Clear">×</button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="gallery-toolbar">
         <div className="gallery-search">
           <Search size={15} className="gallery-search__icon" />
           <input
@@ -289,21 +201,6 @@ export default function Gallery(): JSX.Element {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </div>
-
-        <div className="gallery-filter">
-          <button
-            className={`gallery-filter__btn${filter === 'tracked' ? ' gallery-filter__btn--active' : ''}`}
-            onClick={() => setFilter('tracked')}
-          >
-            Tracked
-          </button>
-          <button
-            className={`gallery-filter__btn${filter === 'ignored' ? ' gallery-filter__btn--active' : ''}`}
-            onClick={() => setFilter('ignored')}
-          >
-            Ignored
-          </button>
         </div>
 
         <div className="gallery-filter">
@@ -347,6 +244,11 @@ export default function Gallery(): JSX.Element {
           ))
         )}
       </div>
+
+      {/* Global Heatmap Modal */}
+      {heatmapOpen && (
+        <GlobalHeatmapModal onClose={() => setHeatmapOpen(false)} />
+      )}
 
     </main>
   )

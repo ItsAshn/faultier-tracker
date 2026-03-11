@@ -9,27 +9,17 @@ export interface AppRecord {
   is_tracked: boolean
   icon_cache_path: string | null
   custom_image_path: string | null
-  description: string
-  notes: string
-  tags: string[]
   first_seen: number
   last_seen: number
-  daily_goal_ms: number | null
 }
-
-export type AppCategory = 'work' | 'personal' | 'gaming' | 'creative' | 'system' | 'other'
 
 export interface AppGroup {
   id: number
   name: string
-  description: string
   icon_cache_path: string | null
   custom_image_path: string | null
-  tags: string[]
   is_manual: boolean
   created_at: number
-  daily_goal_ms: number | null
-  category: AppCategory | null
 }
 
 export interface SessionSummary {
@@ -90,22 +80,16 @@ export interface ExportedApp {
   exe_path: string | null
   display_name: string
   group_name: string | null
-  description: string
-  notes: string
-  tags: string[]
 }
 
 export interface ExportedGroup {
   name: string
-  description: string
-  tags: string[]
   is_manual: boolean
 }
 
 export interface ExportedSession {
   app_exe: string
   app_path: string | null
-  type: 'active' | 'running'
   s: number   // started_at ms
   e: number   // ended_at ms
   machine: string
@@ -122,8 +106,6 @@ export interface TickPayload {
 }
 
 export type WindowControlAction = 'minimize' | 'maximize' | 'close' | 'restart'
-
-export type TrackingMode = 'whitelist' | 'blacklist'
 
 export type DateRangePreset = 'today' | 'week' | 'month' | 'all' | 'custom'
 
@@ -178,4 +160,9 @@ export interface BucketApp {
   app_id: number
   display_name: string
   active_ms: number
+}
+
+// Exe to display name mapping
+export interface ExeNameMapping {
+  [exeName: string]: string
 }

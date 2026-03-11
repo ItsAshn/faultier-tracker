@@ -1,5 +1,5 @@
-import { useState, useEffect, KeyboardEvent } from 'react'
-import { X, Globe } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X } from 'lucide-react'
 import type { AppRecord, AppGroup } from '@shared/types'
 import { useAppStore } from '../../store/appStore'
 import ImageUploader from './ImageUploader'
@@ -19,9 +19,6 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
   const [displayName, setDisplayName] = useState(
     isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   )
-  const [description, setDescription] = useState(item.description)
-  const [tags, setTags] = useState<string[]>(item.tags)
-  const [tagInput, setTagInput] = useState('')
   const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
   const [artworkModalOpen, setArtworkModalOpen] = useState(false)
 
@@ -35,26 +32,11 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
     }
   }, [item.id])
 
-  function addTag(): void {
-    const t = tagInput.trim().toLowerCase()
-    if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
-    setTagInput('')
-  }
-
-  function handleTagKey(e: KeyboardEvent<HTMLInputElement>): void {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault()
-      addTag()
-    } else if (e.key === 'Backspace' && !tagInput) {
-      setTags((prev) => prev.slice(0, -1))
-    }
-  }
-
   async function handleSave(): Promise<void> {
     if (isGroup) {
-      await updateGroup({ id: item.id, name: displayName, description, tags })
+      await updateGroup({ id: item.id, name: displayName })
     } else {
-      await updateApp({ id: item.id, display_name: displayName, description, tags })
+      await updateApp({ id: item.id, display_name: displayName })
     }
     onClose()
   }
@@ -83,47 +65,6 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="App name"
           />
-        </div>
-
-        <div className="field">
-          <label className="field__label">Description</label>
-          <textarea
-            className="input"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optional description..."
-            rows={3}
-            style={{ resize: 'vertical' }}
-          />
-        </div>
-
-        <div className="field">
-          <label className="field__label">Tags (press Enter or comma to add)</label>
-          <div
-            className="tags-input"
-            onClick={() => document.getElementById('tag-field')?.focus()}
-          >
-            {tags.map((tag) => (
-              <span key={tag} className="tags-input__tag">
-                {tag}
-                <button
-                  className="tags-input__tag-remove"
-                  onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
-                >
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
-            <input
-              id="tag-field"
-              className="tags-input__field"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={handleTagKey}
-              onBlur={addTag}
-              placeholder={tags.length === 0 ? 'Add tags...' : ''}
-            />
-          </div>
         </div>
 
         <div className="modal__footer">

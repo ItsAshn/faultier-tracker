@@ -266,12 +266,8 @@ export interface RawApp {
   is_tracked: number;
   icon_cache_path: string | null;
   custom_image_path: string | null;
-  description: string;
-  notes: string;
-  tags: string;
   first_seen: number;
   last_seen: number;
-  daily_goal_ms: number | null;
 }
 
 export function upsertApp(

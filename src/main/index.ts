@@ -13,6 +13,11 @@ import {
 } from "./tracking/sessionManager";
 import { initUpdater } from "./updater";
 import { autoFetchSteamArtwork } from "./artwork/autoFetch";
+import { importFromSteam } from "./importExport/steamImport";
+
+// Steam auto-refresh timer
+let steamRefreshTimer: NodeJS.Timeout | null = null;
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
 function createShortcut(targetPath: string, shortcutPath: string): void {
   const vbscript = `
@@ -28,6 +33,43 @@ shortcut.Save
     execSync(`cscript //Nologo "${tempVbs}"`, { windowsHide: true });
   } finally {
     try { fs.unlinkSync(tempVbs); } catch { /* ignore */ }
+  }
+}
+
+async function refreshSteamData(): Promise<void> {
+  const apiKey = getSetting("steam_api_key") as string | null;
+  const steamId = getSetting("steam_id") as string | null;
+  
+  if (!apiKey || !steamId) {
+    console.log("[SteamRefresh] skipping — no credentials configured");
+    return;
+  }
+
+  console.log("[SteamRefresh] refreshing Steam data...");
+  try {
+    const result = await importFromSteam(apiKey, steamId);
+    console.log(`[SteamRefresh] imported ${result.gamesImported} games, ${result.sessionsAdded} sessions`);
+  } catch (err) {
+    console.error("[SteamRefresh] failed:", err);
+  }
+}
+
+function startSteamRefreshTimer(): void {
+  // Clear existing timer
+  if (steamRefreshTimer) {
+    clearInterval(steamRefreshTimer);
+  }
+  
+  // Check if credentials are configured
+  const apiKey = getSetting("steam_api_key") as string | null;
+  const steamId = getSetting("steam_id") as string | null;
+  
+  if (apiKey && steamId) {
+    console.log("[SteamRefresh] starting auto-refresh timer (every 6 hours)");
+    // Initial refresh on startup
+    refreshSteamData();
+    // Set up interval
+    steamRefreshTimer = setInterval(refreshSteamData, SIX_HOURS_MS);
   }
 }
 
@@ -92,6 +134,8 @@ app.whenReady().then(async () => {
       win.show();
       // Background artwork fetch — starts 5s after window appears to avoid blocking startup
       setTimeout(() => autoFetchSteamArtwork().catch(console.error), 5000);
+      // Start Steam auto-refresh timer
+      startSteamRefreshTimer();
     });
 
     createTray(win);
@@ -112,6 +156,11 @@ app.on("before-quit", () => {
   // Allow the window's close event to proceed — without this, e.preventDefault()
   // in the hide-to-tray handler would permanently block app.quit().
   setQuitting();
+  // Clear Steam refresh timer
+  if (steamRefreshTimer) {
+    clearInterval(steamRefreshTimer);
+    steamRefreshTimer = null;
+  }
   try { closeAllSessions(Date.now()) } catch { /* DB may not be initialised if startup failed */ }
   try { stopTracker() } catch { /* ignore */ }
   try { destroyTray() } catch { /* ignore */ }

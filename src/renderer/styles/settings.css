@@ -52,6 +52,13 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+.settings-card__description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
+}
+
 /* ── Polling slider ───────────────────────────────────────────────────────── */
 
 .polling-row {
@@ -95,6 +102,64 @@ input[type='range']::-webkit-slider-thumb {
 
 input[type='range']::-webkit-slider-thumb:hover {
   box-shadow: 0 0 0 4px var(--color-accent-glow);
+}
+
+/* ── Idle options ─────────────────────────────────────────────────────────── */
+
+.idle-options {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.idle-option {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.idle-option:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+
+.idle-option--active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.idle-option-custom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.idle-option-custom input {
+  width: 60px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  text-align: center;
+}
+
+.idle-option-custom span {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 /* ── App filter list ──────────────────────────────────────────────────────── */
@@ -293,12 +358,63 @@ input[type='range']::-webkit-slider-thumb:hover {
   border-top: 2px solid var(--color-accent);
 }
 
-/* ── Import/Export ────────────────────────────────────────────────────────── */
+/* ── Steam Import Form ─────────────────────────────────────────────────────── */
+
+.steam-import-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.steam-import-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.steam-import-form .field__label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.steam-import-form .field__help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.steam-import-form .field__help-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Data Actions ──────────────────────────────────────────────────────────── */
 
 .data-actions {
   display: flex;
   gap: var(--space-3);
 }
+
+.data-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-status {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Import/Export ────────────────────────────────────────────────────────── */
 
 .import-result {
   margin-top: var(--space-4);
