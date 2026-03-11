@@ -26,7 +26,7 @@ const api = {
   updateApp: (patch: Partial<AppRecord> & { id: number }): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.APPS_UPDATE, patch),
 
-  setAppTracked: (id: number, tracked: boolean): Promise<void> =>
+  setAppTracked: (id: number, tracked: boolean): Promise<boolean> =>
     ipcRenderer.invoke(CHANNELS.APPS_SET_TRACKED, id, tracked),
 
   setAppGroup: (id: number, groupId: number | null): Promise<void> =>

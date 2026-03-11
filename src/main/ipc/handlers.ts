@@ -183,16 +183,22 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     CHANNELS.APPS_SET_TRACKED,
-    (_e, id: number, tracked: boolean): void => {
-      db.prepare<[number, number]>(
-        "UPDATE apps SET is_tracked = ? WHERE id = ?",
-      ).run(tracked ? 1 : 0, id);
-      // When an app is disabled, close any open active sessions immediately
-      // so time stops accruing — don't wait for the next poll tick.
-      if (!tracked) {
-        const now = Date.now();
-        console.log(`[IPC] APPS_SET_TRACKED: app id=${id} disabled — closing open sessions`);
-        endActiveSession(now);
+    async (_e, id: number, tracked: boolean): Promise<boolean> => {
+      try {
+        db.prepare<[number, number]>(
+          "UPDATE apps SET is_tracked = ? WHERE id = ?",
+        ).run(tracked ? 1 : 0, id);
+        // When an app is disabled, close any open active sessions immediately
+        // so time stops accruing — don't wait for the next poll tick.
+        if (!tracked) {
+          const now = Date.now();
+          console.log(`[IPC] APPS_SET_TRACKED: app id=${id} disabled — closing open sessions`);
+          endActiveSession(now);
+        }
+        return true;
+      } catch (err) {
+        console.error('[IPC] APPS_SET_TRACKED error:', err);
+        throw err;
       }
     },
   );

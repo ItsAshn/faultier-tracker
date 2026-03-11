@@ -61,13 +61,26 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async setAppTracked(id, tracked) {
+    // Store the previous state for potential rollback
+    const previousApps = get().apps
+    const previousTracked = previousApps.find((a) => a.id === id)?.is_tracked
+
+    // Optimistically update UI
+    set((s) => ({
+      apps: s.apps.map((a) => (a.id === id ? { ...a, is_tracked: tracked } : a))
+    }))
+
     try {
       await api.setAppTracked(id, tracked)
-      set((s) => ({
-        apps: s.apps.map((a) => (a.id === id ? { ...a, is_tracked: tracked } : a))
-      }))
     } catch (err) {
-      set({ error: String(err) })
+      // Revert to previous state on error
+      console.error('[AppStore] setAppTracked failed, reverting state:', err)
+      set({
+        apps: previousApps,
+        error: String(err)
+      })
+      // Re-throw so UI can show error if needed
+      throw err
     }
   },
 
