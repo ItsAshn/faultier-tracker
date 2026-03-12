@@ -108,11 +108,10 @@ function mapGroup(raw: {
 }
 
 export function registerIpcHandlers(): void {
-  const db = getDb();
-
   // ── Apps ─────────────────────────────────────────────────────────────────
 
   ipcMain.handle(CHANNELS.APPS_GET_ALL, (): AppRecord[] => {
+    const db = getDb();
     interface RawAppRow {
       id: number;
       exe_name: string;
@@ -133,6 +132,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.APPS_UPDATE,
     (_e, patch: Partial<AppRecord> & { id: number }): void => {
+      const db = getDb();
       const {
         id,
         display_name,
@@ -159,6 +159,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.APPS_SET_TRACKED,
     async (_e, id: number, tracked: boolean): Promise<boolean> => {
+      const db = getDb();
       try {
         db.prepare<[number, number]>(
           "UPDATE apps SET is_tracked = ? WHERE id = ?",
@@ -181,6 +182,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.APPS_SET_GROUP,
     (_e, id: number, groupId: number | null): void => {
+      const db = getDb();
       db.prepare<[number | null, number]>(
         "UPDATE apps SET group_id = ? WHERE id = ?",
       ).run(groupId, id);
@@ -190,6 +192,7 @@ export function registerIpcHandlers(): void {
   // ── Groups ────────────────────────────────────────────────────────────────
 
   ipcMain.handle(CHANNELS.GROUPS_GET_ALL, (): AppGroup[] => {
+    const db = getDb();
     interface RawGroupRow {
       id: number;
       name: string;
@@ -203,6 +206,7 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(CHANNELS.GROUPS_CREATE, (_e, name: string): AppGroup => {
+    const db = getDb();
     const now = Date.now();
     const result = db
       .prepare<
@@ -223,6 +227,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.GROUPS_UPDATE,
     (_e, patch: Partial<AppGroup> & { id: number }): void => {
+      const db = getDb();
       const { id, name } = patch;
       const setClauses: string[] = [];
       const params: unknown[] = [];
@@ -239,6 +244,7 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.GROUPS_DELETE, (_e, id: number): void => {
+    const db = getDb();
     db.prepare<[number]>("DELETE FROM app_groups WHERE id = ?").run(id);
   });
 
@@ -256,6 +262,7 @@ export function registerIpcHandlers(): void {
       to: number,
       groupBy: "hour" | "day" = "day",
     ): RangeSummary => {
+      const db = getDb();
       const now = Date.now();
 
       // Query A: per-app aggregated totals via SQL — avoids loading all raw rows into JS
@@ -326,6 +333,7 @@ export function registerIpcHandlers(): void {
       groupBy: "hour" | "day",
       isGroup: boolean,
     ): AppRangeSummary => {
+      const db = getDb();
       const now = Date.now();
       const sessions = isGroup
         ? db
@@ -442,6 +450,7 @@ export function registerIpcHandlers(): void {
       to: number,
       isGroup: boolean,
     ): TitleSummary[] => {
+      const db = getDb();
       const rows = isGroup
         ? db
             .prepare<
@@ -504,6 +513,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.SESSIONS_GET_DAILY_TOTALS,
     (_e, from: number, to: number): DayTotal[] => {
+      const db = getDb();
       console.log(`[IPC] getDailyTotals from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
       const now = Date.now();
       const rows = db
@@ -526,6 +536,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.SESSIONS_GET_BUCKET_APPS,
     (_e, from: number, to: number): BucketApp[] => {
+      const db = getDb();
       console.log(`[IPC] getBucketApps from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
       const now = Date.now();
       const rows = db
@@ -552,6 +563,7 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.SESSIONS_CLEAR_ALL, (): void => {
+    const db = getDb();
     console.log('[IPC] SESSIONS_CLEAR_ALL: deleting all sessions from database');
     db.prepare("DELETE FROM sessions").run();
     // Discard stale in-memory sessions so the tracker starts fresh next tick
@@ -601,6 +613,7 @@ export function registerIpcHandlers(): void {
   // ── Shared icon resolution helpers ───────────────────────────────────────
 
   async function resolveAppIcon(appId: number): Promise<string | null> {
+    const db = getDb();
     const row = db
       .prepare<
         [number],
@@ -651,6 +664,7 @@ export function registerIpcHandlers(): void {
   }
 
   async function resolveGroupIcon(groupId: number): Promise<string | null> {
+    const db = getDb();
     const group = db
       .prepare<
         [number],
@@ -753,6 +767,7 @@ export function registerIpcHandlers(): void {
       base64: string,
       isGroup = false,
     ): Promise<string> => {
+      const db = getDb();
       const fsPath = saveCustomImage(id, base64);
       if (isGroup) {
         db.prepare<[string, number]>(
@@ -776,6 +791,7 @@ export function registerIpcHandlers(): void {
       imgUrl: string,
       isGroup = false,
     ): Promise<string | null> => {
+      const db = getDb();
       const MAX_ATTEMPTS = 3;
       const headers = {
         "User-Agent":
@@ -868,6 +884,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(
     CHANNELS.ICONS_CLEAR_CUSTOM,
     (_e, id: number, isGroup = false): void => {
+      const db = getDb();
       clearCustomImage(id);
       if (isGroup) {
         db.prepare<[number]>(
