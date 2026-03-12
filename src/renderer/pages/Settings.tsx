@@ -21,6 +21,7 @@ export default function Settings(): JSX.Element {
   const [customIdleMinutes, setCustomIdleMinutes] = useState<string>('')
   const [sgdbKey, setSgdbKey] = useState<string>('')
   const [sgdbKeySaved, setSgdbKeySaved] = useState(false)
+  const [sgdbKeyError, setSgdbKeyError] = useState<string | null>(null)
 
   const apps = useAppStore((s) => s.apps)
   const settings = useAppStore((s) => s.settings)
@@ -50,9 +51,14 @@ export default function Settings(): JSX.Element {
 
   async function saveSgdbKey(): Promise<void> {
     if (!sgdbKey.trim()) return
-    await setSetting('steamgriddb_api_key', sgdbKey.trim())
-    setSgdbKeySaved(true)
-    setTimeout(() => setSgdbKeySaved(false), 2500)
+    try {
+      await setSetting('steamgriddb_api_key', sgdbKey.trim())
+      setSgdbKeySaved(true)
+      setSgdbKeyError(null)
+      setTimeout(() => setSgdbKeySaved(false), 2500)
+    } catch (err) {
+      setSgdbKeyError('Failed to save API key. Please try again.')
+    }
   }
 
   const currentIdleMinutes = Math.round(idleThreshold / 60000)
@@ -251,7 +257,12 @@ export default function Settings(): JSX.Element {
                 API key saved.
               </p>
             )}
-            {storedSgdbKey && !sgdbKeySaved && (
+            {sgdbKeyError && (
+              <p style={{ fontSize: 'var(--text-sm)', color: '#ef4444', marginTop: 'var(--space-2)' }}>
+                {sgdbKeyError}
+              </p>
+            )}
+            {storedSgdbKey && !sgdbKeySaved && !sgdbKeyError && (
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', marginTop: 'var(--space-2)' }}>
                 A key is already configured. Paste a new one above to replace it.
               </p>

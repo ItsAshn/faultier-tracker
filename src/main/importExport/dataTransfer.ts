@@ -250,7 +250,7 @@ export async function importData(): Promise<ImportResult> {
       'SELECT COUNT(*) as count FROM sessions WHERE app_id = ? AND started_at = ? AND machine_id = ?'
     )
     const insertSession = db.prepare<[number, number, number, string], void>(
-      'INSERT INTO sessions (app_id, started_at, ended_at, machine_id) VALUES (?, ?, ?, ?)'
+      'INSERT INTO sessions (app_id, session_type, started_at, ended_at, machine_id) VALUES (?, \'active\', ?, ?, ?)'
     )
 
     for (const session of payload.sessions) {

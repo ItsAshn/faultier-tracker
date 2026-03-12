@@ -145,6 +145,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       await api.setSetting(key, value)
     } catch (err) {
       set({ error: String(err) })
+      throw err  // Re-throw so caller knows it failed
     }
   },
 

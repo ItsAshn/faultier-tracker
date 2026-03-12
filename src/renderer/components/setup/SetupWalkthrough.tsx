@@ -16,15 +16,22 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
   const [steamGridKey, setSteamGridKey] = useState('')
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ games: number; sessions: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const setSetting = useAppStore((s) => s.setSetting)
 
   async function handleSteamImport() {
+    setError(null)
     // Save any entered values even if import isn't performed
-    if (steamApiKey) {
-      await setSetting('steam_api_key', steamApiKey)
-    }
-    if (steamId) {
-      await setSetting('steam_id', steamId)
+    try {
+      if (steamApiKey) {
+        await setSetting('steam_api_key', steamApiKey)
+      }
+      if (steamId) {
+        await setSetting('steam_id', steamId)
+      }
+    } catch (err) {
+      setError('Failed to save Steam credentials. Please try again.')
+      return
     }
     
     // Only attempt import if both values are provided
@@ -42,33 +49,44 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
       })
     } catch (err) {
       console.error('Steam import failed:', err)
+      setError('Steam import failed. You can skip this step and try again later in settings.')
     } finally {
       setImporting(false)
     }
   }
 
   async function handleArtworkSave() {
-    // Save SteamGridDB key if provided
-    if (steamGridKey) {
-      await setSetting('steamgriddb_api_key', steamGridKey)
+    setError(null)
+    try {
+      // Save SteamGridDB key if provided
+      if (steamGridKey) {
+        await setSetting('steamgriddb_api_key', steamGridKey)
+      }
+      await setSetting('first_run_completed', true)
+      onComplete()
+    } catch (err) {
+      setError('Failed to save settings. Please try again.')
     }
-    await setSetting('first_run_completed', true)
-    onComplete()
   }
 
   async function skipToComplete() {
-    // Save any entered API keys before skipping
-    if (steamApiKey) {
-      await setSetting('steam_api_key', steamApiKey)
+    setError(null)
+    try {
+      // Save any entered API keys before skipping
+      if (steamApiKey) {
+        await setSetting('steam_api_key', steamApiKey)
+      }
+      if (steamId) {
+        await setSetting('steam_id', steamId)
+      }
+      if (steamGridKey) {
+        await setSetting('steamgriddb_api_key', steamGridKey)
+      }
+      await setSetting('first_run_completed', true)
+      onComplete()
+    } catch (err) {
+      setError('Failed to save settings. Please try again.')
     }
-    if (steamId) {
-      await setSetting('steam_id', steamId)
-    }
-    if (steamGridKey) {
-      await setSetting('steamgriddb_api_key', steamGridKey)
-    }
-    await setSetting('first_run_completed', true)
-    onComplete()
   }
 
   return (
@@ -91,6 +109,21 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
             </div>
           ))}
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div style={{ 
+            background: 'rgba(239, 68, 68, 0.1)', 
+            border: '1px solid #ef4444', 
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-3)',
+            marginBottom: 'var(--space-4)',
+            color: '#ef4444',
+            fontSize: 'var(--text-sm)'
+          }}>
+            {error}
+          </div>
+        )}
 
         {/* Step 1: Welcome */}
         {step === 'welcome' && (

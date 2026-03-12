@@ -29,8 +29,8 @@ function openSession(
   const db = getDb()
   const result = db
     .prepare<[number, number, string], { lastInsertRowid: number | bigint }>(
-      `INSERT INTO sessions (app_id, started_at, machine_id)
-       VALUES (?, ?, ?)`
+      `INSERT INTO sessions (app_id, session_type, started_at, machine_id)
+       VALUES (?, 'active', ?, ?)`
     )
     .run(appId, now, machineId)
 
