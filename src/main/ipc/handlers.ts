@@ -7,6 +7,7 @@ import {
   setSetting,
   getAllSettings,
   resetDbData,
+  isDbOpen,
 } from "../db/client";
 import {
   extractAndCacheIcon,
@@ -630,6 +631,11 @@ export function registerIpcHandlers(): void {
     if (row.exe_path) {
       console.log(`[Icon] app ${appId}: extracting icon from exe (${row.exe_path})`);
       const fsPath = await extractAndCacheIcon(appId, row.exe_path);
+      // DB may have been closed while we awaited the icon extraction
+      if (!isDbOpen()) {
+        console.warn(`[Icon] app ${appId}: DB closed during icon extraction, skipping cache write`);
+        return fsPath ? readFileAsDataUrl(fsPath) : null;
+      }
       if (fsPath) {
         db.prepare<[string, number]>(
           "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
@@ -685,6 +691,11 @@ export function registerIpcHandlers(): void {
       if (member.exe_path) {
         console.log(`[Icon] group ${groupId}: extracting icon from member app ${member.id} (${member.exe_path})`);
         const fsPath = await extractAndCacheIcon(member.id, member.exe_path);
+        // DB may have been closed while we awaited the icon extraction
+        if (!isDbOpen()) {
+          console.warn(`[Icon] group ${groupId}: DB closed during icon extraction, skipping cache write`);
+          return fsPath ? readFileAsDataUrl(fsPath) : null;
+        }
         if (fsPath) {
           db.prepare<[string, number]>(
             "UPDATE apps SET icon_cache_path = ? WHERE id = ?",

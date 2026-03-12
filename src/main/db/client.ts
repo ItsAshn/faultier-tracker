@@ -63,14 +63,10 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
         },
         run(...params: unknown[]) {
           const stmt = getStmt(sql);
-          try {
-            stmt.run(params);
-            const r = raw.exec("SELECT last_insert_rowid()");
-            const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0;
-            return { lastInsertRowid };
-          } finally {
-            stmt.reset();
-          }
+          stmt.run(params);
+          const r = raw.exec("SELECT last_insert_rowid()");
+          const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0;
+          return { lastInsertRowid };
         },
       };
     },
@@ -136,6 +132,10 @@ let _settingsCache: Map<string, unknown> | null = null;
 export function getDb(): DbCompat {
   if (!_db) throw new Error("Database not initialized. Call openDb() first.");
   return _db;
+}
+
+export function isDbOpen(): boolean {
+  return _db !== null;
 }
 
 export function wasDbCorrupted(): boolean {

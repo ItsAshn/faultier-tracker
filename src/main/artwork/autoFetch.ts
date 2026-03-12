@@ -1,5 +1,5 @@
 import { net, BrowserWindow } from 'electron'
-import { getDb, getSetting } from '../db/client'
+import { getDb, getSetting, isDbOpen } from '../db/client'
 import { saveCustomImage } from '../icons/iconExtractor'
 import { searchSteamGridDB } from './artworkProvider'
 import { CHANNELS } from '@shared/channels'
@@ -63,6 +63,12 @@ export async function autoFetchArtwork(): Promise<void> {
       const buf = Buffer.from(await res.arrayBuffer())
       const base64 = `data:${mime};base64,${buf.toString('base64')}`
       const fsPath = saveCustomImage(row.id, base64, ext)
+
+      // DB may have been closed while we awaited the network fetch
+      if (!isDbOpen()) {
+        console.warn(`[AutoFetch] DB closed during fetch for "${row.display_name}", aborting`)
+        return
+      }
 
       db.prepare<[string, number], void>(
         'UPDATE apps SET custom_image_path = ? WHERE id = ?'
