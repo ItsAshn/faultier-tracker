@@ -20,6 +20,9 @@ export interface DbCompat {
   transaction<T>(fn: () => T): () => T;
   pragma(str: string): void;
   close(): void;
+  /** Discard all cached compiled statements so they are re-prepared on next use.
+   *  Must be called after `_rawDb.export()` which frees all WASM statement objects. */
+  clearStmtCache(): void;
 }
 
 function wrapDb(raw: SqlJsDatabase): DbCompat {
@@ -114,6 +117,12 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
       persistDb();
       raw.close();
     },
+
+    clearStmtCache() {
+      // Discard all cached statements — they are already freed at the WASM
+      // level by sql.js Database.export(), so we just drop the stale refs.
+      stmtCache.clear();
+    },
   };
 }
 
@@ -183,6 +192,10 @@ export async function openDb(): Promise<DbCompat> {
     _isSaving = true;
     try {
       const data = _rawDb.export();
+      // export() frees all WASM statement objects — purge the cache so
+      // subsequent prepare() calls compile fresh statements instead of
+      // returning dead references that throw "Statement closed".
+      _db?.clearStmtCache();
       await fs.promises.writeFile(_dbPath, Buffer.from(data));
     } catch (err) {
       console.error("[DB] Auto-save failed:", err);
@@ -198,6 +211,8 @@ export async function openDb(): Promise<DbCompat> {
 export function persistDb(): void {
   if (!_rawDb || !_dbPath) return;
   const data = _rawDb.export();
+  // export() frees all WASM statement objects — purge the cache.
+  _db?.clearStmtCache();
   fs.writeFileSync(_dbPath, Buffer.from(data));
 }
 
