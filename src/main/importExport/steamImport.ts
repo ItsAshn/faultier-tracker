@@ -74,8 +74,8 @@ export async function importFromSteam(apiKey: string, steamId: string): Promise<
     'SELECT id FROM apps WHERE exe_name = ?'
   )
   const insertApp = db.prepare<[string, string, number, number], { lastInsertRowid: number | bigint }>(
-    `INSERT INTO apps (exe_name, exe_path, display_name, group_id, description, notes, tags, first_seen, last_seen, is_tracked)
-     VALUES (?, NULL, ?, NULL, '', '', '[]', ?, ?, 1)`
+    `INSERT INTO apps (exe_name, exe_path, display_name, group_id, first_seen, last_seen, is_tracked)
+     VALUES (?, NULL, ?, NULL, ?, ?, 1)`
   )
   const updateApp = db.prepare<[string, number, number], void>(
     'UPDATE apps SET display_name = ?, last_seen = ? WHERE id = ?'
