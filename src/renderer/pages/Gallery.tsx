@@ -38,19 +38,34 @@ export default function Gallery(): JSX.Element {
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
   const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(_cachedAllTimeSummary)
   const lastSummaryFetchRef = useRef<number>(0)
+  const prevAppsLengthRef = useRef<number>(apps.length)
 
-  // Refresh all-time summary on mount, when the app list changes, and when new
-  // tracking ticks arrive — throttled to at most once per 30s so we don't hammer
-  // the DB on every 5-second poll tick.
-  useEffect(() => {
+  function fetchSummary(force = false): void {
     const now = Date.now()
-    if (lastSummaryFetchRef.current > 0 && now - lastSummaryFetchRef.current < 30_000) return
+    if (!force && lastSummaryFetchRef.current > 0 && now - lastSummaryFetchRef.current < 30_000) return
     lastSummaryFetchRef.current = now
     api.getSessionRange(0, Date.now()).then((data) => {
       _cachedAllTimeSummary = data
       setAllTimeSummary(data)
     }).catch(() => {})
-  }, [apps.length, lastTickAt])
+  }
+
+  // Refresh all-time summary on mount and when tracking ticks arrive — throttled
+  // to at most once per 30s so we don't hammer the DB on every 5-second poll tick.
+  useEffect(() => {
+    fetchSummary()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastTickAt])
+
+  // When a new app is detected (apps.length increases), force an immediate refresh
+  // so it appears with its time straight away without waiting for the throttle.
+  useEffect(() => {
+    if (apps.length > prevAppsLengthRef.current) {
+      fetchSummary(true)
+    }
+    prevAppsLengthRef.current = apps.length
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apps.length])
 
   const navigate = useNavigate()
   const mainRef = useRef<HTMLElement>(null)

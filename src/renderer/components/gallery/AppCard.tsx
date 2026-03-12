@@ -10,9 +10,20 @@ const _iconCache = new Map<string, string | null>()
 const _pending = new Map<string, Array<(icon: string | null) => void>>()
 let _batchTimer: ReturnType<typeof setTimeout> | null = null
 
-function requestIcon(id: number, isGroup: boolean): Promise<string | null> {
+// Bust cache for a single item (e.g. after user sets a custom image).
+export function bustIconCache(id: number, isGroup: boolean): void {
   const key = `${isGroup ? 'g' : 'a'}:${id}`
-  if (_iconCache.has(key)) return Promise.resolve(_iconCache.get(key)!)
+  _iconCache.delete(key)
+}
+
+// Clear entire icon cache — used when auto-fetch artwork update fires.
+export function clearIconCache(): void {
+  _iconCache.clear()
+}
+
+function requestIcon(id: number, isGroup: boolean, bust = false): Promise<string | null> {
+  const key = `${isGroup ? 'g' : 'a'}:${id}`
+  if (!bust && _iconCache.has(key)) return Promise.resolve(_iconCache.get(key)!)
   return new Promise((resolve) => {
     if (!_pending.has(key)) _pending.set(key, [])
     _pending.get(key)!.push(resolve)
@@ -57,12 +68,10 @@ interface AppCardProps {
 }
 
 export default function AppCard({ item, isGroup, memberCount, summary, onClick }: AppCardProps): JSX.Element {
-  const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
+  const [iconSrc, setIconSrc] = useState<string | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (item.custom_image_path) return
-
     const el = cardRef.current
     if (!el) return
 
@@ -78,7 +87,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [item.id, item.custom_image_path, isGroup])
+  }, [item.id, isGroup])
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary ? summary.active_ms : 0

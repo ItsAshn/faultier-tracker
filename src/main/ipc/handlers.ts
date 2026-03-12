@@ -367,8 +367,13 @@ export function registerIpcHandlers(): void {
             .all(from, now, to, id, to, from);
 
       let active_ms = 0;
+      let session_count = 0;
       for (const s of sessions) {
-        active_ms += Math.max(0, s.ended_at - s.started_at);
+        const dur = Math.max(0, s.ended_at - s.started_at);
+        if (dur > 0) {
+          active_ms += dur;
+          session_count++;
+        }
       }
 
       const fmt = (ts: number): string => {
@@ -381,10 +386,12 @@ export function registerIpcHandlers(): void {
 
       const chartMap = new Map<string, ChartDataPoint>();
       for (const s of sessions) {
+        const dur = Math.max(0, s.ended_at - s.started_at);
+        if (dur === 0) continue;
         const key = fmt(s.started_at);
         if (!chartMap.has(key))
           chartMap.set(key, { date: key, active_ms: 0 });
-        chartMap.get(key)!.active_ms += Math.max(0, s.ended_at - s.started_at);
+        chartMap.get(key)!.active_ms += dur;
       }
 
       let member_summaries: SessionSummary[] = [];
@@ -416,6 +423,7 @@ export function registerIpcHandlers(): void {
 
       return {
         active_ms,
+        session_count,
         chart_points: Array.from(chartMap.values()).sort((a, b) =>
           a.date.localeCompare(b.date),
         ),
@@ -757,60 +765,92 @@ export function registerIpcHandlers(): void {
       imgUrl: string,
       isGroup = false,
     ): Promise<string | null> => {
-      try {
-        const res = await net.fetch(imgUrl, {
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            Accept: "image/webp,image/apng,image/*,*/*;q=0.8",
-            Referer: (() => { try { return new URL(imgUrl).origin } catch { return '' } })(),
-          },
-        });
-        if (!res.ok) return null;
+      const MAX_ATTEMPTS = 3;
+      const headers = {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "image/webp,image/apng,image/*,*/*;q=0.8",
+        Referer: (() => { try { return new URL(imgUrl).origin } catch { return '' } })(),
+      };
 
-        const contentType = res.headers.get("content-type") ?? "";
-        const mimeFromHeader = contentType.split(";")[0].trim();
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          console.log(`[Icons] fetchUrl attempt ${attempt}/${MAX_ATTEMPTS} id=${id} url=${imgUrl}`);
+          const res = await net.fetch(imgUrl, { headers });
 
-        // Fallback: detect MIME from URL extension when CDN omits Content-Type
-        const urlExt = imgUrl.split("?")[0].split(".").pop()?.toLowerCase() ?? "";
-        const extMimeMap: Record<string, string> = {
-          jpg: "image/jpeg",
-          jpeg: "image/jpeg",
-          gif: "image/gif",
-          webp: "image/webp",
-          svg: "image/svg+xml",
-          png: "image/png",
-        };
-        const mime =
-          mimeFromHeader && mimeFromHeader.startsWith("image/")
-            ? mimeFromHeader
-            : extMimeMap[urlExt] ?? "image/png";
+          if (res.status === 429) {
+            const retryAfter = Number(res.headers.get("retry-after") ?? 2) * 1000;
+            const delay = Math.max(retryAfter, attempt * 1000);
+            console.warn(`[Icons] fetchUrl rate-limited (429), waiting ${delay}ms before retry`);
+            if (attempt < MAX_ATTEMPTS) {
+              await new Promise<void>((r) => setTimeout(r, delay));
+              continue;
+            }
+            console.error('[Icons] fetchUrl gave up after rate-limit retries');
+            return null;
+          }
 
-        const extMap: Record<string, string> = {
-          "image/jpeg": "jpg",
-          "image/gif": "gif",
-          "image/webp": "webp",
-          "image/svg+xml": "svg",
-        };
-        const ext = extMap[mime] ?? "png";
+          if (!res.ok) {
+            console.error(`[Icons] fetchUrl HTTP ${res.status} for url=${imgUrl}`);
+            return null;
+          }
 
-        const buf = Buffer.from(await res.arrayBuffer());
-        const base64 = `data:${mime};base64,${buf.toString("base64")}`;
+          const contentType = res.headers.get("content-type") ?? "";
+          const mimeFromHeader = contentType.split(";")[0].trim();
 
-        const fsPath = saveCustomImage(id, base64, ext);
-        if (isGroup) {
-          db.prepare<[string, number]>(
-            "UPDATE app_groups SET custom_image_path = ? WHERE id = ?",
-          ).run(fsPath, id);
-        } else {
-          db.prepare<[string, number]>(
-            "UPDATE apps SET custom_image_path = ? WHERE id = ?",
-          ).run(fsPath, id);
+          // Fallback: detect MIME from URL extension when CDN omits Content-Type
+          const urlExt = imgUrl.split("?")[0].split(".").pop()?.toLowerCase() ?? "";
+          const extMimeMap: Record<string, string> = {
+            jpg: "image/jpeg",
+            jpeg: "image/jpeg",
+            gif: "image/gif",
+            webp: "image/webp",
+            svg: "image/svg+xml",
+            png: "image/png",
+          };
+          const mime =
+            mimeFromHeader && mimeFromHeader.startsWith("image/")
+              ? mimeFromHeader
+              : extMimeMap[urlExt] ?? "image/png";
+
+          const extMap: Record<string, string> = {
+            "image/jpeg": "jpg",
+            "image/gif": "gif",
+            "image/webp": "webp",
+            "image/svg+xml": "svg",
+          };
+          const ext = extMap[mime] ?? "png";
+
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.byteLength === 0) {
+            console.error(`[Icons] fetchUrl empty response body for url=${imgUrl}`);
+            return null;
+          }
+          const base64 = `data:${mime};base64,${buf.toString("base64")}`;
+
+          const fsPath = saveCustomImage(id, base64, ext);
+          console.log(`[Icons] fetchUrl saved to ${fsPath} (${buf.byteLength} bytes, ${mime})`);
+
+          if (isGroup) {
+            db.prepare<[string, number]>(
+              "UPDATE app_groups SET custom_image_path = ? WHERE id = ?",
+            ).run(fsPath, id);
+          } else {
+            db.prepare<[string, number]>(
+              "UPDATE apps SET custom_image_path = ? WHERE id = ?",
+            ).run(fsPath, id);
+          }
+          return base64;
+        } catch (err) {
+          console.error(`[Icons] fetchUrl attempt ${attempt} threw:`, err);
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise<void>((r) => setTimeout(r, attempt * 500));
+          }
         }
-        return base64;
-      } catch {
-        return null;
       }
+
+      console.error(`[Icons] fetchUrl failed after ${MAX_ATTEMPTS} attempts for url=${imgUrl}`);
+      return null;
     },
   );
 

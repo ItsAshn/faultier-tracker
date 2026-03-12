@@ -157,6 +157,7 @@ const stub: ApiType = {
   getAppSessionRange: () =>
     Promise.resolve({
       active_ms: 0,
+      session_count: 0,
       chart_points: [],
       member_summaries: [],
     }),

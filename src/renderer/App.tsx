@@ -12,6 +12,7 @@ import { useAppStore } from './store/appStore'
 import { useSessionStore } from './store/sessionStore'
 import { useUpdateStore } from './store/updateStore'
 import { api } from './api/bridge'
+import { clearIconCache } from './components/gallery/AppCard'
 
 function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element {
   const [hasError, setHasError] = useState(false)
@@ -129,6 +130,7 @@ export default function App(): JSX.Element {
       useAppStore.getState().upsertApp(app)
     })
     const unsubArtwork = api.onArtworkUpdated(() => {
+      clearIconCache()
       useAppStore.getState().loadAll()
     })
     const unsubDataCleared = api.onDataCleared(() => {

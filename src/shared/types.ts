@@ -47,6 +47,7 @@ export interface RangeSummary {
 
 export interface AppRangeSummary {
   active_ms: number
+  session_count: number
   chart_points: ChartDataPoint[]
   member_summaries: SessionSummary[]
 }

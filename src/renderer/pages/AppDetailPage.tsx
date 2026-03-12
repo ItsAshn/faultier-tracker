@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Activity, AppWindow, X, Settings, Cloud } from 'lucide-react'
+import { ArrowLeft, Activity, AppWindow, X, Settings, Cloud, Hash } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import '../styles/app-detail.css'
 import { useAppStore } from '../store/appStore'
@@ -10,6 +10,7 @@ import TimeBarChart from '../components/dashboard/TimeBarChart'
 import DetailHeatmap from '../components/detail/DetailHeatmap'
 import ImageUploader from '../components/gallery/ImageUploader'
 import ArtworkSearchModal from '../components/gallery/ArtworkSearchModal'
+import { bustIconCache } from '../components/gallery/AppCard'
 
 type Preset = 'today' | 'week' | 'month' | 'all'
 
@@ -90,17 +91,15 @@ export default function AppDetailPage(): JSX.Element {
     }
   }, [item?.id])
 
-  // Load icon
+  // Load icon — always fetch through IPC so we get a data URL, not a raw FS path
   useEffect(() => {
     if (!item) return
-    const src = item.custom_image_path || item.icon_cache_path
-    if (src) {
-      setIconSrc(src)
-    } else if (isGroup) {
-      api.getIconForGroup(numId).then(setIconSrc).catch(() => {})
-    } else {
-      api.getIconForApp(numId).then(setIconSrc).catch(() => {})
-    }
+    const loader = isGroup
+      ? () => api.getIconForGroup(numId)
+      : () => api.getIconForApp(numId)
+    loader().then(setIconSrc).catch((err) => {
+      console.error('[AppDetail] icon load failed:', err)
+    })
   }, [numId, isGroup, item?.custom_image_path, item?.icon_cache_path])
 
   // Load range data
@@ -111,7 +110,7 @@ export default function AppDetailPage(): JSX.Element {
     setLoading(true)
     api.getAppSessionRange(numId, from, to, groupBy, isGroup)
       .then((data) => { if (!cancelled) setRangeData(data) })
-      .catch(() => {})
+      .catch((err) => { console.error('[AppDetail] getAppSessionRange failed:', err) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [numId, isGroup, preset, item?.id])
@@ -231,14 +230,6 @@ export default function AppDetailPage(): JSX.Element {
         </div>
       </div>
 
-      {/* Total time - Hero stat */}
-      <div className="app-detail__total-time">
-        <div className="app-detail__total-time-label">Total Time</div>
-        <div className="app-detail__total-time-value">
-          {loading ? '—' : rangeData ? fmtMs(rangeData.active_ms) : '—'}
-        </div>
-      </div>
-
       {/* Date range */}
       <div className="app-detail__range-row">
         <div className="date-range-picker">
@@ -263,6 +254,15 @@ export default function AppDetailPage(): JSX.Element {
           <div className="summary-card__label">Active Time</div>
           <div className="summary-card__value">
             {loading ? '—' : rangeData ? fmtMs(rangeData.active_ms) : '—'}
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="summary-card__icon">
+            <Hash size={16} />
+          </div>
+          <div className="summary-card__label">Sessions</div>
+          <div className="summary-card__value">
+            {loading ? '—' : rangeData ? String(rangeData.session_count) : '—'}
           </div>
         </div>
       </div>
@@ -295,7 +295,10 @@ export default function AppDetailPage(): JSX.Element {
                 id={numId}
                 isGroup={isGroup}
                 currentSrc={iconSrc}
-                onUpdated={(url) => setIconSrc(url)}
+                onUpdated={(url) => {
+                  bustIconCache(numId, isGroup)
+                  setIconSrc(url)
+                }}
                 onSearchOnline={() => setArtworkModalOpen(true)}
               />
 
@@ -340,7 +343,11 @@ export default function AppDetailPage(): JSX.Element {
           displayName={name}
           isGroup={isGroup}
           onClose={() => setArtworkModalOpen(false)}
-          onApply={(url) => setIconSrc(url)}
+          onApply={(url) => {
+            bustIconCache(numId, isGroup)
+            setIconSrc(url)
+            setArtworkModalOpen(false)
+          }}
         />
       )}
     </main>
