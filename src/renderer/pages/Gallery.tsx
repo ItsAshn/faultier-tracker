@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Fuse from 'fuse.js'
-import { Search, Images, Zap, X, Calendar, RefreshCw } from 'lucide-react'
+import { Search, Images, Calendar, RefreshCw, Filter } from 'lucide-react'
 import '../styles/gallery.css'
 import { useAppStore } from '../store/appStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -59,10 +59,6 @@ export default function Gallery(): JSX.Element {
   
   // Modal states
   const [heatmapOpen, setHeatmapOpen] = useState(false)
-
-  // Onboarding banner
-  const [bannerDismissed, setBannerDismissed] = useState(false)
-  const showOnboarding = lastTickAt === null && !bannerDismissed
 
   // Restore scroll position when returning from a detail page
   useEffect(() => {
@@ -139,8 +135,11 @@ export default function Gallery(): JSX.Element {
   }
 
   const displayed = useMemo(() => {
-    if (search.trim()) return fuse.search(search).map((r) => r.item)
-    return [...allItems].sort((a, b) => {
+    let items = allItems
+    if (search.trim()) {
+      items = fuse.search(search).map((r) => r.item)
+    }
+    return [...items].sort((a, b) => {
       if (sort === 'time') return getItemTotalMs(b) - getItemTotalMs(a)
       if (sort === 'name') return getItemName(a).localeCompare(getItemName(b), undefined, { sensitivity: 'base' })
       // last_seen
@@ -161,40 +160,10 @@ export default function Gallery(): JSX.Element {
 
   return (
     <main ref={mainRef} className="page-content">
-      {showOnboarding && (
-        <div className="onboarding-banner">
-          <Zap size={16} className="onboarding-banner__icon" />
-          <div className="onboarding-banner__text">
-            <strong>Faultier Tracker is running.</strong>
-            {' '}Apps will appear here automatically as you use your computer — typically within 5 seconds.
-          </div>
-          <button className="onboarding-banner__close" onClick={() => setBannerDismissed(true)} title="Dismiss">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
       {/* Toolbar */}
       <div className="gallery-toolbar">
-        <div className="gallery-toolbar__left">
-          <button
-            className="gallery-toolbar__btn"
-            onClick={() => setHeatmapOpen(true)}
-            title="View activity heatmap"
-          >
-            <Calendar size={16} />
-          </button>
-          <button
-            className="gallery-toolbar__btn"
-            onClick={handleSteamRefresh}
-            title="Refresh Steam data"
-          >
-            <RefreshCw size={16} />
-          </button>
-        </div>
-
-        <div className="gallery-search">
-          <Search size={15} className="gallery-search__icon" />
+        <div className="gallery-toolbar__search">
+          <Search size={16} className="gallery-search__icon" />
           <input
             className="gallery-search__input"
             placeholder="Search apps..."
@@ -208,19 +177,39 @@ export default function Gallery(): JSX.Element {
             className={`gallery-filter__btn${sort === 'time' ? ' gallery-filter__btn--active' : ''}`}
             onClick={() => setSort('time')}
           >
-            Most time
+            <Filter size={14} />
+            <span>Most time</span>
           </button>
           <button
             className={`gallery-filter__btn${sort === 'name' ? ' gallery-filter__btn--active' : ''}`}
             onClick={() => setSort('name')}
           >
-            Name
+            <Filter size={14} />
+            <span>Name</span>
           </button>
           <button
             className={`gallery-filter__btn${sort === 'last_seen' ? ' gallery-filter__btn--active' : ''}`}
             onClick={() => setSort('last_seen')}
           >
-            Recent
+            <Filter size={14} />
+            <span>Recent</span>
+          </button>
+        </div>
+
+        <div className="gallery-toolbar__actions">
+          <button
+            className="gallery-toolbar__btn"
+            onClick={() => setHeatmapOpen(true)}
+            title="View activity heatmap"
+          >
+            <Calendar size={16} />
+          </button>
+          <button
+            className="gallery-toolbar__btn"
+            onClick={handleSteamRefresh}
+            title="Refresh Steam data"
+          >
+            <RefreshCw size={16} />
           </button>
         </div>
       </div>

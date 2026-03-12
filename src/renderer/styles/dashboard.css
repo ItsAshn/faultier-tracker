@@ -890,7 +890,7 @@
   outline-offset: 1px;
 }
 
-.heatmap-cell--l0 { background: var(--color-surface-3); }
+.heatmap-cell--l0 { background: var(--color-surface-3); border: 1px solid var(--color-border); }
 .heatmap-cell--l1 { background: rgba(245, 158, 11, 0.25); }
 .heatmap-cell--l2 { background: rgba(245, 158, 11, 0.50); }
 .heatmap-cell--l3 { background: rgba(245, 158, 11, 0.75); }

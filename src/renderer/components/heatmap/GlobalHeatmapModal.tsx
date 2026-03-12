@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { DayTotal, BucketApp } from '@shared/types'
 import { api } from '../../api/bridge'
-import { X } from 'lucide-react'
+import { X, Calendar } from 'lucide-react'
 
 interface Props {
   onClose: () => void
@@ -109,127 +109,145 @@ export default function GlobalHeatmapModal({ onClose }: Props): JSX.Element {
           </button>
         </div>
 
-        <div className="global-heatmap-content" style={{ display: 'flex', gap: 20 }}>
-          {/* Heatmap */}
-          <div style={{ flex: 1 }}>
-            <div className="heatmap-container" style={{ margin: 0 }}>
-              <div className="heatmap-scroll">
-                <div className="heatmap-inner">
-                  <div className="heatmap-months">
-                    <div style={{ width: 18 }} />
-                    {weeks.map((_, wi) => {
-                      const label = monthLabelCols.find((m) => m.col === wi)
-                      return (
-                        <div key={wi} className="heatmap-month-cell">
-                          {label ? label.label : ''}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    <div className="heatmap-days">
-                      {DAY_LABELS.map((d, i) => (
-                        <div key={i} className="heatmap-day-label">{i % 2 === 1 ? d : ''}</div>
-                      ))}
+        {maxMs === 0 ? (
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            padding: 'var(--space-8)',
+            color: 'var(--color-text-muted)',
+            gap: 'var(--space-3)'
+          }}>
+            <Calendar size={48} style={{ opacity: 0.5 }} />
+            <p style={{ fontSize: 'var(--text-base)', margin: 0 }}>No activity recorded yet</p>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', margin: 0 }}>
+              Apps will appear here once you start using your computer
+            </p>
+          </div>
+        ) : (
+          <div className="global-heatmap-content" style={{ display: 'flex', gap: 20 }}>
+            {/* Heatmap */}
+            <div style={{ flex: 1 }}>
+              <div className="heatmap-container" style={{ margin: 0 }}>
+                <div className="heatmap-scroll">
+                  <div className="heatmap-inner">
+                    <div className="heatmap-months">
+                      <div style={{ width: 18 }} />
+                      {weeks.map((_, wi) => {
+                        const label = monthLabelCols.find((m) => m.col === wi)
+                        return (
+                          <div key={wi} className="heatmap-month-cell">
+                            {label ? label.label : ''}
+                          </div>
+                        )
+                      })}
                     </div>
 
-                    {weeks.map((week, wi) => (
-                      <div key={wi} className="heatmap-week">
-                        {week.map((dateStr) => {
-                          const ms = totalsMap.get(dateStr) ?? 0
-                          const level = intensityLevel(ms, maxMs)
-                          const isFuture = dateStr > todayStr
-                          return (
-                            <div
-                              key={dateStr}
-                              className={`heatmap-cell heatmap-cell--l${level}${isFuture ? ' heatmap-cell--future' : ''}${dateStr === todayStr ? ' heatmap-cell--today' : ''}${selectedDay === dateStr ? ' heatmap-cell--selected' : ''}`}
-                              onClick={() => handleDayClick(dateStr)}
-                              onMouseEnter={(e) => {
-                                if (!isFuture) {
-                                  const rect = (e.target as HTMLElement).getBoundingClientRect()
-                                  setTooltip({ date: dateStr, ms, x: rect.left, y: rect.top })
-                                }
-                              }}
-                              onMouseLeave={() => setTooltip(null)}
-                              title=""
-                            />
-                          )
-                        })}
+                    <div style={{ display: 'flex', gap: 2 }}>
+                      <div className="heatmap-days">
+                        {DAY_LABELS.map((d, i) => (
+                          <div key={i} className="heatmap-day-label">{i % 2 === 1 ? d : ''}</div>
+                        ))}
                       </div>
-                    ))}
+
+                      {weeks.map((week, wi) => (
+                        <div key={wi} className="heatmap-week">
+                          {week.map((dateStr) => {
+                            const ms = totalsMap.get(dateStr) ?? 0
+                            const level = intensityLevel(ms, maxMs)
+                            const isFuture = dateStr > todayStr
+                            return (
+                              <div
+                                key={dateStr}
+                                className={`heatmap-cell heatmap-cell--l${level}${isFuture ? ' heatmap-cell--future' : ''}${dateStr === todayStr ? ' heatmap-cell--today' : ''}${selectedDay === dateStr ? ' heatmap-cell--selected' : ''}`}
+                                onClick={() => handleDayClick(dateStr)}
+                                onMouseEnter={(e) => {
+                                  if (!isFuture) {
+                                    const rect = (e.target as HTMLElement).getBoundingClientRect()
+                                    setTooltip({ date: dateStr, ms, x: rect.left, y: rect.top })
+                                  }
+                                }}
+                                onMouseLeave={() => setTooltip(null)}
+                                title=""
+                              />
+                            )
+                          })}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {tooltip && (
-                <div
-                  className="heatmap-tooltip"
-                  style={{ left: tooltip.x, top: tooltip.y - 40 }}
-                >
-                  <span className="heatmap-tooltip__date">{tooltip.date}</span>
-                  <span className="heatmap-tooltip__time">
-                    {tooltip.ms > 0 ? fmtMs(tooltip.ms) : 'No activity'}
-                  </span>
-                </div>
-              )}
-
-              <div className="heatmap-legend">
-                <span className="heatmap-legend__label">Less</span>
-                {[0, 1, 2, 3, 4].map((l) => (
-                  <div key={l} className={`heatmap-cell heatmap-cell--l${l}`} style={{ cursor: 'default' }} />
-                ))}
-                <span className="heatmap-legend__label">More</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Day Detail Panel */}
-          <div style={{ width: 250, borderLeft: '1px solid var(--color-border)', paddingLeft: 20 }}>
-            {selectedDay ? (
-              <>
-                <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 'var(--text-base)' }}>
-                  {formatDayLabel(selectedDay)}
-                </div>
-                {dayApps.length === 0 ? (
-                  <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-                    No activity recorded
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {dayApps.slice(0, 10).map((app) => (
-                      <div 
-                        key={app.app_id} 
-                        style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          alignItems: 'center',
-                          fontSize: 'var(--text-sm)'
-                        }}
-                      >
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {app.display_name}
-                        </span>
-                        <span style={{ color: 'var(--color-text-muted)', marginLeft: 8 }}>
-                          {fmtMs(app.active_ms)}
-                        </span>
-                      </div>
-                    ))}
-                    {dayApps.length > 10 && (
-                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', marginTop: 4 }}>
-                        +{dayApps.length - 10} more apps
-                      </div>
-                    )}
+                {tooltip && (
+                  <div
+                    className="heatmap-tooltip"
+                    style={{ left: tooltip.x, top: tooltip.y - 40 }}
+                  >
+                    <span className="heatmap-tooltip__date">{tooltip.date}</span>
+                    <span className="heatmap-tooltip__time">
+                      {tooltip.ms > 0 ? fmtMs(tooltip.ms) : 'No activity'}
+                    </span>
                   </div>
                 )}
-              </>
-            ) : (
-              <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-                Click a day to see activity breakdown
+
+                <div className="heatmap-legend">
+                  <span className="heatmap-legend__label">Less</span>
+                  {[0, 1, 2, 3, 4].map((l) => (
+                    <div key={l} className={`heatmap-cell heatmap-cell--l${l}`} style={{ cursor: 'default' }} />
+                  ))}
+                  <span className="heatmap-legend__label">More</span>
+                </div>
               </div>
-            )}
+            </div>
+
+            {/* Day Detail Panel */}
+            <div style={{ width: 250, borderLeft: '1px solid var(--color-border)', paddingLeft: 20 }}>
+              {selectedDay ? (
+                <>
+                  <div style={{ fontWeight: 600, marginBottom: 12, fontSize: 'var(--text-base)' }}>
+                    {formatDayLabel(selectedDay)}
+                  </div>
+                  {dayApps.length === 0 ? (
+                    <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                      No activity recorded
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {dayApps.slice(0, 10).map((app) => (
+                        <div 
+                          key={app.app_id} 
+                          style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            fontSize: 'var(--text-sm)'
+                          }}
+                        >
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {app.display_name}
+                          </span>
+                          <span style={{ color: 'var(--color-text-muted)', marginLeft: 8 }}>
+                            {fmtMs(app.active_ms)}
+                          </span>
+                        </div>
+                      ))}
+                      {dayApps.length > 10 && (
+                        <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)', marginTop: 4 }}>
+                          +{dayApps.length - 10} more apps
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                  Click a day to see activity breakdown
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
