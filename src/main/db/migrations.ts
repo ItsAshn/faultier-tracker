@@ -8,6 +8,31 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    // Add Steam import tracking columns and delta session support
+    version: 8,
+    up(db) {
+      db.exec(`
+        -- Add columns to track Steam imports and cached playtime
+        ALTER TABLE apps ADD COLUMN is_steam_import INTEGER NOT NULL DEFAULT 0;
+        ALTER TABLE apps ADD COLUMN last_steam_playtime_ms INTEGER DEFAULT 0;
+        
+        -- Mark existing Steam apps
+        UPDATE apps SET is_steam_import = 1 WHERE exe_name LIKE 'steam:%';
+        
+        -- Initialize last_steam_playtime_ms for existing imports
+        UPDATE apps 
+        SET last_steam_playtime_ms = (
+          SELECT COALESCE(SUM(ended_at - started_at), 0)
+          FROM sessions 
+          WHERE sessions.app_id = apps.id 
+          AND machine_id = 'steam-import'
+        )
+        WHERE is_steam_import = 1;
+      `);
+      console.log('[DB] Migration v8: Added Steam tracking columns');
+    },
+  },
+  {
     // Clean up database for simplified v2.0 architecture:
     // - Remove clutter columns (description, notes, tags, goals)
     // - Remove window_title tracking (stop collecting)

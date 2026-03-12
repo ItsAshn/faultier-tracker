@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AppWindow } from 'lucide-react'
+import { AppWindow, Cloud } from 'lucide-react'
 import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
 import { api } from '../../api/bridge'
 
@@ -83,6 +83,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary ? summary.active_ms : 0
   const hasTime = activeMs > 0
+  const isSteamGame = !isGroup && (item as AppRecord).exe_name?.startsWith('steam:')
 
   return (
     <div
@@ -114,6 +115,11 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       {hasTime && (
         <div className="app-card__time-badge">
           {fmtMs(activeMs)}
+          {isSteamGame && (
+            <span className="app-card__steam-icon" title="Playtime from Steam">
+              <Cloud size={12} style={{ marginLeft: 4, opacity: 0.8 }} />
+            </span>
+          )}
         </div>
       )}
 

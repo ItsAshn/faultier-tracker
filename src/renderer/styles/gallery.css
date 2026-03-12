@@ -368,6 +368,16 @@
   border: 1px solid rgba(245, 158, 11, 0.3);
   backdrop-filter: blur(4px);
   text-shadow: none;
+  display: flex;
+  align-items: center;
+}
+
+/* Steam icon inside time badge */
+.app-card__steam-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: #66c0f4; /* Steam blue */
 }
 
 /* Tracking badge — top right corner */

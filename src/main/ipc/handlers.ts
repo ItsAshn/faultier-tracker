@@ -67,6 +67,7 @@ function mapApp(raw: {
   display_name: string;
   group_id: number | null;
   is_tracked: number;
+  is_steam_import: number;
   icon_cache_path: string | null;
   custom_image_path: string | null;
   first_seen: number;
@@ -79,6 +80,7 @@ function mapApp(raw: {
     display_name: raw.display_name,
     group_id: raw.group_id,
     is_tracked: raw.is_tracked === 1,
+    is_steam_import: raw.is_steam_import === 1,
     icon_cache_path: null,
     custom_image_path: null,
     first_seen: raw.first_seen,
@@ -117,12 +119,13 @@ export function registerIpcHandlers(): void {
       display_name: string;
       group_id: number | null;
       is_tracked: number;
+      is_steam_import: number;
       icon_cache_path: string | null;
       custom_image_path: string | null;
       first_seen: number;
       last_seen: number;
     }
-    const rows = db.prepare<[], RawAppRow>("SELECT id, exe_name, exe_path, display_name, group_id, is_tracked, icon_cache_path, custom_image_path, first_seen, last_seen FROM apps ORDER BY display_name COLLATE NOCASE").all();
+    const rows = db.prepare<[], RawAppRow>("SELECT id, exe_name, exe_path, display_name, group_id, is_tracked, is_steam_import, icon_cache_path, custom_image_path, first_seen, last_seen FROM apps ORDER BY display_name COLLATE NOCASE").all();
     return rows.map(mapApp);
   });
 

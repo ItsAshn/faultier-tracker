@@ -13,7 +13,7 @@ import {
 } from "./tracking/sessionManager";
 import { initUpdater } from "./updater";
 import { autoFetchSteamArtwork } from "./artwork/autoFetch";
-import { importFromSteam } from "./importExport/steamImport";
+import { importFromSteam, refreshSteamPlaytimes } from "./importExport/steamImport";
 
 // Steam auto-refresh timer
 let steamRefreshTimer: NodeJS.Timeout | null = null;
@@ -45,10 +45,10 @@ async function refreshSteamData(): Promise<void> {
     return;
   }
 
-  console.log("[SteamRefresh] refreshing Steam data...");
+  console.log("[SteamRefresh] refreshing Steam playtimes...");
   try {
-    const result = await importFromSteam(apiKey, steamId);
-    console.log(`[SteamRefresh] imported ${result.gamesImported} games, ${result.sessionsAdded} sessions`);
+    const result = await refreshSteamPlaytimes(apiKey, steamId);
+    console.log(`[SteamRefresh] updated ${result.updated} games, added ${Math.round(result.totalDeltaMs / 60000)}m of playtime`);
   } catch (err) {
     console.error("[SteamRefresh] failed:", err);
   }

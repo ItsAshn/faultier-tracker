@@ -264,6 +264,7 @@ export interface RawApp {
   display_name: string;
   group_id: number | null;
   is_tracked: number;
+  is_steam_import: number;
   icon_cache_path: string | null;
   custom_image_path: string | null;
   first_seen: number;

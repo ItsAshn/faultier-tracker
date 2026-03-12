@@ -7,6 +7,7 @@ export interface AppRecord {
   display_name: string
   group_id: number | null
   is_tracked: boolean
+  is_steam_import: boolean  // NEW: true for Steam-imported games
   icon_cache_path: string | null
   custom_image_path: string | null
   first_seen: number

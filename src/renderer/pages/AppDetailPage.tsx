@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Activity, AppWindow, X, Settings } from 'lucide-react'
+import { ArrowLeft, Activity, AppWindow, X, Settings, Cloud } from 'lucide-react'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 import '../styles/app-detail.css'
 import { useAppStore } from '../store/appStore'
@@ -221,8 +221,11 @@ export default function AppDetailPage(): JSX.Element {
           )}
           {!isGroup && isSteamGame && (
             <div className="app-detail__hero-track">
-              <span className="app-detail__steam-badge">Steam</span>
-              <span className="app-detail__steam-note">Tracked by Steam</span>
+              <span className="app-detail__steam-badge">
+                <Cloud size={14} style={{ marginRight: 4 }} />
+                Steam
+              </span>
+              <span className="app-detail__steam-note">Playtime from Steam API</span>
             </div>
           )}
         </div>

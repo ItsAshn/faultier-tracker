@@ -21,6 +21,7 @@ function toAppRecord(raw: RawApp): AppRecord {
     display_name: raw.display_name,
     group_id: raw.group_id,
     is_tracked: raw.is_tracked !== 0,
+    is_steam_import: raw.is_steam_import !== 0,
     icon_cache_path: raw.icon_cache_path,
     custom_image_path: raw.custom_image_path,
     first_seen: raw.first_seen,
@@ -99,13 +100,14 @@ async function pollTick(): Promise<void> {
           [string],
           | {
               id: number;
+              exe_name: string;
               display_name: string;
               is_tracked: number;
               exe_path: string | null;
               group_id: number | null;
             }
           | undefined
-        >("SELECT id, display_name, is_tracked, exe_path, group_id FROM apps WHERE exe_name = ?")
+        >("SELECT id, exe_name, display_name, is_tracked, exe_path, group_id FROM apps WHERE exe_name = ?")
         .get(activeApp.exeName);
 
       let appId: number;
@@ -142,19 +144,31 @@ async function pollTick(): Promise<void> {
             [string],
             | {
                 id: number;
+                exe_name: string;
                 display_name: string;
                 is_tracked: number;
                 exe_path: string | null;
                 group_id: number | null;
               }
             | undefined
-          >("SELECT id, display_name, is_tracked, exe_path, group_id FROM apps WHERE exe_name = ?")
+          >("SELECT id, exe_name, display_name, is_tracked, exe_path, group_id FROM apps WHERE exe_name = ?")
           .get(activeApp.exeName);
       } else {
         appId = appRow.id;
       }
 
-      if (appRow && appRow.is_tracked !== 0 && !isIdle) {
+      // ── Skip tracking for Steam games ─────────────────────────────────
+      // Steam games use API playtime only, no local tracking
+      const isSteamGame = appRow && appRow.exe_name?.startsWith('steam:');
+      
+      if (isSteamGame && appRow) {
+        console.log(`[Tracker] Steam game active, using API time only: ${appRow.exe_name}`);
+        endActiveSession(now);
+        // Continue to update last_seen and other metadata
+        db.prepare<[number, number], void>(
+          'UPDATE apps SET last_seen = ? WHERE id = ?'
+        ).run(now, appRow.id);
+      } else if (appRow && appRow.is_tracked !== 0 && !isIdle) {
         tickActive(appId, now);
         activeAppId = appId;
         activeDisplayName = appRow.display_name;
