@@ -19,6 +19,15 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
   const setSetting = useAppStore((s) => s.setSetting)
 
   async function handleSteamImport() {
+    // Save any entered values even if import isn't performed
+    if (steamApiKey) {
+      await setSetting('steam_api_key', steamApiKey)
+    }
+    if (steamId) {
+      await setSetting('steam_id', steamId)
+    }
+    
+    // Only attempt import if both values are provided
     if (!steamApiKey || !steamId) {
       setStep('artwork')
       return
@@ -31,8 +40,6 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
         games: result.gamesImported,
         sessions: result.sessionsAdded
       })
-      await setSetting('steam_api_key', steamApiKey)
-      await setSetting('steam_id', steamId)
     } catch (err) {
       console.error('Steam import failed:', err)
     } finally {
@@ -41,6 +48,7 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
   }
 
   async function handleArtworkSave() {
+    // Save SteamGridDB key if provided
     if (steamGridKey) {
       await setSetting('steamgriddb_api_key', steamGridKey)
     }
@@ -48,8 +56,18 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
     onComplete()
   }
 
-  function skipToComplete() {
-    setSetting('first_run_completed', true)
+  async function skipToComplete() {
+    // Save any entered API keys before skipping
+    if (steamApiKey) {
+      await setSetting('steam_api_key', steamApiKey)
+    }
+    if (steamId) {
+      await setSetting('steam_id', steamId)
+    }
+    if (steamGridKey) {
+      await setSetting('steamgriddb_api_key', steamGridKey)
+    }
+    await setSetting('first_run_completed', true)
     onComplete()
   }
 
@@ -182,9 +200,9 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
                   <button
                     className="btn btn--primary"
                     onClick={handleSteamImport}
-                    disabled={importing || (!steamApiKey || !steamId)}
+                    disabled={importing}
                   >
-                    {importing ? 'Importing...' : 'Import Steam Data'}
+                    {importing ? 'Importing...' : (steamApiKey && steamId ? 'Import Steam Data' : 'Continue')}
                   </button>
                 </div>
               </>

@@ -112,7 +112,8 @@ export default function App(): JSX.Element {
 
     loadAll().then(() => {
       // Check if first run after loading settings
-      const firstRunCompleted = settings['first_run_completed']
+      // Must read from store directly to get fresh value after loadAll
+      const firstRunCompleted = useAppStore.getState().settings['first_run_completed']
       if (firstRunCompleted !== true && firstRunCompleted !== 'true') {
         setShowSetup(true)
       }
