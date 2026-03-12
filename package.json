@@ -60,8 +60,7 @@
       "target": [
         "nsis"
       ],
-      "icon": "resources/icon.ico",
-      "publisherName": "Ashn"
+      "icon": "resources/icon.ico"
     }
   }
 }
