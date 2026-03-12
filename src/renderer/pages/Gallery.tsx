@@ -8,7 +8,7 @@ import { useSessionStore } from '../store/sessionStore'
 import AppCard from '../components/gallery/AppCard'
 import { api } from '../api/bridge'
 import type { AppRecord, AppGroup, RangeSummary } from '@shared/types'
-import GlobalHeatmapModal from '../components/heatmap/GlobalHeatmapModal'
+import GalleryHeatmap from '../components/gallery/GalleryHeatmap'
 
 type SortMode = 'time' | 'name' | 'last_seen'
 
@@ -236,7 +236,7 @@ export default function Gallery(): JSX.Element {
 
       {/* Global Heatmap Modal */}
       {heatmapOpen && (
-        <GlobalHeatmapModal onClose={() => setHeatmapOpen(false)} />
+        <GalleryHeatmap onClose={() => setHeatmapOpen(false)} />
       )}
 
     </main>

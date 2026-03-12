@@ -7,7 +7,7 @@ import { useAppStore } from '../store/appStore'
 import { api } from '../api/bridge'
 import type { AppRecord, AppGroup, AppRangeSummary } from '@shared/types'
 import TimeBarChart from '../components/dashboard/TimeBarChart'
-import AppHeatmap from '../components/dashboard/AppHeatmap'
+import DetailHeatmap from '../components/detail/DetailHeatmap'
 import ImageUploader from '../components/gallery/ImageUploader'
 import ArtworkSearchModal from '../components/gallery/ArtworkSearchModal'
 
@@ -273,7 +273,7 @@ export default function AppDetailPage(): JSX.Element {
       )}
 
       {/* Per-app heatmap */}
-      <AppHeatmap appId={numId} isGroup={isGroup} />
+      <DetailHeatmap appId={numId} isGroup={isGroup} />
 
       {/* Settings Modal */}
       {settingsModalOpen && (
