@@ -32,6 +32,11 @@ function toAppRecord(raw: RawApp): AppRecord {
 let pollTimer: NodeJS.Timeout | null = null;
 let isRunning = false;
 
+// Throttle last_seen DB writes for known apps to avoid per-tick DB churn.
+// Key: app id, Value: timestamp of last last_seen write (ms).
+const lastSeenWrittenAt = new Map<number, number>();
+const LAST_SEEN_WRITE_INTERVAL = 60_000; // write at most once per minute
+
 export async function startTracker(): Promise<void> {
   const machineId = getSetting("machine_id") as string;
   initSessionManager(machineId);
@@ -50,6 +55,7 @@ export function stopTracker(): void {
     clearTimeout(pollTimer);
     pollTimer = null;
   }
+  lastSeenWrittenAt.clear();
   console.log("[Tracker] Stopped");
 }
 
@@ -172,6 +178,26 @@ async function pollTick(): Promise<void> {
         tickActive(appId, now);
         activeAppId = appId;
         activeDisplayName = appRow.display_name;
+
+        // Update last_seen for this known app, throttled to once per minute,
+        // so Gallery "Recent" sort stays accurate without per-tick DB writes.
+        const lastWrite = lastSeenWrittenAt.get(appId) ?? 0;
+        if (now - lastWrite >= LAST_SEEN_WRITE_INTERVAL) {
+          db.prepare<[number, number], void>(
+            "UPDATE apps SET last_seen = ? WHERE id = ?",
+          ).run(now, appId);
+          lastSeenWrittenAt.set(appId, now);
+          // Notify renderer so the in-memory store reflects the fresh last_seen.
+          const updatedApp = db
+            .prepare<[number], RawApp>("SELECT * FROM apps WHERE id = ?")
+            .get(appId);
+          if (updatedApp) {
+            BrowserWindow.getAllWindows().forEach((win) => {
+              if (!win.isDestroyed())
+                win.webContents.send(CHANNELS.TRACKING_APP_SEEN, toAppRecord(updatedApp));
+            });
+          }
+        }
 
         // Update exe_path if we now have it; if this is the first time we get
         // the path AND the app has no group yet, re-run group resolution so

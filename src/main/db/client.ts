@@ -25,8 +25,10 @@ export interface DbCompat {
 function wrapDb(raw: SqlJsDatabase): DbCompat {
   // Cache compiled statements to avoid recompiling the same SQL repeatedly
   const stmtCache = new Map<string, Statement>();
+  let _closed = false;
 
   function getStmt(sql: string): Statement {
+    if (_closed) throw new Error("Database is closed");
     let stmt = stmtCache.get(sql);
     if (!stmt) {
       stmt = raw.prepare(sql);
@@ -101,6 +103,9 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
     },
 
     close() {
+      // Mark closed first so any concurrent getStmt() calls fail fast
+      // instead of operating on freed WASM statement objects.
+      _closed = true;
       // Free all cached compiled statements before closing the DB
       for (const stmt of stmtCache.values()) {
         try {
@@ -202,9 +207,14 @@ export function closeDb(): void {
     _saveTimer = null;
   }
   _settingsCache = null;
-  _db?.close(); // frees statement cache, persists DB, closes raw
-  _rawDb = null;
+  // Null out _db before calling close() so any concurrent IPC that calls
+  // getDb() gets "Database not initialized" rather than operating on a
+  // half-closed wrapper with freed WASM statement objects.
+  // Keep _rawDb alive until after db.close() since persistDb() needs it.
+  const db = _db;
   _db = null;
+  db?.close(); // sets _closed flag, frees statement cache, persists DB, closes raw
+  _rawDb = null;
   console.log("[DB] Closed");
 }
 

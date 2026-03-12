@@ -252,6 +252,9 @@ export default function Settings(): JSX.Element {
                 Save
               </button>
             </div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', marginTop: 'var(--space-2)' }}>
+              Note: fetching artwork for your entire library may take a moment — requests are spaced out to avoid overloading the API.
+            </p>
             {sgdbKeySaved && (
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginTop: 'var(--space-2)' }}>
                 API key saved.

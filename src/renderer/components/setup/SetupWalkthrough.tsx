@@ -273,6 +273,9 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
                 >
                   <ExternalLink size={12} /> Get your free API key
                 </a>
+                <p className="field__hint">
+                  Note: fetching artwork for your entire library may take a moment — requests are spaced out to avoid overloading the API.
+                </p>
               </div>
             </div>
 
