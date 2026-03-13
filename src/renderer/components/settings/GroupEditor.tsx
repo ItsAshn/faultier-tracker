@@ -140,15 +140,13 @@ export default function GroupEditor(): JSX.Element {
                 onDragEnd={() => setDraggingAppId(null)}
               >
                 <span
-                  style={{ cursor: 'grab', color: 'var(--color-text-dim)', marginRight: 4 }}
+                  style={{ cursor: 'grab', color: 'var(--color-text-dim)', flexShrink: 0 }}
                   title="Drag to move"
                 >
                   ⠿
                 </span>
-                <span style={{ fontSize: 'var(--text-sm)', flex: 1 }}>{app.display_name}</span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-dim)', fontFamily: 'var(--font-mono)' }}>
-                  {app.exe_name}
-                </span>
+                <span className="group-app-row__name">{app.display_name}</span>
+                <span className="group-app-row__exe">{app.exe_name}</span>
               </div>
             ))}
             {(selectedGroupId !== null ? groupApps : ungroupedApps).length === 0 && (

@@ -11,6 +11,7 @@ import { updateTrayTooltip } from "../tray";
 import { CHANNELS } from "@shared/channels";
 import type { AppRecord, TickPayload } from "@shared/types";
 import { getDisplayNameFromExe } from "../utils/exeNameResolver";
+import { distance } from "fastest-levenshtein";
 
 // Convert a raw DB row to a renderer-safe AppRecord (mirrors mapApp in handlers.ts)
 function toAppRecord(raw: RawApp): AppRecord {
@@ -27,6 +28,50 @@ function toAppRecord(raw: RawApp): AppRecord {
     first_seen: raw.first_seen,
     last_seen: raw.last_seen,
   };
+}
+
+/**
+ * If the given exe path lives inside a Steam library (steamapps/common/<Folder>/),
+ * check whether there is already a Steam-imported app whose display name closely
+ * matches the folder name (normalised Levenshtein ≤ 0.1).
+ *
+ * Returns the matching steam app's id + exe_name when found, null otherwise.
+ * This is used to suppress tracking the raw .exe as a separate entry when its
+ * playtime is already tracked via the Steam API import.
+ */
+function findSteamAppForExePath(
+  exePath: string,
+): { id: number; exe_name: string; display_name: string } | null {
+  const steamMatch = /steamapps[\\/]common[\\/]([^\\/]+)/i.exec(exePath);
+  if (!steamMatch) return null;
+
+  const normalize = (s: string): string =>
+    s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const folderNorm = normalize(steamMatch[1]);
+
+  const db = getDb();
+  const steamApps = db
+    .prepare<
+      [],
+      { id: number; exe_name: string; display_name: string }
+    >(
+      "SELECT id, exe_name, display_name FROM apps WHERE exe_name LIKE 'steam:%' AND is_steam_import = 1",
+    )
+    .all();
+
+  let best: { id: number; exe_name: string; display_name: string; dist: number } | null = null;
+
+  for (const app of steamApps) {
+    const appNorm = normalize(app.display_name);
+    const maxLen = Math.max(folderNorm.length, appNorm.length);
+    if (maxLen === 0) continue;
+    const dist = distance(folderNorm, appNorm) / maxLen;
+    if (dist <= 0.1 && (!best || dist < best.dist)) {
+      best = { ...app, dist };
+    }
+  }
+
+  return best ? { id: best.id, exe_name: best.exe_name, display_name: best.display_name } : null;
 }
 
 let pollTimer: NodeJS.Timeout | null = null;
@@ -118,6 +163,32 @@ async function pollTick(): Promise<void> {
 
       let appId: number;
       if (!appRow) {
+        // ── Steam exe suppression ──────────────────────────────────────────
+        // Before inserting a new app, check if this exe lives inside a Steam
+        // library folder and already has a matching steam:APPID entry. If so,
+        // skip the insert entirely — the game is tracked via Steam API only.
+        if (activeApp.exePath) {
+          const steamEntry = findSteamAppForExePath(activeApp.exePath);
+          if (steamEntry) {
+            console.log(
+              `[Tracker] Suppressing exe "${activeApp.exeName}" — already imported as Steam game "${steamEntry.display_name}" (${steamEntry.exe_name})`,
+            );
+            endActiveSession(now);
+            // Touch last_seen on the steam entry so it stays "recently seen"
+            db.prepare<[number, number], void>(
+              "UPDATE apps SET last_seen = ? WHERE id = ?",
+            ).run(now, steamEntry.id);
+            // Leave payload.active_app = null and fall through to the tick push
+            updateTrayTooltip(null, isIdle);
+            payload = { active_app: null, timestamp: now, is_idle: isIdle };
+            // Skip the rest of the active-window block
+            BrowserWindow.getAllWindows().forEach((win) => {
+              if (!win.isDestroyed()) win.webContents.send(CHANNELS.TRACKING_TICK, payload);
+            });
+            return;
+          }
+        }
+
         const displayName = getDisplayNameFromExe(activeApp.exeName);
         console.log(`[Tracker] active window new app: ${activeApp.exeName} -> "${displayName}"`);
         // All new apps start tracked by default (is_tracked=1)

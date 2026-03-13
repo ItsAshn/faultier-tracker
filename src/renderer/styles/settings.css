@@ -233,7 +233,24 @@ input[type='range']::-webkit-slider-thumb:hover {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: var(--space-4);
-  min-height: 400px;
+  height: 480px;
+  min-height: 0;
+}
+
+/* Stack vertically on narrow windows */
+@media (max-width: 520px) {
+  .group-editor {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .group-list {
+    max-height: 200px;
+  }
+
+  .group-apps-panel {
+    max-height: 260px;
+  }
 }
 
 .group-list {
@@ -244,6 +261,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  min-width: 0;
 }
 
 .group-list__header {
@@ -258,11 +276,13 @@ input[type='range']::-webkit-slider-thumb:hover {
   letter-spacing: 0.6px;
   color: var(--color-text-muted);
   background: var(--color-surface);
+  flex-shrink: 0;
 }
 
 .group-list__body {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .group-list__item {
@@ -276,6 +296,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   border: none;
   width: 100%;
   text-align: left;
+  min-width: 0;
 }
 
 .group-list__item:hover {
@@ -291,6 +312,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   font-size: var(--text-sm);
   font-weight: 500;
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -302,6 +324,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   background: var(--color-surface-3);
   padding: 1px 6px;
   border-radius: var(--radius-full);
+  flex-shrink: 0;
 }
 
 .group-apps-panel {
@@ -311,6 +334,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  min-width: 0;
 }
 
 .group-apps-panel__header {
@@ -325,11 +349,16 @@ input[type='range']::-webkit-slider-thumb:hover {
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--color-text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .group-apps-panel__body {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .group-app-row {
@@ -340,6 +369,7 @@ input[type='range']::-webkit-slider-thumb:hover {
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   transition: background var(--transition-fast);
+  min-width: 0;
 }
 
 .group-app-row:last-child {
@@ -356,6 +386,26 @@ input[type='range']::-webkit-slider-thumb:hover {
 
 .group-app-row--drag-over {
   border-top: 2px solid var(--color-accent);
+}
+
+.group-app-row__name {
+  font-size: var(--text-sm);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-app-row__exe {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 35%;
+  flex-shrink: 0;
 }
 
 /* ── Steam Import Form ─────────────────────────────────────────────────────── */
