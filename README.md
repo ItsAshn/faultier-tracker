@@ -11,10 +11,9 @@
 
 ## What It Does
 
-KIOKU runs quietly in your system tray and tracks every application you use. It distinguishes between:
+KIOKU runs quietly in your system tray and tracks focused application you use.
 
 - **Active time** — the app has your focus (window in foreground)
-- **Running time** — the app is open but not focused (background)
 
 All data is stored locally in a SQLite database. Nothing is sent to any server.
 
@@ -33,11 +32,11 @@ All data is stored locally in a SQLite database. Nothing is sent to any server.
 
 **Gallery** — every tracked app and game shown as a card with cover art. From here you can rename entries, assign custom artwork, and organize apps into groups.
 
-![Gallery page showing a grid of tracked games with cover art](docs/Gallery.png)
+![Gallery page showing a grid of tracked games with cover art](docs/screenshots/Gallery.png)
 
 **Dashboard heatmap** — a calendar-style heatmap showing daily usage intensity over time, part of the main Dashboard view.
 
-![Dashboard heatmap showing daily usage patterns over several months](docs/Heatmap.png)
+![Dashboard heatmap showing daily usage patterns over several months](docs/screenshots/Heatmap.png)
 
 ---
 
