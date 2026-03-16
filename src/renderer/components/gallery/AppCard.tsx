@@ -6,6 +6,8 @@ import { api } from '../../api/bridge'
 // ── Module-level icon batch queue ────────────────────────────────────────────
 // Collects icon requests from all visible cards within a 50ms window and fires
 // a single IPC call instead of one call per card.
+// Cache persists for the lifetime of the renderer process — images already
+// fetched from disk/SteamGridDB are never re-fetched unless explicitly busted.
 const _iconCache = new Map<string, string | null>()
 const _pending = new Map<string, Array<(icon: string | null) => void>>()
 let _batchTimer: ReturnType<typeof setTimeout> | null = null
@@ -68,10 +70,21 @@ interface AppCardProps {
 }
 
 export default function AppCard({ item, isGroup, memberCount, summary, onClick }: AppCardProps): JSX.Element {
-  const [iconSrc, setIconSrc] = useState<string | null>(null)
+  // Three states: null = not yet loaded, string = loaded, undefined = in-flight
+  const [iconSrc, setIconSrc] = useState<string | null | undefined>(() => {
+    // If already in cache, use it immediately — no IPC round-trip needed
+    const key = `${isGroup ? 'g' : 'a'}:${item.id}`
+    if (_iconCache.has(key)) return _iconCache.get(key) ?? null
+    return undefined
+  })
+  const [imgVisible, setImgVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Already resolved from cache in initial state — nothing to do
+    const key = `${isGroup ? 'g' : 'a'}:${item.id}`
+    if (_iconCache.has(key)) return
+
     const el = cardRef.current
     if (!el) return
 
@@ -79,20 +92,30 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       ([entry]) => {
         if (entry.isIntersecting) {
           observer.disconnect()
-          requestIcon(item.id, isGroup).then(setIconSrc).catch(() => {})
+          requestIcon(item.id, isGroup)
+            .then((src) => setIconSrc(src))
+            .catch(() => setIconSrc(null))
         }
       },
-      { rootMargin: '200px' }
+      { rootMargin: '300px' }
     )
 
     observer.observe(el)
     return () => observer.disconnect()
   }, [item.id, isGroup])
 
+  // Reset fade-in state when the image source changes
+  useEffect(() => {
+    if (iconSrc) setImgVisible(false)
+  }, [iconSrc])
+
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary ? summary.active_ms : 0
   const hasTime = activeMs > 0
   const isSteamGame = !isGroup && (item as AppRecord).exe_name?.startsWith('steam:')
+
+  // iconSrc === undefined means "in-flight" — show skeleton shimmer
+  const isLoading = iconSrc === undefined
 
   return (
     <div
@@ -104,19 +127,28 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       <div className="app-card__backdrop">
         {iconSrc
           ? <img src={iconSrc} alt="" aria-hidden className="app-card__backdrop-img" />
-          : <div className="app-card__backdrop-fallback" />
+          : <div className={`app-card__backdrop-fallback${isLoading ? ' app-card__backdrop-fallback--shimmer' : ''}`} />
         }
       </div>
 
       {/* Sharp icon/art centered in the card */}
       <div className="app-card__art">
         {iconSrc
-          ? <img src={iconSrc} alt={name} className="app-card__img" />
-          : (
-            <div className="app-card__placeholder">
-              <AppWindow size={48} strokeWidth={1} />
-            </div>
+          ? (
+            <img
+              src={iconSrc}
+              alt={name}
+              className={`app-card__img${imgVisible ? ' app-card__img--visible' : ''}`}
+              onLoad={() => setImgVisible(true)}
+            />
           )
+          : isLoading
+            ? <div className="app-card__skeleton" />
+            : (
+              <div className="app-card__placeholder">
+                <AppWindow size={56} strokeWidth={1} />
+              </div>
+            )
         }
       </div>
 

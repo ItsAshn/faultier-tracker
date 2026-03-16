@@ -19,3 +19,6 @@ Thumbs.db
 
 # Electron builder cache
 .electron-builder-cache/
+
+# Local config with secrets
+opencode.json

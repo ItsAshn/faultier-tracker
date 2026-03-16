@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Fuse from 'fuse.js'
 import { Search, Images, Calendar, RefreshCw, Filter } from 'lucide-react'
@@ -35,7 +35,9 @@ function fmtMs(ms: number): string {
 export default function Gallery(): JSX.Element {
   const apps = useAppStore((s) => s.apps)
   const groups = useAppStore((s) => s.groups)
+  const loadAll = useAppStore((s) => s.loadAll)
   const lastTickAt = useSessionStore((s) => s.lastTickAt)
+  const loadRange = useSessionStore((s) => s.loadRange)
   const [allTimeSummary, setAllTimeSummary] = useState<RangeSummary | null>(_cachedAllTimeSummary)
   const lastSummaryFetchRef = useRef<number>(0)
   const prevAppsLengthRef = useRef<number>(apps.length)
@@ -74,6 +76,7 @@ export default function Gallery(): JSX.Element {
   
   // Modal states
   const [heatmapOpen, setHeatmapOpen] = useState(false)
+  const [steamRefreshing, setSteamRefreshing] = useState(false)
 
   // Restore scroll position when returning from a detail page
   useEffect(() => {
@@ -168,10 +171,22 @@ export default function Gallery(): JSX.Element {
     navigate(item.isGroup ? `/group/${item.id}` : `/app/${item.id}`)
   }
 
-  function handleSteamRefresh(): void {
-    // TODO: Implement steam refresh
-    console.log('[Gallery] Steam refresh requested')
-  }
+  const handleSteamRefresh = useCallback(async (): Promise<void> => {
+    if (steamRefreshing) return;
+    setSteamRefreshing(true);
+    try {
+      const result = await api.refreshSteamData();
+      if (result.updated > 0) {
+        await loadAll();
+        loadRange();
+        fetchSummary(true);
+      }
+    } catch (err) {
+      console.error('[Gallery] Steam refresh failed:', err);
+    } finally {
+      setSteamRefreshing(false);
+    }
+  }, [steamRefreshing, loadAll, loadRange]);
 
   return (
     <main ref={mainRef} className="page-content">
@@ -223,8 +238,9 @@ export default function Gallery(): JSX.Element {
             className="gallery-toolbar__btn"
             onClick={handleSteamRefresh}
             title="Refresh Steam data"
+            disabled={steamRefreshing}
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={16} className={steamRefreshing ? 'spin' : ''} />
           </button>
         </div>
       </div>

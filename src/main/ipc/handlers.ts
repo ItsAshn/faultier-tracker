@@ -21,7 +21,7 @@ import {
   exportDataCsv,
   importData,
 } from "../importExport/dataTransfer";
-import { importFromSteam } from "../importExport/steamImport";
+import { importFromSteam, refreshSteamPlaytimes } from "../importExport/steamImport";
 import { autoFetchSteamArtwork } from "../artwork/autoFetch";
 import { searchSteamGridDB } from "../artwork/artworkProvider";
 import { CHANNELS } from "@shared/channels";
@@ -938,6 +938,21 @@ export function registerIpcHandlers(): void {
       return result;
     },
   );
+
+  ipcMain.handle(CHANNELS.DATA_STEAM_REFRESH, async () => {
+    const apiKey = getSetting("steam_api_key") as string | null;
+    const steamId = getSetting("steam_id") as string | null;
+    if (!apiKey || !steamId) {
+      return { updated: 0, totalDeltaMs: 0, error: "no_credentials" };
+    }
+    try {
+      const result = await refreshSteamPlaytimes(apiKey, steamId);
+      return result;
+    } catch (err) {
+      console.error("[IPC] DATA_STEAM_REFRESH failed:", err);
+      throw err;
+    }
+  });
 
   ipcMain.handle(CHANNELS.DATA_RESET_ALL, async (): Promise<void> => {
     console.log('[IPC] DATA_RESET_ALL: stopping tracker, resetting all data, restarting tracker');

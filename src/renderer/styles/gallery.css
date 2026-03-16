@@ -206,7 +206,7 @@
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--space-4);
   align-items: start;
 }
@@ -275,6 +275,12 @@
   height: 100%;
   object-fit: cover;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7));
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.app-card__img--visible {
+  opacity: 1;
 }
 
 .app-card__placeholder {
@@ -283,6 +289,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Skeleton shimmer shown while the image IPC call is in-flight */
+@keyframes card-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.app-card__skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3, rgba(255,255,255,0.06)) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: card-shimmer 1.4s ease-in-out infinite;
+}
+
+.app-card__backdrop-fallback--shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3, rgba(255,255,255,0.06)) 50%,
+    var(--color-surface-2) 75%
+  );
+  background-size: 200% 100%;
+  animation: card-shimmer 1.4s ease-in-out infinite;
 }
 
 /* Gallery empty state */

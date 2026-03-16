@@ -67,6 +67,12 @@ export interface SteamImportResult {
   errors: string[]
 }
 
+export interface SteamRefreshResult {
+  updated: number
+  totalDeltaMs: number
+  error?: string
+}
+
 export interface ExportPayload {
   version: 2
   exported_at: string

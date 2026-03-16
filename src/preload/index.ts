@@ -7,6 +7,7 @@ import type {
   AppRangeSummary,
   ImportResult,
   SteamImportResult,
+  SteamRefreshResult,
   WindowControlAction,
   TickPayload,
   UpdateInfo,
@@ -156,6 +157,9 @@ const api = {
     steamId: string,
   ): Promise<SteamImportResult> =>
     ipcRenderer.invoke(CHANNELS.DATA_STEAM_IMPORT, apiKey, steamId),
+
+  refreshSteamData: (): Promise<SteamRefreshResult> =>
+    ipcRenderer.invoke(CHANNELS.DATA_STEAM_REFRESH),
 
   // Window
   windowControl: (action: WindowControlAction): void =>

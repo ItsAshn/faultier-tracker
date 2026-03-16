@@ -191,6 +191,8 @@ const stub: ApiType = {
       duplicates: 0,
       errors: [],
     }),
+  refreshSteamData: () =>
+    Promise.resolve({ updated: 0, totalDeltaMs: 0 }),
   searchArtwork: () => Promise.resolve({ results: [] }),
   windowControl: () => {},
   onTick: () => () => {},

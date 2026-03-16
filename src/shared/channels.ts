@@ -42,6 +42,7 @@ export const CHANNELS = {
   DATA_EXPORT_CSV: "data:exportCsv",
   DATA_IMPORT: "data:import",
   DATA_STEAM_IMPORT: "data:steamImport",
+  DATA_STEAM_REFRESH: "data:steamRefresh",
   DATA_RESET_ALL: "data:resetAll",
 
   // Window
