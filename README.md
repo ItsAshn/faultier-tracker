@@ -89,53 +89,6 @@ npm run build      # Build JS/CSS bundles only
 npm run package    # Build + create Windows NSIS installer
 ```
 
-### Release
-
-Releases are automated via GitHub Actions. Push a version tag to trigger a build and publish:
-
-```bash
-git tag v1.2.3
-git push origin v1.2.3
-```
-
-The workflow builds the installer and creates a GitHub Release. The app will detect the update on next launch.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Runtime | Electron v33 |
-| Build tool | Electron Vite v2 |
-| UI | React 18, TypeScript |
-| State | Zustand |
-| Charts | Recharts |
-| Database | sql.js (SQLite/WASM) |
-| Styling | Plain CSS |
-| Packaging | electron-builder (NSIS) |
-| Updates | electron-updater |
-
----
-
-## Project Structure
-
-```
-src/
-├── main/          # Electron main process (Node.js)
-│   ├── tracking/  # Polling loop, process/window detection, session management
-│   ├── db/        # sql.js client, schema migrations
-│   ├── ipc/       # IPC handlers (main ↔ renderer bridge)
-│   ├── icons/     # .exe icon extraction
-│   ├── grouping/  # Auto-grouping engine
-│   └── importExport/
-├── preload/       # contextBridge — secure IPC exposure
-├── renderer/      # React SPA (pages, components, Zustand stores)
-└── shared/        # Shared TypeScript types and IPC channel constants
-```
-
----
-
 ## Privacy
 
 KIOKU reads the names and executable paths of running processes, and the title of your active window, every 5 seconds. This data is used solely to build your local usage history.
