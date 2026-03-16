@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Fuse from 'fuse.js'
-import { Search, Images, Calendar, RefreshCw, Clock, ArrowUpAZ, Eye } from 'lucide-react'
+import { Search, Images, Calendar, RefreshCw, Filter } from 'lucide-react'
 import '../styles/gallery.css'
 import { useAppStore } from '../store/appStore'
 import { useSessionStore } from '../store/sessionStore'
@@ -236,21 +236,21 @@ export default function Gallery(): JSX.Element {
             className={`gallery-filter__btn${sort === 'time' ? ' gallery-filter__btn--active' : ''}`}
             onClick={() => setSort('time')}
           >
-            <Clock size={14} />
+            <Filter size={14} />
             <span>Most time</span>
           </button>
           <button
             className={`gallery-filter__btn${sort === 'name' ? ' gallery-filter__btn--active' : ''}`}
             onClick={() => setSort('name')}
           >
-            <ArrowUpAZ size={14} />
+            <Filter size={14} />
             <span>Name</span>
           </button>
           <button
             className={`gallery-filter__btn${sort === 'last_seen' ? ' gallery-filter__btn--active' : ''}`}
             onClick={() => setSort('last_seen')}
           >
-            <Eye size={14} />
+            <Filter size={14} />
             <span>Recent</span>
           </button>
         </div>

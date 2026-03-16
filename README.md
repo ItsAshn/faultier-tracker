@@ -33,11 +33,11 @@ All data is stored locally in a SQLite database. Nothing is sent to any server.
 
 **Gallery** — every tracked app and game shown as a card with cover art. From here you can rename entries, assign custom artwork, and organize apps into groups.
 
-![Gallery page showing a grid of tracked games with cover art](docs/screenshots/Gallery.png)
+![Gallery page showing a grid of tracked games with cover art](docs/Gallery.png)
 
 **Dashboard heatmap** — a calendar-style heatmap showing daily usage intensity over time, part of the main Dashboard view.
 
-![Dashboard heatmap showing daily usage patterns over several months](docs/screenshots/Heatmap.png)
+![Dashboard heatmap showing daily usage patterns over several months](docs/Heatmap.png)
 
 ---
 
@@ -151,5 +151,4 @@ KIOKU reads the names and executable paths of running processes, and the title o
 
 Copyright (c) 2025 ItsAshn. All Rights Reserved.
 
-This software is proprietary. See [NOTICE](NOTICE) for details.
-Third-party open-source component licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+This software is proprietary. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for third-party open-source component licenses.
