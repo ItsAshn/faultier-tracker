@@ -5,6 +5,7 @@ import NavPills from './components/layout/NavPills'
 import UpdateBanner from './components/layout/UpdateBanner'
 import SetupWalkthrough from './components/setup/SetupWalkthrough'
 import { ToastContainer } from './components/ui/Toast'
+import { SteamLinkBannerContainer } from './components/ui/SteamLinkBanner'
 import Gallery from './pages/Gallery'
 import Settings from './pages/Settings'
 import AppDetailPage from './pages/AppDetailPage'
@@ -180,6 +181,7 @@ export default function App(): JSX.Element {
         <TitleBar />
         <UpdateBanner />
         <ToastContainer />
+        <SteamLinkBannerContainer onAnyMerged={loadAll} />
         <div className="main-layout">
           <NavPills />
           <div className="main-content">

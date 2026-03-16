@@ -48,11 +48,15 @@ export const CHANNELS = {
   // Window
   WINDOW_CONTROL: "window:control",
 
+  // Steam exe linking
+  APPS_MERGE_STEAM: "apps:mergeSteam",   // renderer→main: merge exe row into steam: row
+
   // Push from main → renderer (one-way via webContents.send)
   TRACKING_APP_SEEN: "tracking:appSeen",
   TRACKING_TICK: "tracking:tick",
   APPS_ARTWORK_UPDATED: "apps:artworkUpdated",
   DATA_CLEARED: "data:cleared",   // sent after sessions clear or full reset
+  APPS_STEAM_LINK_SUGGESTED: "apps:steamLinkSuggested",  // main→renderer: prompt user to confirm link
 
   // Updater — invoke (renderer → main)
   UPDATE_CHECK: "update:check",

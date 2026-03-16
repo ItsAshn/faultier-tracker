@@ -294,6 +294,7 @@ export interface RawApp {
   custom_image_path: string | null;
   first_seen: number;
   last_seen: number;
+  linked_steam_app_id: number | null;
 }
 
 export function upsertApp(

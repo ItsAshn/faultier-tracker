@@ -8,6 +8,8 @@ export interface AppRecord {
   group_id: number | null
   is_tracked: boolean
   is_steam_import: boolean  // NEW: true for Steam-imported games
+  /** Set when this exe row has been linked (but not yet merged) to a steam: app row */
+  linked_steam_app_id: number | null
   icon_cache_path: string | null
   custom_image_path: string | null
   first_seen: number
@@ -170,7 +172,20 @@ export interface BucketApp {
   active_ms: number
 }
 
-// Exe to display name mapping
 export interface ExeNameMapping {
   [exeName: string]: string
+}
+
+/** Payload for the APPS_STEAM_LINK_SUGGESTED push event */
+export interface SteamLinkSuggestion {
+  /** The raw exe app row (is_steam_import = false) */
+  exeApp: AppRecord
+  /** Candidate steam: app rows ordered by confidence (best first, max 3) */
+  candidates: AppRecord[]
+}
+
+/** Result of APPS_MERGE_STEAM */
+export interface MergeSteamResult {
+  success: boolean
+  error?: string
 }

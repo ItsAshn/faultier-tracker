@@ -8,6 +8,20 @@ type Migration = {
 
 const migrations: Migration[] = [
   {
+    // Add linked_steam_app_id column to support explicit exe→steam app links.
+    // When a raw exe row is confirmed to be a duplicate of a steam:APPID row
+    // the merge logic reassigns sessions and deletes the exe row; this column
+    // is used transiently while the merge is pending (e.g. user has been
+    // prompted but not yet confirmed).  A NULL value means no link is set.
+    version: 9,
+    up(db) {
+      db.exec(`
+        ALTER TABLE apps ADD COLUMN linked_steam_app_id INTEGER REFERENCES apps(id) ON DELETE SET NULL;
+      `);
+      console.log('[DB] Migration v9: Added linked_steam_app_id column');
+    },
+  },
+  {
     // Add Steam import tracking columns and delta session support
     version: 8,
     up(db) {

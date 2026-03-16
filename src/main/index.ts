@@ -5,7 +5,7 @@ import { execSync } from "child_process";
 import { openDb, closeDb, getSetting, wasDbCorrupted } from "./db/client";
 import { createWindow, setQuitting } from "./window";
 import { createTray, destroyTray } from "./tray";
-import { registerIpcHandlers } from "./ipc/handlers";
+import { registerIpcHandlers, runStartupSteamDuplicateScan } from "./ipc/handlers";
 import { startTracker, stopTracker } from "./tracking/tracker";
 import {
   closeAllSessions,
@@ -136,6 +136,8 @@ app.whenReady().then(async () => {
       setTimeout(() => autoFetchSteamArtwork().catch(console.error), 5000);
       // Start Steam auto-refresh timer
       startSteamRefreshTimer();
+      // Run duplicate scan after renderer is ready so suggestions can be pushed
+      setTimeout(() => runStartupSteamDuplicateScan().catch(console.error), 3000);
     });
 
     createTray(win);

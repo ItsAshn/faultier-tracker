@@ -37,12 +37,19 @@ import type {
   TitleSummary,
   DayTotal,
   BucketApp,
+  MergeSteamResult,
+  SteamLinkSuggestion,
 } from "@shared/types";
 import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
 import { resetSessionState, endActiveSession } from "../tracking/sessionManager";
 import { persistDb } from "../db/client";
 import { execSync } from "child_process";
+import {
+  refreshSteamLibraryIndex,
+  lookupByInstallDirNorm,
+  getAllAcfEntries,
+} from "../tracking/steamLibrary";
 
 function createShortcut(targetPath: string, shortcutPath: string): void {
   const vbscript = `
@@ -69,6 +76,7 @@ function mapApp(raw: {
   group_id: number | null;
   is_tracked: number;
   is_steam_import: number;
+  linked_steam_app_id?: number | null;
   icon_cache_path: string | null;
   custom_image_path: string | null;
   first_seen: number;
@@ -82,6 +90,7 @@ function mapApp(raw: {
     group_id: raw.group_id,
     is_tracked: raw.is_tracked === 1,
     is_steam_import: raw.is_steam_import === 1,
+    linked_steam_app_id: raw.linked_steam_app_id ?? null,
     icon_cache_path: null,
     custom_image_path: null,
     first_seen: raw.first_seen,
@@ -105,6 +114,232 @@ function mapGroup(raw: {
     is_manual: raw.is_manual === 1,
     created_at: raw.created_at,
   };
+}
+
+// ── Steam exe deduplication helpers ──────────────────────────────────────────
+
+/**
+ * Merge a raw exe app row into its corresponding steam:APPID row.
+ * - Reassigns all sessions from exeAppId → steamAppId
+ * - Deletes the exe app row
+ * - Refreshes Steam playtime for the target app (uses the Steam API if credentials exist)
+ *
+ * The Steam API playtime is the source of truth so we overwrite local tracked
+ * time by creating a corrective session if needed.  The actual playtime
+ * correction is handled by the next `refreshSteamPlaytimes` call; here we
+ * only do the structural merge so the data is consistent.
+ */
+export function mergeSteamExeDuplicate(
+  exeAppId: number,
+  steamAppId: number,
+): MergeSteamResult {
+  const db = getDb();
+
+  // Verify both rows exist
+  const exeRow = db
+    .prepare<[number], { id: number; exe_name: string }>(
+      "SELECT id, exe_name FROM apps WHERE id = ?",
+    )
+    .get(exeAppId);
+  if (!exeRow) {
+    return { success: false, error: `Exe app id=${exeAppId} not found` };
+  }
+
+  const steamRow = db
+    .prepare<[number], { id: number; exe_name: string; display_name: string }>(
+      "SELECT id, exe_name, display_name FROM apps WHERE id = ? AND is_steam_import = 1",
+    )
+    .get(steamAppId);
+  if (!steamRow) {
+    return {
+      success: false,
+      error: `Steam app id=${steamAppId} not found or is not a Steam import`,
+    };
+  }
+
+  try {
+    db.transaction(() => {
+      // Reassign all sessions from the exe row to the steam row
+      db.prepare<[number, number], void>(
+        "UPDATE sessions SET app_id = ? WHERE app_id = ?",
+      ).run(steamAppId, exeAppId);
+
+      // Delete the raw exe row (sessions ON DELETE CASCADE would handle it
+      // but we already re-pointed them so this is safe)
+      db.prepare<[number], void>("DELETE FROM apps WHERE id = ?").run(exeAppId);
+    })();
+
+    console.log(
+      `[Merge] Merged exe app id=${exeAppId} (${exeRow.exe_name}) → steam app id=${steamAppId} (${steamRow.exe_name} "${steamRow.display_name}")`,
+    );
+
+    // Fire-and-forget: refresh Steam playtime so the merged data is accurate
+    const apiKey = getSetting("steam_api_key") as string | null;
+    const steamId = getSetting("steam_id") as string | null;
+    if (apiKey && steamId) {
+      refreshSteamPlaytimes(apiKey, steamId).catch((err) =>
+        console.error("[Merge] Steam refresh after merge failed:", err),
+      );
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[Merge] Failed to merge Steam exe duplicate:", err);
+    return { success: false, error: String(err) };
+  }
+}
+
+/**
+ * Scan all non-Steam apps that have a steamapps/common path and check them
+ * against the manifest index.  Called once at startup.
+ *
+ * - If a high-confidence match is found (exact installDir match from .acf):
+ *   auto-merge silently.
+ * - If a lower-confidence match is found (Levenshtein ≤ 0.25, no exact ACF match):
+ *   send APPS_STEAM_LINK_SUGGESTED to prompt the user.
+ */
+export async function runStartupSteamDuplicateScan(): Promise<void> {
+  const db = getDb();
+
+  // Make sure the manifest index is current
+  refreshSteamLibraryIndex();
+
+  // Find all non-Steam apps that have a path inside a steamapps/common folder
+  // and don't already have a linked_steam_app_id set
+  const candidates = db
+    .prepare<
+      [],
+      {
+        id: number;
+        exe_name: string;
+        display_name: string;
+        exe_path: string;
+        linked_steam_app_id: number | null;
+      }
+    >(
+      `SELECT id, exe_name, display_name, exe_path, linked_steam_app_id
+       FROM apps
+       WHERE is_steam_import = 0
+         AND exe_path IS NOT NULL
+         AND exe_path LIKE '%steamapps%common%'
+         AND linked_steam_app_id IS NULL`,
+    )
+    .all();
+
+  if (candidates.length === 0) return;
+
+  // Lazy-load distance function to keep import cycle clean
+  const { distance } = await import("fastest-levenshtein");
+
+  const normalize = (s: string): string =>
+    s.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  // Get all steam: app rows for fuzzy fallback
+  const steamApps = db
+    .prepare<
+      [],
+      { id: number; exe_name: string; display_name: string }
+    >(
+      "SELECT id, exe_name, display_name FROM apps WHERE is_steam_import = 1",
+    )
+    .all();
+
+  for (const cand of candidates) {
+    const steamFolderMatch =
+      /steamapps[\\/]common[\\/]([^\\/]+)/i.exec(cand.exe_path);
+    if (!steamFolderMatch) continue;
+
+    const folderName = steamFolderMatch[1];
+    const folderNorm = normalize(folderName);
+
+    // ── Try exact ACF manifest lookup first ────────────────────────────
+    const acfEntry = lookupByInstallDirNorm(folderNorm);
+    if (acfEntry) {
+      // Exact match — find the steam: row for this appId
+      const steamRow = db
+        .prepare<
+          [string],
+          { id: number; exe_name: string; display_name: string } | undefined
+        >(
+          "SELECT id, exe_name, display_name FROM apps WHERE exe_name = ? AND is_steam_import = 1",
+        )
+        .get(`steam:${acfEntry.appId}`);
+
+      if (steamRow) {
+        console.log(
+          `[StartupScan] Auto-merging "${cand.exe_name}" → "${steamRow.display_name}" (ACF exact match, appid=${acfEntry.appId})`,
+        );
+        mergeSteamExeDuplicate(cand.id, steamRow.id);
+        // Notify renderer to reload apps
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send(CHANNELS.APPS_ARTWORK_UPDATED);
+          }
+        });
+        continue;
+      }
+    }
+
+    // ── Fall back to fuzzy Levenshtein matching ────────────────────────
+    // Lower threshold than tracker (0.25 vs 0.1) since we're prompting the user
+    const scored: Array<{
+      id: number;
+      exe_name: string;
+      display_name: string;
+      dist: number;
+    }> = [];
+
+    for (const app of steamApps) {
+      const appNorm = normalize(app.display_name);
+      const maxLen = Math.max(folderNorm.length, appNorm.length);
+      if (maxLen === 0) continue;
+      const dist = distance(folderNorm, appNorm) / maxLen;
+      if (dist <= 0.25) {
+        scored.push({ ...app, dist });
+      }
+    }
+
+    if (scored.length === 0) continue;
+
+    // Sort by distance (best first), take top 3
+    scored.sort((a, b) => a.dist - b.dist);
+    const top3 = scored.slice(0, 3);
+
+    // Check if user hasn't dismissed this suggestion already
+    const ignoredKey = `steam_link_ignored_${cand.id}`;
+    const ignored = getSetting(ignoredKey);
+    if (ignored) continue;
+
+    // Build full AppRecord rows for the suggestion payload
+    const exeRow = db
+      .prepare<[number], Record<string, unknown>>("SELECT * FROM apps WHERE id = ?")
+      .get(cand.id);
+    const candidateRows = top3
+      .map((c) =>
+        db
+          .prepare<[number], Record<string, unknown>>("SELECT * FROM apps WHERE id = ?")
+          .get(c.id),
+      )
+      .filter(Boolean) as Record<string, unknown>[];
+
+    if (!exeRow) continue;
+
+    const suggestion: SteamLinkSuggestion = {
+      exeApp: mapApp(exeRow as Parameters<typeof mapApp>[0]),
+      candidates: candidateRows.map((r) => mapApp(r as Parameters<typeof mapApp>[0])),
+    };
+
+    console.log(
+      `[StartupScan] Suggesting link for "${cand.exe_name}" → candidates: ${top3.map((c) => c.display_name).join(", ")}`,
+    );
+
+    // Push to all renderer windows
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send(CHANNELS.APPS_STEAM_LINK_SUGGESTED, suggestion);
+      }
+    });
+  }
 }
 
 export function registerIpcHandlers(): void {
@@ -936,6 +1171,9 @@ export function registerIpcHandlers(): void {
       if (result.gamesImported > 0) {
         // Fire-and-forget background artwork fetch for newly imported games
         autoFetchSteamArtwork().catch(console.error);
+        // Run duplicate scan so any existing exe rows for these new steam: games
+        // are merged automatically or surfaced to the user
+        runStartupSteamDuplicateScan().catch(console.error);
       }
       return result;
     },
@@ -949,12 +1187,33 @@ export function registerIpcHandlers(): void {
     }
     try {
       const result = await refreshSteamPlaytimes(apiKey, steamId);
+      // After a Steam refresh, run the duplicate scan in case new games were
+      // added that now match previously unresolved exe rows
+      runStartupSteamDuplicateScan().catch(console.error);
       return result;
     } catch (err) {
       console.error("[IPC] DATA_STEAM_REFRESH failed:", err);
       throw err;
     }
   });
+
+  // ── Steam exe merge ───────────────────────────────────────────────────────
+
+  ipcMain.handle(
+    CHANNELS.APPS_MERGE_STEAM,
+    (_e, exeAppId: number, steamAppId: number): MergeSteamResult => {
+      const result = mergeSteamExeDuplicate(exeAppId, steamAppId);
+      if (result.success) {
+        // Reload apps in renderer
+        BrowserWindow.getAllWindows().forEach((win) => {
+          if (!win.isDestroyed()) {
+            win.webContents.send(CHANNELS.APPS_ARTWORK_UPDATED);
+          }
+        });
+      }
+      return result;
+    },
+  );
 
   ipcMain.handle(CHANNELS.DATA_RESET_ALL, async (): Promise<void> => {
     console.log('[IPC] DATA_RESET_ALL: stopping tracker, resetting all data, restarting tracker');

@@ -12,6 +12,10 @@ import { CHANNELS } from "@shared/channels";
 import type { AppRecord, TickPayload } from "@shared/types";
 import { getDisplayNameFromExe } from "../utils/exeNameResolver";
 import { distance } from "fastest-levenshtein";
+import {
+  refreshSteamLibraryIndex,
+  lookupByInstallDirNorm,
+} from "./steamLibrary";
 
 // Convert a raw DB row to a renderer-safe AppRecord (mirrors mapApp in handlers.ts)
 function toAppRecord(raw: RawApp): AppRecord {
@@ -23,6 +27,7 @@ function toAppRecord(raw: RawApp): AppRecord {
     group_id: raw.group_id,
     is_tracked: raw.is_tracked !== 0,
     is_steam_import: raw.is_steam_import !== 0,
+    linked_steam_app_id: (raw as any).linked_steam_app_id ?? null,
     icon_cache_path: raw.icon_cache_path,
     custom_image_path: raw.custom_image_path,
     first_seen: raw.first_seen,
@@ -32,12 +37,15 @@ function toAppRecord(raw: RawApp): AppRecord {
 
 /**
  * If the given exe path lives inside a Steam library (steamapps/common/<Folder>/),
- * check whether there is already a Steam-imported app whose display name closely
- * matches the folder name (normalised Levenshtein ≤ 0.1).
+ * check whether there is already a Steam-imported app for that folder.
+ *
+ * Resolution order:
+ * 1. Exact match via the .acf manifest index (installDir → appId → steam: row).
+ *    This handles cases like "sotgame.exe" inside "Sea Of Thieves/" perfectly.
+ * 2. Fuzzy Levenshtein fallback (≤ 0.1 threshold) on display_name, same as before.
+ *    Kept as safety net for games not yet installed (no .acf on disk).
  *
  * Returns the matching steam app's id + exe_name when found, null otherwise.
- * This is used to suppress tracking the raw .exe as a separate entry when its
- * playtime is already tracked via the Steam API import.
  */
 function findSteamAppForExePath(
   exePath: string,
@@ -50,6 +58,27 @@ function findSteamAppForExePath(
   const folderNorm = normalize(steamMatch[1]);
 
   const db = getDb();
+
+  // ── 1. Exact ACF manifest lookup ──────────────────────────────────────────
+  const acfEntry = lookupByInstallDirNorm(folderNorm);
+  if (acfEntry) {
+    const steamRow = db
+      .prepare<
+        [string],
+        { id: number; exe_name: string; display_name: string } | undefined
+      >(
+        "SELECT id, exe_name, display_name FROM apps WHERE exe_name = ? AND is_steam_import = 1",
+      )
+      .get(`steam:${acfEntry.appId}`);
+    if (steamRow) {
+      console.log(
+        `[Tracker] ACF match: folder "${steamMatch[1]}" → appid=${acfEntry.appId} "${steamRow.display_name}"`,
+      );
+      return steamRow;
+    }
+  }
+
+  // ── 2. Fuzzy Levenshtein fallback ─────────────────────────────────────────
   const steamApps = db
     .prepare<
       [],
@@ -85,6 +114,10 @@ const LAST_SEEN_WRITE_INTERVAL = 60_000; // write at most once per minute
 export async function startTracker(): Promise<void> {
   const machineId = getSetting("machine_id") as string;
   initSessionManager(machineId);
+
+  // Build Steam manifest index before the first poll so suppression works
+  // immediately even on first launch with existing installed games
+  refreshSteamLibraryIndex();
 
   await initActiveWin();
 
@@ -278,6 +311,35 @@ async function pollTick(): Promise<void> {
           db.prepare<[string, number], void>(
             "UPDATE apps SET exe_path = ? WHERE id = ?",
           ).run(activeApp.exePath, appId);
+
+          // Deferred Steam suppression: now that we have the path, check if
+          // this app is actually a Steam game that was missed on first detection
+          // (e.g. path wasn't available yet on the first tick).
+          if (appRow.is_tracked !== 0) {
+            const steamEntry = findSteamAppForExePath(activeApp.exePath);
+            if (steamEntry && steamEntry.id !== appId) {
+              console.log(
+                `[Tracker] Deferred suppression: reassigning exe "${activeApp.exeName}" → Steam game "${steamEntry.display_name}"`,
+              );
+              // Reassign all sessions to the steam entry and delete this exe row.
+              // Use a transaction so we never leave sessions pointing at a dead row.
+              db.transaction(() => {
+                db.prepare<[number, number], void>(
+                  "UPDATE sessions SET app_id = ? WHERE app_id = ?",
+                ).run(steamEntry.id, appId);
+                db.prepare<[number], void>(
+                  "DELETE FROM apps WHERE id = ?",
+                ).run(appId);
+              })();
+              // Clear the in-memory last_seen tracker for the deleted app
+              lastSeenWrittenAt.delete(appId);
+              // Touch last_seen on the steam entry
+              db.prepare<[number, number], void>(
+                "UPDATE apps SET last_seen = ? WHERE id = ?",
+              ).run(now, steamEntry.id);
+              return; // Skip rest of tick — will resolve correctly next poll
+            }
+          }
 
           if (!appRow.group_id) {
             const groupId = await resolveGroup(activeApp.exeName, activeApp.exePath);

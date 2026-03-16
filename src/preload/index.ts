@@ -16,6 +16,8 @@ import type {
   TitleSummary,
   DayTotal,
   BucketApp,
+  MergeSteamResult,
+  SteamLinkSuggestion,
 } from "@shared/types";
 
 // Typed API exposed to the renderer via contextBridge
@@ -161,6 +163,10 @@ const api = {
   refreshSteamData: (): Promise<SteamRefreshResult> =>
     ipcRenderer.invoke(CHANNELS.DATA_STEAM_REFRESH),
 
+  // Steam exe merge
+  mergeSteamApp: (exeAppId: number, steamAppId: number): Promise<MergeSteamResult> =>
+    ipcRenderer.invoke(CHANNELS.APPS_MERGE_STEAM, exeAppId, steamAppId),
+
   // Window
   windowControl: (action: WindowControlAction): void =>
     ipcRenderer.send(CHANNELS.WINDOW_CONTROL, action),
@@ -195,6 +201,15 @@ const api = {
     const handler = (): void => cb();
     ipcRenderer.on(CHANNELS.DATA_CLEARED, handler);
     return () => ipcRenderer.removeListener(CHANNELS.DATA_CLEARED, handler);
+  },
+
+  // Steam link suggestion — main detected a potential exe↔Steam game duplicate
+  onSteamLinkSuggested: (cb: (suggestion: SteamLinkSuggestion) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, suggestion: SteamLinkSuggestion): void =>
+      cb(suggestion);
+    ipcRenderer.on(CHANNELS.APPS_STEAM_LINK_SUGGESTED, handler);
+    return () =>
+      ipcRenderer.removeListener(CHANNELS.APPS_STEAM_LINK_SUGGESTED, handler);
   },
 
   // Auto-updater — invoke commands

@@ -193,12 +193,15 @@ const stub: ApiType = {
     }),
   refreshSteamData: () =>
     Promise.resolve({ updated: 0, totalDeltaMs: 0 }),
+  mergeSteamApp: () =>
+    Promise.resolve({ success: true }),
   searchArtwork: () => Promise.resolve({ results: [] }),
   windowControl: () => {},
   onTick: () => () => {},
   onAppSeen: () => () => {},
   onArtworkUpdated: () => () => {},
   onDataCleared: () => () => {},
+  onSteamLinkSuggested: () => () => {},
   checkForUpdates: () => Promise.resolve(),
   downloadUpdate: () => Promise.resolve(),
   quitAndInstall: () => {},

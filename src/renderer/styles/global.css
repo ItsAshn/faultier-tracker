@@ -667,4 +667,156 @@ ul, ol {
   color: var(--color-text);
 }
 
+/* ── Steam link banner ──────────────────────────────────────────────────── */
 
+.steam-link-banners {
+  position: fixed;
+  bottom: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 200;
+  width: min(640px, calc(100vw - var(--space-4)));
+  pointer-events: none;
+}
+
+.steam-link-banner {
+  pointer-events: all;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  animation: banner-slide-in 0.2s ease;
+}
+
+@keyframes banner-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.steam-link-banner__icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.steam-link-banner__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.steam-link-banner__label {
+  font-size: 0.8rem;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.steam-link-banner__label strong {
+  color: var(--color-accent);
+}
+
+.steam-link-banner__candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.steam-link-banner__candidate {
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  border: 1px solid var(--color-surface-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.steam-link-banner__candidate:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.steam-link-banner__candidate--selected {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.steam-link-banner__candidate:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.steam-link-banner__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.steam-link-banner__btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px var(--space-2);
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--transition-fast);
+}
+
+.steam-link-banner__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.steam-link-banner__btn--confirm {
+  background: var(--color-accent);
+  color: #000;
+  font-weight: 600;
+}
+
+.steam-link-banner__btn--confirm:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.steam-link-banner__btn--dismiss {
+  background: transparent;
+  color: var(--color-text-muted);
+  border-color: var(--color-surface-2);
+}
+
+.steam-link-banner__btn--dismiss:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.steam-link-banner__close {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+
+.steam-link-banner__close:hover {
+  color: var(--color-text);
+}
