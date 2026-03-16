@@ -39,7 +39,7 @@ All data is stored locally in a SQLite database. Nothing is sent to any server.
 
 ## Installation
 
-Download the latest installer from the [Releases](https://github.com/ItsAshn/kioku/releases) page and run the `.exe`.
+Download the latest installer from the [Releases](https://github.com/ItsAshn/Kioku/releases) page and run the `.exe`.
 
 The app installs per-user (no admin required) and starts tracking immediately. It lives in your system tray.
 
@@ -66,8 +66,8 @@ The application is safe. This warning appears for any installer without a paid c
 ### Setup
 
 ```bash
-git clone https://github.com/ItsAshn/kioku.git
-cd kioku
+git clone https://github.com/ItsAshn/Kioku.git
+cd Kioku
 npm install
 ```
 

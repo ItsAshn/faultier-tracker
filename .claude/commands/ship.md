@@ -16,7 +16,7 @@ Release a new version of KIOKU by following these steps exactly:
 
 8. Push the tag to origin with `git push origin v<version>`. This triggers the GitHub Actions release workflow which builds and publishes the installer.
 
-9. Confirm to the user that the tag has been pushed and that they can monitor the build at `https://github.com/ItsAshn/kioku/actions`.
+9. Confirm to the user that the tag has been pushed and that they can monitor the build at `https://github.com/ItsAshn/Kioku/actions`.
 
 Important rules:
 - Never skip step 3 — always confirm the version with the user before making any changes to package.json.

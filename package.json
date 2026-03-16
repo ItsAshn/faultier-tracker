@@ -55,7 +55,7 @@
     "publish": {
       "provider": "github",
       "owner": "ItsAshn",
-      "repo": "kioku",
+      "repo": "Kioku",
       "releaseType": "release"
     },
     "win": {
