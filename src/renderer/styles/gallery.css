@@ -97,9 +97,11 @@
 .gallery-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-  padding: var(--space-3) 0;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  row-gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  justify-content: space-between;
 }
 
 .gallery-toolbar__search {
@@ -178,7 +180,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-left: auto;
 }
 
 .gallery-toolbar__btn {
@@ -206,7 +207,7 @@
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--space-4);
   align-items: start;
 }

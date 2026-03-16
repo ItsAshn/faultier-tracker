@@ -2,24 +2,23 @@
 
 ## Context7 Integration
 
-When checking docs for any library/framework used here (React, Electron, sql.js, date-fns,
-Recharts, Zustand, Zod, etc.), **always use Context7** for up-to-date, version-specific docs
-rather than relying on training data.
+When checking docs for any library/framework (React, Electron, sql.js, date-fns, Recharts,
+Zustand, Zod, etc.), **always use Context7** for up-to-date, version-specific docs rather
+than relying on training data.
 
-## Build Commands
+## Build & Type-Check Commands
 
 ```bash
-npm run dev          # Start dev server (Electron + Vite hot reload)
-npm run build        # Build production bundles (main + preload + renderer)
-npm run preview      # Preview built app in Electron
+npm run dev          # Electron + Vite dev server with hot reload
+npm run build        # Production bundles (main + preload + renderer)
 npm run package      # Build + create Windows NSIS installer
 npm run release      # Build + publish to GitHub Releases (needs GH_TOKEN)
 ```
 
-## Type Checking (no test framework, no ESLint/Prettier)
+**No test framework, no ESLint/Prettier.** Type-checking is the only automated validation:
 
 ```bash
-npx tsc --noEmit                        # Type-check everything (root tsconfig)
+npx tsc --noEmit                        # Check everything (root tsconfig)
 npx tsc --noEmit -p tsconfig.web.json  # Renderer + preload + shared only
 npx tsc --noEmit -p tsconfig.node.json # Main process + preload only
 ```
@@ -31,14 +30,14 @@ npx tsc --noEmit -p tsconfig.node.json # Main process + preload only
 | Package | Version | Role |
 |---|---|---|
 | Electron | v33 | Desktop runtime (Windows-only) |
-| electron-vite | v2 | Build tooling (3 separate bundles) |
+| electron-vite | v2 | Build tooling (3 entry bundles) |
 | React + TypeScript | 18 / 5 | Renderer UI (`strict: true`) |
 | sql.js | v1 | SQLite WASM — no native bindings |
 | Zustand | v4 | Client-side state |
 | React Router | v6 | `HashRouter` |
 | Recharts | v2 | Charts |
 | date-fns | v3 | Date formatting/arithmetic |
-| Zod | v3 | Schema validation |
+| Zod | v3 | Schema validation (import validation) |
 | Fuse.js | v7 | Fuzzy search |
 | get-windows | v9 | Active window detection |
 | ps-list | v8 | Process enumeration |
@@ -49,26 +48,25 @@ npx tsc --noEmit -p tsconfig.node.json # Main process + preload only
 ```
 src/
 ├── main/                  # Node.js / Electron main process
-│   ├── artwork/           # SteamGridDB auto-fetch (autoFetch.ts, artworkProvider.ts)
-│   ├── db/                # sql.js singleton + migrations v1–v8 (client.ts, migrations.ts)
-│   ├── grouping/          # Pattern-based auto-grouping engine (groupEngine.ts)
+│   ├── artwork/           # SteamGridDB auto-fetch
+│   ├── db/                # sql.js singleton + migrations v1–v9 (client.ts, migrations.ts)
+│   ├── grouping/          # Pattern-based auto-grouping (groupEngine.ts)
 │   ├── icons/             # .exe icon extraction → base64 (iconExtractor.ts)
-│   ├── importExport/      # JSON export/import + Steam import (dataTransfer.ts, steamImport.ts)
-│   ├── ipc/               # All ipcMain.handle() registrations (handlers.ts)
-│   ├── tracking/          # 5s polling loop (tracker.ts), session manager
+│   ├── importExport/      # JSON/CSV export, JSON import, Steam import
+│   ├── ipc/               # All ipcMain.handle() registrations (handlers.ts, ~1254 lines)
+│   ├── tracking/          # 5s polling loop (tracker.ts) + sessionManager.ts
 │   ├── utils/             # exeNameResolver.ts
 │   ├── index.ts           # App lifecycle + startup sequence
-│   ├── tray.ts            # System tray
+│   ├── tray.ts            # System tray icon + tooltip
 │   ├── updater.ts         # electron-updater integration
 │   └── window.ts          # BrowserWindow creation
-├── preload/
-│   └── index.ts           # contextBridge — sole gateway from renderer to Node/Electron
+├── preload/index.ts       # contextBridge — sole IPC gateway to renderer
 ├── renderer/              # React SPA
-│   ├── api/bridge.ts      # Typed wrappers around window.api; browser stub for Vite dev
-│   ├── components/        # dashboard/, gallery/, detail/, layout/, ui/
+│   ├── api/bridge.ts      # Typed wrappers around window.api + browser stub
+│   ├── components/        # dashboard/, gallery/, detail/, layout/, settings/, setup/
 │   ├── pages/             # AppDetailPage.tsx, Gallery.tsx, Settings.tsx
-│   ├── store/             # Zustand stores: appStore.ts, sessionStore.ts, updateStore.ts
-│   ├── styles/            # Per-feature CSS modules + global.css (CSS variables)
+│   ├── store/             # Zustand: appStore.ts, sessionStore.ts, updateStore.ts
+│   ├── styles/            # Per-feature CSS + global.css (CSS variables)
 │   ├── App.tsx            # Router, IPC push subscriptions, error boundary
 │   └── main.tsx           # ReactDOM.createRoot entry point
 └── shared/
@@ -77,22 +75,21 @@ src/
     └── exeNames.json      # exe → display name overrides
 ```
 
-## IPC Pattern (Critical — touch all 4 files for every new endpoint)
+## IPC Pattern — Touch All 4 Files for Every New Endpoint
 
 1. `src/shared/channels.ts` — add constant to `CHANNELS` (`domain:action` format)
-2. `src/main/ipc/handlers.ts` — `ipcMain.handle(CHANNELS.YOUR_CHANNEL, ...)`
+2. `src/main/ipc/handlers.ts` — `ipcMain.handle(CHANNELS.X, async (_e, ...args) => { ... })`
 3. `src/preload/index.ts` — expose via `contextBridge.exposeInMainWorld`
-4. `src/renderer/api/bridge.ts` — add typed wrapper + stub for browser dev
+4. `src/renderer/api/bridge.ts` — add typed wrapper + browser-mode stub
 
 **Never hardcode channel strings.** Push-event subscribers (e.g. `onTick`) must return a
-`() => void` cleanup that calls `ipcRenderer.removeListener(...)`. Use this in `useEffect` returns.
+`() => void` cleanup calling `ipcRenderer.removeListener(...)` — use as `useEffect` return.
 
 ## Code Style
 
 ### Imports
-
-Order: React/built-ins → third-party → `@shared/*` → `@renderer/*` → relative paths.
-Single quotes for import paths; double quotes for string values.
+Order: React/Node built-ins → third-party → `@shared/*` → `@renderer/*` → relative.
+Single quotes for paths; double quotes for string values in code.
 
 ```typescript
 import { useState, useEffect } from 'react'
@@ -102,11 +99,8 @@ import { api } from '../../api/bridge'
 ```
 
 ### Formatting
-
-- **Indent:** 2 spaces
-- **Semicolons:** required
-- **Trailing commas:** required in multi-line arrays/objects/params
-- **Quotes:** single `'` in imports; double `"` for string literals
+- **Indent:** 2 spaces — **Semicolons:** required — **Trailing commas:** required in multi-line
+- **Quotes:** single `'` in imports; double `"` for string literals elsewhere
 
 ### Naming Conventions
 
@@ -120,7 +114,6 @@ import { api } from '../../api/bridge'
 | CSS classes | BEM | `app-card__art--placeholder` |
 
 ### TypeScript
-
 - `strict: true` — never use `any` except in legacy DB row generics
 - Prefer `interface` over `type` alias
 - Explicit return types on all exported functions: `function foo(): ReturnType`
@@ -129,64 +122,47 @@ import { api } from '../../api/bridge'
 - Path aliases: `@shared/*` (both processes), `@renderer/*` (renderer only)
 
 ### React Components
+- Functional components only, return type `JSX.Element`, destructure props in signature
+- `useCallback` for handlers passed as props to children
+- Every `useEffect` that subscribes must return a cleanup: `return () => unsubscribe()`
 
 ```typescript
-interface Props {
-  item: AppRecord;
-  onClick: () => void;
-}
-
-export default function AppCard({ item, onClick }: Props): JSX.Element {
-  // useCallback for handlers passed as props to children
-  // useEffect must return cleanup: return () => unsubscribe()
-}
+interface Props { item: AppRecord; onClick: () => void; }
+export default function AppCard({ item, onClick }: Props): JSX.Element { ... }
 ```
 
-- Functional components only, return type `JSX.Element`
-- Destructure props in signature
-- `useCallback` for handlers passed to children
-
 ### Zustand Stores
+- Business logic stays in the **main process** — stores only call `api.*` → IPC
+- Every store exposes `error: string | null` and `clearError(): void`
+- Optimistic updates: snapshot previous state, revert on catch
 
 ```typescript
 async loadAll() {
   set({ loading: true, error: null });
-  try {
-    const data = await api.getData();
-    set({ data, loading: false });
-  } catch (err) {
-    set({ loading: false, error: String(err) });
-  }
+  try { set({ data: await api.getData(), loading: false }); }
+  catch (err) { set({ loading: false, error: String(err) }); }
 }
 ```
 
-- Business logic stays in the **main process** — stores only call bridge → IPC
-- Every store exposes `error: string | null` and `clearError(): void`
-- Optimistic updates: save previous state, revert in catch
-
 ### Error Handling
-
 - Wrap all async operations in `try/catch`
-- Log with `[ModuleName]` prefix: `console.error('[AppStore] failed to load', err)`
-- IPC handlers: `throw` after logging so the renderer receives the rejection
-- Main process has global `uncaughtException` / `unhandledRejection` handlers in `index.ts`
+- Log with `[ModuleName]` prefix: `console.error('[Tracker] poll failed', err)`
+- IPC handlers: log then `throw` so the renderer receives the rejection
+- Global `uncaughtException` / `unhandledRejection` handlers live in `src/main/index.ts`
 
 ### CSS / Styling
-
-- BEM class names: `block__element--modifier`
-- All colors/spacing through CSS variables — never hardcode hex/px
+- BEM class names; all colors/spacing through CSS variables — never hardcode hex/px
 - Dark-only design; do **not** add light-mode styles
 - Key variables: `--color-bg`, `--color-surface`, `--color-surface-2`,
   `--color-accent` (`#f59e0b` amber), `--color-text`, `--color-text-muted`,
   `--color-danger`, `--color-success`, `--space-{n}`
 
 ### Database
-
 - `getDb()` returns the `DbCompat` singleton — call it **inside** handler functions, never at module scope
 - `db.prepare<Params[], RowType>(sql)` — always type both generics
-- SQLite booleans are `0`/`1` integers; convert to `boolean` via the `mapApp()` helper in `handlers.ts`
-- Auto-saves to `%APPDATA%/Faultier Tracker/data.db` every 30 seconds via `persistDb()`
-- Schema version tracked in `schema_migrations`; new migrations go in `migrations.ts` (currently v8)
+- SQLite booleans are `0`/`1` integers; convert via `mapApp()` helper in `handlers.ts`
+- Auto-saves to `%APPDATA%/KIOKU/data.db` every 30 seconds via `persistDb()`
+- Schema tracked in `schema_migrations`; new migrations go in `migrations.ts` (currently v9)
 - **Never delete session rows** in normal operation — only via Settings → clear data
 
 ## Key Files
@@ -195,11 +171,11 @@ async loadAll() {
 |---|---|
 | `src/shared/types.ts` | All TypeScript interfaces (`AppRecord`, `AppGroup`, `SessionSummary`, …) |
 | `src/shared/channels.ts` | IPC channel constants — single source of truth |
-| `src/main/ipc/handlers.ts` | All `ipcMain.handle()` registrations (~992 lines) |
+| `src/main/ipc/handlers.ts` | All `ipcMain.handle()` registrations (~1254 lines) |
 | `src/preload/index.ts` | `contextBridge` — only renderer→Node gateway |
 | `src/renderer/api/bridge.ts` | Typed renderer wrappers + browser stub |
 | `src/main/db/client.ts` | DB singleton, `openDb()`, `getDb()`, `persistDb()` |
-| `src/main/db/migrations.ts` | Schema creation + incremental migrations |
+| `src/main/db/migrations.ts` | Schema creation + incremental migrations (v1–v9) |
 | `electron.vite.config.ts` | Build config; defines `@shared` and `@renderer` path aliases |
 
 ## Important Constraints
@@ -207,9 +183,10 @@ async loadAll() {
 - **Windows-only** — uses `get-windows`, icon extraction via VBScript/PowerShell
 - **No Node.js in renderer** — all Node/Electron access goes through `contextBridge`
 - **No ESLint/Prettier** — follow style rules manually; validate with `tsc --noEmit`
-- **Icons** are base64 data URLs (never file paths in the renderer)
+- **Icons** are base64 data URLs — never file paths in the renderer
 - **`group_rules` table** was dropped in migration v7 — do not reference it
 - **Session `type`** is always `'active'`; `'running'` no longer exists
+- **`linked_steam_app_id`** column added in migration v9 — present on `apps` table
 
 ## Release
 
@@ -217,7 +194,7 @@ async loadAll() {
 git tag v1.2.3 && git push origin v1.2.3
 ```
 
-GitHub Actions (`.github/workflows/release.yml`) runs on `v*.*.*` tags, builds the NSIS
+GitHub Actions (`.github/workflows/release.yml`) triggers on `v*.*.*` tags, builds the NSIS
 installer on `windows-latest`, and publishes to GitHub Releases. Use `/ship` for a guided flow.
 
 <!-- gitnexus:start -->

@@ -31,9 +31,13 @@ All data is stored locally in a SQLite database. Nothing is sent to any server.
 
 ## Screenshots
 
-> Dashboard, Gallery, and Settings pages
+**Gallery** — every tracked app and game shown as a card with cover art. From here you can rename entries, assign custom artwork, and organize apps into groups.
 
-*(Add screenshots here)*
+![Gallery page showing a grid of tracked games with cover art](docs/screenshots/Gallery.png)
+
+**Dashboard heatmap** — a calendar-style heatmap showing daily usage intensity over time, part of the main Dashboard view.
+
+![Dashboard heatmap showing daily usage patterns over several months](docs/screenshots/Heatmap.png)
 
 ---
 
