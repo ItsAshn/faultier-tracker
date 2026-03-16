@@ -7,7 +7,7 @@ import { useAppStore } from '../store/appStore'
 import { useSessionStore } from '../store/sessionStore'
 import AppCard from '../components/gallery/AppCard'
 import { api } from '../api/bridge'
-import type { AppRecord, AppGroup, RangeSummary } from '@shared/types'
+import type { AppRecord, AppGroup, RangeSummary, SessionSummary } from '@shared/types'
 import GalleryHeatmap from '../components/gallery/GalleryHeatmap'
 
 type SortMode = 'time' | 'name' | 'last_seen'
@@ -90,22 +90,32 @@ export default function Gallery(): JSX.Element {
   }, [])
 
   // Build gallery items: one per group + ungrouped apps
+  // Pre-index group membership (O(N)) so sort and summary lookups don't filter per call.
+  const groupMembers = useMemo(() => {
+    const m = new Map<number, AppRecord[]>()
+    for (const app of apps) {
+      if (app.group_id !== null) {
+        const arr = m.get(app.group_id)
+        if (arr) arr.push(app)
+        else m.set(app.group_id, [app])
+      }
+    }
+    return m
+  }, [apps])
+
   const allItems: GalleryItem[] = useMemo(() => {
     const items: GalleryItem[] = []
-
     for (const group of groups) {
-      const members = apps.filter((a) => a.group_id === group.id)
+      const members = groupMembers.get(group.id) ?? []
       items.push({ id: group.id, isGroup: true, item: group, memberCount: members.length })
     }
-
     for (const app of apps) {
       if (app.group_id === null) {
         items.push({ id: app.id, isGroup: false, item: app })
       }
     }
-
     return items
-  }, [apps, groups])
+  }, [apps, groups, groupMembers])
 
   // Fuse.js search
   const fuse = useMemo(() => new Fuse(allItems, {
@@ -116,40 +126,33 @@ export default function Gallery(): JSX.Element {
     threshold: 0.4
   }), [allItems])
 
+  // O(1) lookup map from allTimeSummary.apps
+  const summaryByAppId = useMemo(() => {
+    const m = new Map<number, SessionSummary>()
+    if (allTimeSummary) {
+      for (const s of allTimeSummary.apps) m.set(s.app_id, s)
+    }
+    return m
+  }, [allTimeSummary])
+
   function getAllTimeSummary(item: GalleryItem) {
     if (!allTimeSummary) return null
     if (item.isGroup) {
-      const memberIds = apps.filter((a) => a.group_id === item.id).map((a) => a.id)
-      const sums = allTimeSummary.apps.filter((s) => memberIds.includes(s.app_id))
-      if (!sums.length) return null
+      const members = groupMembers.get(item.id) ?? []
+      let total = 0
+      for (const a of members) {
+        total += summaryByAppId.get(a.id)?.active_ms ?? 0
+      }
+      if (total === 0) return null
       return {
         app_id: item.id,
         exe_name: '',
         display_name: (item.item as AppGroup).name,
         group_id: null,
-        active_ms: sums.reduce((acc, s) => acc + s.active_ms, 0),
+        active_ms: total,
       }
     }
-    return allTimeSummary.apps.find((s) => s.app_id === item.id) ?? null
-  }
-
-  function getItemTotalMs(item: GalleryItem): number {
-    const s = getAllTimeSummary(item)
-    if (!s) return 0
-    return s.active_ms
-  }
-
-  function getItemLastSeen(item: GalleryItem): number {
-    if (item.isGroup) {
-      return apps
-        .filter((a) => a.group_id === item.id)
-        .reduce((max, a) => Math.max(max, a.last_seen), 0)
-    }
-    return (item.item as AppRecord).last_seen
-  }
-
-  function getItemName(item: GalleryItem): string {
-    return item.isGroup ? (item.item as AppGroup).name : (item.item as AppRecord).display_name
+    return summaryByAppId.get(item.id) ?? null
   }
 
   const displayed = useMemo(() => {
@@ -157,14 +160,38 @@ export default function Gallery(): JSX.Element {
     if (search.trim()) {
       items = fuse.search(search).map((r) => r.item)
     }
+
+    // Pre-compute sort keys once (O(N)) to avoid repeated O(N) lookups inside
+    // the comparator which would make the overall sort O(N² log N).
+    const totalMs = new Map<string, number>()
+    const lastSeen = new Map<string, number>()
+    const name = new Map<string, string>()
+
+    for (const item of items) {
+      const key = `${item.isGroup ? 'g' : 'a'}-${item.id}`
+      const s = getAllTimeSummary(item)
+      totalMs.set(key, s ? s.active_ms : 0)
+      if (item.isGroup) {
+        const members = groupMembers.get(item.id) ?? []
+        lastSeen.set(key, members.reduce((max, a) => Math.max(max, a.last_seen), 0))
+      } else {
+        lastSeen.set(key, (item.item as AppRecord).last_seen)
+      }
+      name.set(key, item.isGroup
+        ? (item.item as AppGroup).name
+        : (item.item as AppRecord).display_name)
+    }
+
     return [...items].sort((a, b) => {
-      if (sort === 'time') return getItemTotalMs(b) - getItemTotalMs(a)
-      if (sort === 'name') return getItemName(a).localeCompare(getItemName(b), undefined, { sensitivity: 'base' })
+      const ka = `${a.isGroup ? 'g' : 'a'}-${a.id}`
+      const kb = `${b.isGroup ? 'g' : 'a'}-${b.id}`
+      if (sort === 'time') return (totalMs.get(kb) ?? 0) - (totalMs.get(ka) ?? 0)
+      if (sort === 'name') return (name.get(ka) ?? '').localeCompare(name.get(kb) ?? '', undefined, { sensitivity: 'base' })
       // last_seen
-      return getItemLastSeen(b) - getItemLastSeen(a)
+      return (lastSeen.get(kb) ?? 0) - (lastSeen.get(ka) ?? 0)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, allItems, fuse, sort, allTimeSummary])
+  }, [search, allItems, fuse, sort, allTimeSummary, groupMembers, summaryByAppId])
 
   function handleCardClick(item: GalleryItem): void {
     if (mainRef.current) sessionStorage.setItem(SCROLL_KEY, String(mainRef.current.scrollTop))
@@ -176,10 +203,12 @@ export default function Gallery(): JSX.Element {
     setSteamRefreshing(true);
     try {
       const result = await api.refreshSteamData();
-      if (result.updated > 0) {
-        await loadAll();
-        loadRange();
-        fetchSummary(true);
+      // Always reload so charts reflect the latest data regardless of delta.
+      await loadAll();
+      loadRange();
+      fetchSummary(true);
+      if (result.updated === 0) {
+        console.log('[Gallery] Steam refresh: no new playtime detected');
       }
     } catch (err) {
       console.error('[Gallery] Steam refresh failed:', err);

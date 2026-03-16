@@ -1,4 +1,4 @@
-# AGENTS.md — Faultier Tracker
+# AGENTS.md — KIOKU
 
 ## Context7 Integration
 

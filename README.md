@@ -1,6 +1,6 @@
-# Faultier Tracker
+# KIOKU
 
-> **Know where your hours go.** Faultier Tracker automatically monitors which applications you use and for how long — no manual timers, no input required.
+> **Know where your hours go.** KIOKU automatically monitors which applications you use and for how long — no manual timers, no input required.
 
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 ![Electron](https://img.shields.io/badge/Electron-v33-47848F?logo=electron)
@@ -11,7 +11,7 @@
 
 ## What It Does
 
-Faultier Tracker runs quietly in your system tray and tracks every application you use. It distinguishes between:
+KIOKU runs quietly in your system tray and tracks every application you use. It distinguishes between:
 
 - **Active time** — the app has your focus (window in foreground)
 - **Running time** — the app is open but not focused (background)
@@ -39,11 +39,11 @@ All data is stored locally in a SQLite database. Nothing is sent to any server.
 
 ## Installation
 
-Download the latest installer from the [Releases](https://github.com/ItsAshn/faultier-tracker/releases) page and run the `.exe`.
+Download the latest installer from the [Releases](https://github.com/ItsAshn/kioku/releases) page and run the `.exe`.
 
 The app installs per-user (no admin required) and starts tracking immediately. It lives in your system tray.
 
-**Data location**: `%APPDATA%\Faultier Tracker\`
+**Data location**: `%APPDATA%\KIOKU\`
 
 ### Windows SmartScreen Warning
 
@@ -66,8 +66,8 @@ The application is safe. This warning appears for any installer without a paid c
 ### Setup
 
 ```bash
-git clone https://github.com/ItsAshn/faultier-tracker.git
-cd faultier-tracker
+git clone https://github.com/ItsAshn/kioku.git
+cd kioku
 npm install
 ```
 
@@ -135,9 +135,9 @@ src/
 
 ## Privacy
 
-Faultier Tracker reads the names and executable paths of running processes, and the title of your active window, every 5 seconds. This data is used solely to build your local usage history.
+KIOKU reads the names and executable paths of running processes, and the title of your active window, every 5 seconds. This data is used solely to build your local usage history.
 
-- **All data is stored locally** in `%APPDATA%\Faultier Tracker\data.db`.
+- **All data is stored locally** in `%APPDATA%\KIOKU\data.db`.
 - **No data is transmitted** to any external server except automatic update checks against GitHub Releases.
 - The app does **not** record keystrokes, clipboard content, screenshots, or any other personal data.
 

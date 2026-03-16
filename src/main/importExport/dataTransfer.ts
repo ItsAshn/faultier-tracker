@@ -43,10 +43,10 @@ export async function exportData(): Promise<{ success: boolean; filePath?: strin
   const db = getDb()
 
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Export Faultier Tracker Data',
+    title: 'Export KIOKU Data',
     defaultPath: path.join(
       app.getPath('documents'),
-      `faultier-tracker-export-${new Date().toISOString().slice(0, 10)}.json`
+      `kioku-export-${new Date().toISOString().slice(0, 10)}.json`
     ),
     filters: [{ name: 'JSON', extensions: ['json'] }]
   })
@@ -113,10 +113,10 @@ export async function exportDataCsv(): Promise<{ success: boolean; filePath?: st
   const db = getDb()
 
   const { canceled, filePath } = await dialog.showSaveDialog({
-    title: 'Export Faultier Tracker Data (CSV)',
+    title: 'Export KIOKU Data (CSV)',
     defaultPath: path.join(
       app.getPath('documents'),
-      `faultier-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`
+      `kioku-export-${new Date().toISOString().slice(0, 10)}.csv`
     ),
     filters: [{ name: 'CSV', extensions: ['csv'] }]
   })
@@ -165,7 +165,7 @@ export async function importData(): Promise<ImportResult> {
   const result: ImportResult = { appsAdded: 0, appsUpdated: 0, sessionsAdded: 0, duplicates: 0, errors: [] }
 
   const { canceled, filePaths } = await dialog.showOpenDialog({
-    title: 'Import Faultier Tracker Data',
+    title: 'Import KIOKU Data',
     filters: [{ name: 'JSON', extensions: ['json'] }],
     properties: ['openFile']
   })

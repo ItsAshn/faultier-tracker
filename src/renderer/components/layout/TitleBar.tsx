@@ -18,7 +18,7 @@ export default function TitleBar(): JSX.Element {
   return (
     <header className="titlebar">
       <div className="titlebar__logo">
-        <span className="titlebar__logo-text">Faultier Tracker</span>
+        <span className="titlebar__logo-text">KIOKU</span>
       </div>
 
       <div className="titlebar__spacer" />

@@ -9,6 +9,7 @@ import { api } from '../../api/bridge'
 // unavailable (sandboxed contexts, quota full, etc.).
 
 const SESSION_PREFIX = 'ic:'
+const THUMB_PREFIX = 'th:'
 
 function ssGet(key: string): string | null | undefined {
   try {
@@ -33,19 +34,44 @@ function ssDel(key: string): void {
   try { sessionStorage.removeItem(SESSION_PREFIX + key) } catch { /* ignore */ }
 }
 
+function ssGetThumb(key: string): string | undefined {
+  try {
+    const raw = sessionStorage.getItem(THUMB_PREFIX + key)
+    return raw === null ? undefined : raw
+  } catch {
+    return undefined
+  }
+}
+
+function ssSetThumb(key: string, value: string): void {
+  try {
+    sessionStorage.setItem(THUMB_PREFIX + key, value)
+  } catch {
+    // Quota exceeded — in-memory cache still works
+  }
+}
+
+function ssDelThumb(key: string): void {
+  try { sessionStorage.removeItem(THUMB_PREFIX + key) } catch { /* ignore */ }
+}
+
 // ── Module-level in-memory icon batch queue ───────────────────────────────────
 // Collects icon requests from all visible cards within a 30ms window and fires
 // a single IPC call instead of one call per card.
 // In-memory cache is warmed from sessionStorage on first miss.
 const _iconCache = new Map<string, string | null>()
+const _thumbCache = new Map<string, string>()
 const _pending = new Map<string, Array<(icon: string | null) => void>>()
 let _batchTimer: ReturnType<typeof setTimeout> | null = null
 
 // Bust cache for a single item (e.g. after user sets a custom image).
 export function bustIconCache(id: number, isGroup: boolean): void {
   const key = `${isGroup ? 'g' : 'a'}:${id}`
+  const existingSrc = _iconCache.get(key)
+  if (existingSrc) _thumbCache.delete(existingSrc)
   _iconCache.delete(key)
   ssDel(key)
+  ssDelThumb(key)
 }
 
 // Clear entire icon cache — used when auto-fetch artwork update fires.
@@ -55,20 +81,27 @@ export function clearIconCache(): void {
     const toRemove: string[] = []
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i)
-      if (k && k.startsWith(SESSION_PREFIX)) toRemove.push(k)
+      if (k && (k.startsWith(SESSION_PREFIX) || k.startsWith(THUMB_PREFIX))) toRemove.push(k)
     }
     toRemove.forEach((k) => sessionStorage.removeItem(k))
   } catch { /* ignore */ }
   _iconCache.clear()
+  _thumbCache.clear()
 }
 
 // Read from in-memory cache, falling back to sessionStorage.
 // Returns undefined when key is completely absent (IPC fetch required).
+// Also warms _thumbCache from sessionStorage when a persisted thumb exists.
 function readCache(key: string): string | null | undefined {
   if (_iconCache.has(key)) return _iconCache.get(key)!
   const ss = ssGet(key)
   if (ss !== undefined) {
     _iconCache.set(key, ss)   // warm in-memory layer
+    // Warm thumb cache from sessionStorage so it's instantly available
+    if (ss !== null && !_thumbCache.has(ss)) {
+      const storedThumb = ssGetThumb(key)
+      if (storedThumb !== undefined) _thumbCache.set(ss, storedThumb)
+    }
     return ss
   }
   return undefined
@@ -77,6 +110,14 @@ function readCache(key: string): string | null | undefined {
 function writeCache(key: string, value: string | null): void {
   _iconCache.set(key, value)
   ssSet(key, value)
+  // Pre-generate and persist the tiny thumb so it's instantly available on
+  // back-navigation — the blurred placeholder will appear before the full
+  // image decodes on subsequent visits.
+  if (value !== null && !_thumbCache.has(value)) {
+    makeTinyThumb(value).then((thumb) => {
+      ssSetThumb(key, thumb)
+    }).catch(() => {})
+  }
 }
 
 function requestIcon(id: number, isGroup: boolean): Promise<string | null> {
@@ -117,8 +158,6 @@ function requestIcon(id: number, isGroup: boolean): Promise<string | null> {
 // size with CSS blur, giving a coloured wash instantly while the full image
 // decodes in the browser. The thumb is module-level cached (never regenerated
 // for the same source URL).
-
-const _thumbCache = new Map<string, string>()
 
 function makeTinyThumb(dataUrl: string): Promise<string> {
   const hit = _thumbCache.get(dataUrl)
@@ -169,8 +208,14 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
     const cached = readCache(key)
     return cached !== undefined ? cached : undefined
   })
-  // Tiny blurred placeholder (blur-up): set as soon as full src arrives, hidden after onLoad
-  const [thumbSrc, setThumbSrc] = useState<string | null>(null)
+  // Tiny blurred placeholder (blur-up): pre-populated from cache on back-navigation,
+  // otherwise set as soon as full src arrives, hidden after onLoad.
+  const [thumbSrc, setThumbSrc] = useState<string | null>(() => {
+    const key = `${isGroup ? 'g' : 'a'}:${item.id}`
+    const cached = readCache(key)
+    if (cached == null) return null
+    return _thumbCache.get(cached) ?? null
+  })
   // True only after the full <img> fires onLoad — triggers the opacity-1 class
   const [imgVisible, setImgVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)

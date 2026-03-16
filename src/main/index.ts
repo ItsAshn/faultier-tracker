@@ -92,12 +92,12 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   try {
-    await openDb();
+    openDb();
 
     if (wasDbCorrupted()) {
       dialog.showMessageBox({
         type: "warning",
-        title: "Faultier Tracker — Database Recovered",
+        title: "KIOKU — Database Recovered",
         message: "A corrupted database file was detected and backed up. A fresh database has been created.\n\nYour previous data has been preserved in a backup file.",
         buttons: ["OK"],
       });
@@ -111,7 +111,7 @@ app.whenReady().then(async () => {
       const enable = launchAtStartup === true || launchAtStartup === "true";
       const exePath = process.execPath;
       const startupFolder = path.join(app.getPath("home"), "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
-      const shortcutPath = path.join(startupFolder, "Faultier Tracker.lnk");
+      const shortcutPath = path.join(startupFolder, "KIOKU.lnk");
 
       if (enable) {
         createShortcut(exePath, shortcutPath);
@@ -147,7 +147,7 @@ app.whenReady().then(async () => {
     await startTracker();
   } catch (err) {
     dialog.showErrorBox(
-      "Faultier Tracker — Startup Error",
+      "KIOKU — Startup Error",
       `The app failed to start:\n\n${err instanceof Error ? err.message : String(err)}`,
     );
     app.quit();

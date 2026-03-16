@@ -70,11 +70,11 @@ export function updateTrayTooltip(
 ): void {
   if (!tray) return;
   if (isIdle) {
-    tray.setToolTip("Faultier Tracker — Idle");
+    tray.setToolTip("KIOKU — Idle");
   } else if (displayName) {
-    tray.setToolTip(`Faultier Tracker — ${displayName}`);
+    tray.setToolTip(`KIOKU — ${displayName}`);
   } else {
-    tray.setToolTip("Faultier Tracker");
+  tray.setToolTip("KIOKU");
   }
 }
 

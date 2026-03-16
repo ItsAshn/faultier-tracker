@@ -102,7 +102,7 @@ export default function Settings(): JSX.Element {
           <div className="settings-card">
             <div className="settings-card__title">Launch at Startup</div>
             <p className="settings-card__description">
-              Automatically start Faultier Tracker when you log in to Windows.
+              Automatically start KIOKU when you log in to Windows.
             </p>
             <div className="mode-toggle">
               <button

@@ -1,16 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell
 } from 'recharts'
 import type { ChartDataPoint, SessionSummary, BucketApp } from '@shared/types'
 import { api } from '../../api/bridge'
-
-function AppIcon({ appId }: { appId: number }): JSX.Element {
-  const [src, setSrc] = useState<string | null>(null)
-  useEffect(() => { api.getIconForApp(appId).then(setSrc).catch(() => {}) }, [appId])
-  if (src) return <img src={src} alt="" width={20} height={20} style={{ borderRadius: 3, objectFit: 'contain', flexShrink: 0 }} />
-  return <div style={{ width: 20, height: 20, borderRadius: 3, background: 'var(--color-surface-3)', flexShrink: 0 }} />
-}
 
 const APP_COLORS = [
   '#f59e0b', '#81c784', '#fb923c', '#f06292',
@@ -65,10 +58,29 @@ interface BreakdownProps {
 }
 
 function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
+  const topApps = useMemo(() => appSummaries.slice(0, TOP_N), [appSummaries])
+
+  // Stable key — only refetch icons when the top-N app IDs change
+  const topIds = useMemo(() => topApps.map((a) => a.app_id).join(','), [topApps])
+
+  // Batch-fetch all icons in one IPC call instead of N individual calls
+  const [icons, setIcons] = useState<Map<number, string>>(new Map())
+  useEffect(() => {
+    if (topApps.length === 0) { setIcons(new Map()); return }
+    const reqs = topApps.map((app) => ({ id: app.app_id, isGroup: false }))
+    api.getIconBatch(reqs).then((results) => {
+      const m = new Map<number, string>()
+      for (const app of topApps) {
+        const icon = results[`a:${app.app_id}`]
+        if (icon) m.set(app.app_id, icon)
+      }
+      setIcons(m)
+    }).catch(() => {})
+  }, [topIds]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const totalActive = appSummaries.reduce((acc, a) => acc + a.active_ms, 0)
   if (totalActive === 0) return null
 
-  const topApps = appSummaries.slice(0, TOP_N)
   const otherMs = appSummaries.slice(TOP_N).reduce((acc, a) => acc + a.active_ms, 0)
   const maxMs = topApps[0]?.active_ms ?? 0
   if (maxMs === 0) return null
@@ -76,21 +88,27 @@ function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
   return (
     <div className="chart-breakdown">
       <div className="chart-breakdown__title">Top Apps · Active Time</div>
-      {topApps.map((app, i) => (
-        <div key={app.app_id} className="chart-breakdown__row">
-          <span className="chart-breakdown__dot" style={{ background: APP_COLORS[i] }} />
-          <AppIcon appId={app.app_id} />
-          <span className="chart-breakdown__name" title={app.display_name}>{app.display_name}</span>
-          <div className="chart-breakdown__bar-wrap">
-            <div
-              className="chart-breakdown__bar"
-              style={{ width: `${(app.active_ms / maxMs) * 100}%`, background: APP_COLORS[i] }}
-            />
+      {topApps.map((app, i) => {
+        const icon = icons.get(app.app_id) ?? null
+        return (
+          <div key={app.app_id} className="chart-breakdown__row">
+            <span className="chart-breakdown__dot" style={{ background: APP_COLORS[i] }} />
+            {icon
+              ? <img src={icon} alt="" width={20} height={20} style={{ borderRadius: 3, objectFit: 'contain', flexShrink: 0 }} />
+              : <div style={{ width: 20, height: 20, borderRadius: 3, background: 'var(--color-surface-3)', flexShrink: 0 }} />
+            }
+            <span className="chart-breakdown__name" title={app.display_name}>{app.display_name}</span>
+            <div className="chart-breakdown__bar-wrap">
+              <div
+                className="chart-breakdown__bar"
+                style={{ width: `${(app.active_ms / maxMs) * 100}%`, background: APP_COLORS[i] }}
+              />
+            </div>
+            <span className="chart-breakdown__time">{fmtMs(app.active_ms)}</span>
+            <span className="chart-breakdown__pct">{Math.round((app.active_ms / totalActive) * 100)}%</span>
           </div>
-          <span className="chart-breakdown__time">{fmtMs(app.active_ms)}</span>
-          <span className="chart-breakdown__pct">{Math.round((app.active_ms / totalActive) * 100)}%</span>
-        </div>
-      ))}
+        )
+      })}
       {otherMs > 0 && (
         <div className="chart-breakdown__row chart-breakdown__row--other">
           <span className="chart-breakdown__dot" style={{ background: 'var(--color-text-dim)' }} />

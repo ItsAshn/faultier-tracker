@@ -19,7 +19,7 @@ export default function AboutUpdates(): JSX.Element {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Faultier Tracker</div>
+          <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>KIOKU</div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
             Version {APP_VERSION}
           </div>

@@ -1,11 +1,10 @@
-import initSqlJs from "sql.js";
-import type { Database as SqlJsDatabase, Statement } from "sql.js";
+import Database from "better-sqlite3";
 import { app } from "electron";
 import path from "path";
 import fs from "fs";
 import { runMigrations, seedDefaults } from "./migrations";
 
-// ─── Compatibility wrapper (mimics better-sqlite3 API) ─────────────────────
+// ─── Compatibility interface (matches better-sqlite3 API natively) ──────────
 
 export interface DbCompat {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,119 +19,14 @@ export interface DbCompat {
   transaction<T>(fn: () => T): () => T;
   pragma(str: string): void;
   close(): void;
-  /** Discard all cached compiled statements so they are re-prepared on next use.
-   *  Must be called after `_rawDb.export()` which frees all WASM statement objects. */
+  /** No-op with better-sqlite3 — prepared statements never go stale. */
   clearStmtCache(): void;
-}
-
-function wrapDb(raw: SqlJsDatabase): DbCompat {
-  // Cache compiled statements to avoid recompiling the same SQL repeatedly
-  const stmtCache = new Map<string, Statement>();
-  let _closed = false;
-
-  function getStmt(sql: string): Statement {
-    if (_closed) throw new Error("Database is closed");
-    let stmt = stmtCache.get(sql);
-    if (!stmt) {
-      stmt = raw.prepare(sql);
-      stmtCache.set(sql, stmt);
-    }
-    return stmt;
-  }
-
-  return {
-    prepare(sql: string) {
-      return {
-        get(...params: unknown[]) {
-          const stmt = getStmt(sql);
-          try {
-            stmt.bind(params as any[]);
-            const row = stmt.step() ? stmt.getAsObject() : undefined;
-            return row as any;
-          } finally {
-            stmt.reset();
-          }
-        },
-        all(...params: unknown[]) {
-          const stmt = getStmt(sql);
-          try {
-            stmt.bind(params as any[]);
-            const rows: unknown[] = [];
-            while (stmt.step()) rows.push(stmt.getAsObject());
-            return rows as any[];
-          } finally {
-            stmt.reset();
-          }
-        },
-        run(...params: unknown[]) {
-          const stmt = getStmt(sql);
-          stmt.run(params as any[]);
-          const r = raw.exec("SELECT last_insert_rowid()");
-          const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0;
-          return { lastInsertRowid };
-        },
-      };
-    },
-
-    exec(sql: string) {
-      raw.exec(sql);
-    },
-
-    transaction<T>(fn: () => T): () => T {
-      return () => {
-        raw.exec("BEGIN");
-        try {
-          const result = fn();
-          raw.exec("COMMIT");
-          return result;
-        } catch (e) {
-          raw.exec("ROLLBACK");
-          throw e;
-        }
-      };
-    },
-
-    pragma(str: string) {
-      if (str.startsWith("journal_mode")) return;
-      try {
-        raw.exec(`PRAGMA ${str}`);
-      } catch {
-        /* ignore */
-      }
-    },
-
-    close() {
-      // Mark closed first so any concurrent getStmt() calls fail fast
-      // instead of operating on freed WASM statement objects.
-      _closed = true;
-      // Free all cached compiled statements before closing the DB
-      for (const stmt of stmtCache.values()) {
-        try {
-          stmt.free();
-        } catch {
-          /* ignore */
-        }
-      }
-      stmtCache.clear();
-      persistDb();
-      raw.close();
-    },
-
-    clearStmtCache() {
-      // Discard all cached statements — they are already freed at the WASM
-      // level by sql.js Database.export(), so we just drop the stale refs.
-      stmtCache.clear();
-    },
-  };
 }
 
 // ─── Singleton state ────────────────────────────────────────────────────────
 
 let _db: DbCompat | null = null;
-let _rawDb: SqlJsDatabase | null = null;
 let _dbPath = "";
-let _saveTimer: NodeJS.Timeout | null = null;
-let _isSaving = false;
 let _dbWasCorrupted = false;
 
 // In-memory settings cache — populated on first getSetting() call, invalidated on set
@@ -151,85 +45,80 @@ export function wasDbCorrupted(): boolean {
   return _dbWasCorrupted;
 }
 
-export async function openDb(): Promise<DbCompat> {
+function openRaw(dbPath: string): Database.Database {
+  return new Database(dbPath);
+}
+
+function attachCompat(raw: Database.Database): DbCompat & { close(): void } {
+  return {
+    prepare(sql: string) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return raw.prepare(sql) as any;
+    },
+    exec(sql: string): void {
+      raw.exec(sql);
+    },
+    // better-sqlite3 transaction() returns a callable directly — wrap to
+    // match DbCompat which expects a factory returning () => T.
+    transaction<T>(fn: () => T): () => T {
+      return raw.transaction(fn) as unknown as () => T;
+    },
+    pragma(str: string): void {
+      raw.pragma(str);
+    },
+    close(): void {
+      raw.close();
+    },
+    clearStmtCache(): void {
+      // No-op: better-sqlite3 prepared statements never go stale.
+    },
+  };
+}
+
+export function openDb(): DbCompat {
   if (_db) return _db;
 
   const userDataPath = app.getPath("userData");
   fs.mkdirSync(userDataPath, { recursive: true });
   _dbPath = path.join(userDataPath, "data.db");
 
-  // Resolve WASM file relative to current __dirname (out/main/)
-  const wasmPath = path.resolve(
-    __dirname,
-    "../../node_modules/sql.js/dist/sql-wasm.wasm",
-  );
-  const SQL = await initSqlJs({ locateFile: () => wasmPath });
-
-  if (fs.existsSync(_dbPath)) {
-    try {
-      const buffer = await fs.promises.readFile(_dbPath);
-      _rawDb = new SQL.Database(buffer);
-    } catch (err) {
-      console.error("[DB] Corrupted database file detected, backing up and creating fresh:", err);
-      const backupPath = `${_dbPath}.corrupted.${Date.now()}`;
-      fs.renameSync(_dbPath, backupPath);
-      _rawDb = new SQL.Database();
-      _dbWasCorrupted = true;
-    }
-  } else {
-    _rawDb = new SQL.Database();
+  let raw: Database.Database;
+  try {
+    raw = openRaw(_dbPath);
+  } catch (err) {
+    console.error("[DB] Corrupted database file detected, backing up and creating fresh:", err);
+    const backupPath = `${_dbPath}.corrupted.${Date.now()}`;
+    try { fs.renameSync(_dbPath, backupPath); } catch { /* ignore */ }
+    raw = openRaw(_dbPath);
+    _dbWasCorrupted = true;
   }
 
-  _db = wrapDb(_rawDb);
-  _db.pragma("foreign_keys = ON");
+  // WAL mode: concurrent reads don't block writes; writes don't block reads.
+  raw.pragma("journal_mode = WAL");
+  raw.pragma("foreign_keys = ON");
+
+  _db = attachCompat(raw);
 
   runMigrations(_db);
   seedDefaults(_db);
-
-  // Auto-save every 30 seconds using async I/O to avoid blocking the main thread
-  _saveTimer = setInterval(async () => {
-    if (!_rawDb || !_dbPath || _isSaving) return;
-    _isSaving = true;
-    try {
-      const data = _rawDb.export();
-      // export() frees all WASM statement objects — purge the cache so
-      // subsequent prepare() calls compile fresh statements instead of
-      // returning dead references that throw "Statement closed".
-      _db?.clearStmtCache();
-      await fs.promises.writeFile(_dbPath, Buffer.from(data));
-    } catch (err) {
-      console.error("[DB] Auto-save failed:", err);
-    } finally {
-      _isSaving = false;
-    }
-  }, 30_000);
 
   console.log("[DB] Opened:", _dbPath);
   return _db;
 }
 
+/** With better-sqlite3 every write goes directly to disk — this is a no-op
+ *  kept for call-sites that existed under the sql.js implementation. */
 export function persistDb(): void {
-  if (!_rawDb || !_dbPath) return;
-  const data = _rawDb.export();
-  // export() frees all WASM statement objects — purge the cache.
-  _db?.clearStmtCache();
-  fs.writeFileSync(_dbPath, Buffer.from(data));
+  // No-op: better-sqlite3 writes synchronously to the file on every statement.
 }
 
 export function closeDb(): void {
-  if (_saveTimer) {
-    clearInterval(_saveTimer);
-    _saveTimer = null;
-  }
   _settingsCache = null;
-  // Null out _db before calling close() so any concurrent IPC that calls
-  // getDb() gets "Database not initialized" rather than operating on a
-  // half-closed wrapper with freed WASM statement objects.
-  // Keep _rawDb alive until after db.close() since persistDb() needs it.
   const db = _db;
   _db = null;
-  db?.close(); // sets _closed flag, frees statement cache, persists DB, closes raw
-  _rawDb = null;
+  if (db) {
+    try { db.close(); } catch { /* ignore */ }
+  }
   console.log("[DB] Closed");
 }
 

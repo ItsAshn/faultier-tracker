@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Faultier Tracker includes the following open-source software components.
+KIOKU includes the following open-source software components.
 Their respective licenses are reproduced below as required.
 
 ---

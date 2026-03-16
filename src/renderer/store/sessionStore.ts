@@ -18,8 +18,6 @@ interface SessionStore {
   clearError: () => void
   // Internal: timestamp of last loadRange() call (not exposed to consumers)
   _lastLoadAt: number | null
-  // Internal: timestamp of first tick received (for adaptive throttle)
-  _appStartedAt: number | null
 
   setPreset: (preset: DateRangePreset) => void
   setCustomRange: (from: number, to: number) => void
@@ -57,7 +55,6 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   isIdle: false,
   lastTickAt: null,
   _lastLoadAt: null,
-  _appStartedAt: null,
   error: null,
   clearError: () => set({ error: null }),
 
@@ -99,20 +96,16 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
 
   onTick(payload) {
     const now = Date.now()
-    const startedAt = get()._appStartedAt
     set({
       activeAppId: payload.active_app?.app_id ?? null,
       activeExeName: payload.active_app?.exe_name ?? null,
       activeDisplayName: payload.active_app?.display_name ?? null,
       isIdle: payload.is_idle,
       lastTickAt: payload.timestamp,
-      _appStartedAt: startedAt ?? now,
     })
 
-    // Use a shorter throttle during the first 2 minutes so fresh-install
-    // data becomes visible quickly, then back off to 30s for steady state.
-    const age = now - (startedAt ?? now)
-    const throttleMs = age < 120_000 ? 5_000 : 30_000
+    // Throttle to 30s steady state — data freshness is sufficient at this cadence.
+    const throttleMs = 30_000
 
     const lastLoad = get()._lastLoadAt
     if (!lastLoad || now - lastLoad > throttleMs) {
@@ -123,7 +116,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   onDataCleared() {
     // Wipe summary so the UI shows a loading state, and clear the throttle
     // timestamp so the very next tick (or immediate loadRange call) fires.
-    set({ summary: null, _lastLoadAt: null, _appStartedAt: null })
+    set({ summary: null, _lastLoadAt: null })
     get().loadRange()
   },
 }))

@@ -42,12 +42,12 @@ export default function TopAppsLeaderboard({ summaries, period, onPeriodChange, 
 
   useEffect(() => {
     if (topApps.length === 0) { setIcons(new Map()); return }
-    Promise.all(
-      topApps.map((app) => api.getIconForApp(app.app_id).then((icon) => ({ id: app.app_id, icon })))
-    ).then((results) => {
+    const reqs = topApps.map((app) => ({ id: app.app_id, isGroup: false }))
+    api.getIconBatch(reqs).then((results) => {
       const m = new Map<number, string>()
-      for (const r of results) {
-        if (r.icon) m.set(r.id, r.icon)
+      for (const app of topApps) {
+        const icon = results[`a:${app.app_id}`]
+        if (icon) m.set(app.app_id, icon)
       }
       setIcons(m)
     }).catch(() => {})

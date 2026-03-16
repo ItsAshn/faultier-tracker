@@ -111,6 +111,10 @@ let isRunning = false;
 const lastSeenWrittenAt = new Map<number, number>();
 const LAST_SEEN_WRITE_INTERVAL = 60_000; // write at most once per minute
 
+// Throttle last_track_time setting writes — no need for per-tick persistence.
+let _lastTrackTimeWriteAt = 0;
+const LAST_TRACK_TIME_WRITE_INTERVAL = 60_000;
+
 export async function startTracker(): Promise<void> {
   const machineId = getSetting("machine_id") as string;
   initSessionManager(machineId);
@@ -159,9 +163,12 @@ async function pollTick(): Promise<void> {
 
   try {
     // Persist the current tick time so repairOrphanedSessions can use it on
-    // the next startup after a crash. Inside the try so a transient DB error
-    // doesn't stop the polling loop.
-    setSetting("last_track_time", now);
+    // the next startup after a crash. Throttled to once per minute to avoid
+    // a DB write on every 5-second poll tick.
+    if (now - _lastTrackTimeWriteAt >= LAST_TRACK_TIME_WRITE_INTERVAL) {
+      setSetting("last_track_time", now);
+      _lastTrackTimeWriteAt = now;
+    }
 
     const idleThreshold = (getSetting("idle_threshold_ms") as number) ?? 300000;
     const idleSecs = powerMonitor.getSystemIdleTime();

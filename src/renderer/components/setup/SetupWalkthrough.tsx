@@ -131,7 +131,7 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
             <div className="setup-step__icon">
               <Gamepad2 size={48} />
             </div>
-            <h1 className="setup-step__title">Welcome to Faultier Tracker</h1>
+            <h1 className="setup-step__title">Welcome to KIOKU</h1>
             <p className="setup-step__description">
               Track your focused time across all apps and games. Perfect for tracking
               games and programs not covered by Steam's time tracking.

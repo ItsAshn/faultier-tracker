@@ -5,8 +5,9 @@ import type { SteamImportResult } from '@shared/types'
 interface SteamGame {
   appid: number
   name: string
-  playtime_forever: number   // total playtime in minutes
-  rtime_last_played: number  // Unix timestamp (seconds) of last play session
+  playtime_forever: number    // total playtime in minutes
+  rtime_last_played: number   // Unix timestamp (seconds) of last play session
+  playtime_2weeks?: number    // playtime in last 2 weeks (minutes), may be absent
 }
 
 interface SteamApiResponse {
@@ -94,10 +95,11 @@ export async function refreshSteamPlaytimes(
       const deltaMs = currentPlaytimeMs - lastPlaytimeMs
 
       if (deltaMs > 0) {
-        // Create a session for just the new playtime
-        // Use endedAt = now, startedAt = now - deltaMs
-        const endedAt = now
-        const startedAt = now - deltaMs
+        // Anchor the session to when Steam says the game was last played,
+        // so new playtime appears on the correct date in charts.
+        // Fall back to now only if Steam omits the timestamp.
+        const endedAt = game.rtime_last_played > 0 ? game.rtime_last_played * 1000 : now
+        const startedAt = endedAt - deltaMs
 
         db.prepare(
           `INSERT INTO sessions (app_id, session_type, started_at, ended_at, machine_id)

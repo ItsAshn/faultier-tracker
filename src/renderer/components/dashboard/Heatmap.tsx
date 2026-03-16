@@ -37,6 +37,10 @@ function buildGrid(): string[][] {
   return weeks
 }
 
+// Pre-compute once per app lifetime — the grid only changes when the calendar date
+// rolls over, which doesn't happen mid-session in practice.
+const HEATMAP_WEEKS = buildGrid()
+
 function intensityLevel(ms: number, maxMs: number): number {
   if (ms === 0 || maxMs === 0) return 0
   const ratio = ms / maxMs
@@ -70,7 +74,7 @@ export default function Heatmap({ onDayClick }: Props): JSX.Element {
     return () => clearTimeout(timer)
   }, [])
 
-  const weeks = buildGrid()
+  const weeks = HEATMAP_WEEKS
   const todayStr = getISODateStr(new Date())
   const maxMs = Math.max(...Array.from(totalsMap.values()), 0)
 

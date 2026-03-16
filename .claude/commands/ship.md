@@ -1,4 +1,4 @@
-Release a new version of Faultier Tracker by following these steps exactly:
+Release a new version of KIOKU by following these steps exactly:
 
 1. Check for uncommitted changes with `git status`. If there are any staged or unstaged changes, stage all modified/new tracked files and commit them with a descriptive message summarising what changed. Do not use Co-Authored-By. Then push the commit to `origin main`.
 
@@ -16,7 +16,7 @@ Release a new version of Faultier Tracker by following these steps exactly:
 
 8. Push the tag to origin with `git push origin v<version>`. This triggers the GitHub Actions release workflow which builds and publishes the installer.
 
-9. Confirm to the user that the tag has been pushed and that they can monitor the build at `https://github.com/ItsAshn/faultier-tracker/actions`.
+9. Confirm to the user that the tag has been pushed and that they can monitor the build at `https://github.com/ItsAshn/kioku/actions`.
 
 Important rules:
 - Never skip step 3 — always confirm the version with the user before making any changes to package.json.

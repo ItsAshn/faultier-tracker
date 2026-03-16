@@ -30,15 +30,14 @@ import type {
   AppGroup,
   SessionSummary,
   RangeSummary,
-  ChartDataPoint,
-  WindowControlAction,
-  ArtworkSearchResponse,
   AppRangeSummary,
   TitleSummary,
   DayTotal,
   BucketApp,
   MergeSteamResult,
   SteamLinkSuggestion,
+  ArtworkSearchResponse,
+  WindowControlAction,
 } from "@shared/types";
 import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
@@ -570,107 +569,101 @@ export function registerIpcHandlers(): void {
     ): AppRangeSummary => {
       const db = getDb();
       const now = Date.now();
-      const sessions = isGroup
-        ? db
-            .prepare<
-              [number, number, number, number, number, number],
-              {
-                app_id: number;
-                started_at: number;
-                ended_at: number;
-              }
-            >(
-              `SELECT s.app_id,
-                      MAX(s.started_at, ?) AS started_at,
-                      MIN(COALESCE(s.ended_at, ?), ?) AS ended_at
-               FROM sessions s
-               WHERE s.session_type = 'active'
-                 AND s.app_id IN (SELECT id FROM apps WHERE group_id = ?)
-                 AND s.started_at < ?
-                 AND (s.ended_at IS NULL OR s.ended_at > ?)`,
-            )
-            .all(from, now, to, id, to, from)
-        : db
-            .prepare<
-              [number, number, number, number, number, number],
-              {
-                app_id: number;
-                started_at: number;
-                ended_at: number;
-              }
-            >(
-              `SELECT app_id,
-                      MAX(started_at, ?) AS started_at,
-                      MIN(COALESCE(ended_at, ?), ?) AS ended_at
-               FROM sessions
-               WHERE session_type = 'active'
-                 AND app_id = ?
-                 AND started_at < ?
-                 AND (ended_at IS NULL OR ended_at > ?)`,
-            )
-            .all(from, now, to, id, to, from);
 
-      let active_ms = 0;
-      let session_count = 0;
-      for (const s of sessions) {
-        const dur = Math.max(0, s.ended_at - s.started_at);
-        if (dur > 0) {
-          active_ms += dur;
-          session_count++;
-        }
-      }
+      // Timezone offset in ms so SQLite strftime buckets match local time.
+      // getTimezoneOffset() returns minutes west of UTC (negative = east).
+      const tzOffsetMs = new Date().getTimezoneOffset() * -60_000;
 
-      const fmt = (ts: number): string => {
-        const d = new Date(ts);
-        if (groupBy === "hour") {
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:00`;
-        }
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-      };
+      // strftime format string — produce labels matching the renderer's fmtLabel()
+      const dateFmt = groupBy === "hour" ? "%Y-%m-%d %H:00" : "%Y-%m-%d";
 
-      const chartMap = new Map<string, ChartDataPoint>();
-      for (const s of sessions) {
-        const dur = Math.max(0, s.ended_at - s.started_at);
-        if (dur === 0) continue;
-        const key = fmt(s.started_at);
-        if (!chartMap.has(key))
-          chartMap.set(key, { date: key, active_ms: 0 });
-        chartMap.get(key)!.active_ms += dur;
-      }
+      // App-id filter — either a single app or all members of a group.
+      const appFilter = isGroup
+        ? "s.app_id IN (SELECT id FROM apps WHERE group_id = ?)"
+        : "s.app_id = ?";
 
+      // CTE clips each session to [from, to] once; subsequent queries reuse it.
+      const cteClipped = `
+        WITH clipped AS (
+          SELECT s.app_id,
+                 MAX(s.started_at, ?) AS cs,
+                 MIN(COALESCE(s.ended_at, ?), ?) AS ce
+          FROM sessions s
+          WHERE s.session_type = 'active'
+            AND ${appFilter}
+            AND s.started_at < ?
+            AND (s.ended_at IS NULL OR s.ended_at > ?)
+        )`;
+
+      // Params order: from, now, to, id, to, from
+      const baseParams: [number, number, number, number, number, number] = [
+        from, now, to, id, to, from,
+      ];
+
+      // ── Totals ──────────────────────────────────────────────────────────────
+      const totalsRow = db
+        .prepare<
+          typeof baseParams,
+          { active_ms: number; session_count: number }
+        >(
+          `${cteClipped}
+           SELECT COALESCE(SUM(ce - cs), 0) AS active_ms,
+                  COUNT(*)                  AS session_count
+           FROM clipped
+           WHERE ce > cs`,
+        )
+        .get(...baseParams)!;
+
+      // ── Chart buckets ────────────────────────────────────────────────────────
+      const chartRows = db
+        .prepare<
+          [...typeof baseParams, number],
+          { date: string; active_ms: number }
+        >(
+          `${cteClipped}
+           SELECT strftime('${dateFmt}', (cs + ?) / 1000, 'unixepoch') AS date,
+                  SUM(ce - cs)                                          AS active_ms
+           FROM clipped
+           WHERE ce > cs
+           GROUP BY date
+           ORDER BY date`,
+        )
+        .all(...baseParams, tzOffsetMs);
+
+      // ── Member summaries (groups only) ───────────────────────────────────────
       let member_summaries: SessionSummary[] = [];
       if (isGroup) {
-        const members = db
+        // Extra trailing `id` binds the outer WHERE a.group_id = ?
+        const memberParams: [...typeof baseParams, number] = [...baseParams, id];
+        member_summaries = db
           .prepare<
-            [number],
-            { id: number; exe_name: string; display_name: string }
-          >("SELECT id, exe_name, display_name FROM apps WHERE group_id = ?")
-          .all(id);
-        const memberMap = new Map<number, SessionSummary>();
-        for (const m of members) {
-          memberMap.set(m.id, {
-            app_id: m.id,
-            exe_name: m.exe_name,
-            display_name: m.display_name,
-            group_id: id,
-            active_ms: 0,
-          });
-        }
-        for (const s of sessions) {
-          const entry = memberMap.get(s.app_id);
-          if (entry) entry.active_ms += Math.max(0, s.ended_at - s.started_at);
-        }
-        member_summaries = Array.from(memberMap.values()).sort(
-          (a, b) => b.active_ms - a.active_ms,
-        );
+            typeof memberParams,
+            {
+              app_id: number;
+              exe_name: string;
+              display_name: string;
+              active_ms: number;
+            }
+          >(
+            `${cteClipped}
+             SELECT a.id           AS app_id,
+                    a.exe_name,
+                    a.display_name,
+                    COALESCE(SUM(CASE WHEN c.ce > c.cs THEN c.ce - c.cs ELSE 0 END), 0) AS active_ms
+             FROM apps a
+             LEFT JOIN clipped c ON c.app_id = a.id
+             WHERE a.group_id = ?
+             GROUP BY a.id
+             ORDER BY active_ms DESC`,
+          )
+          .all(...memberParams)
+          .map((r) => ({ ...r, group_id: id }));
       }
 
       return {
-        active_ms,
-        session_count,
-        chart_points: Array.from(chartMap.values()).sort((a, b) =>
-          a.date.localeCompare(b.date),
-        ),
+        active_ms: totalsRow.active_ms,
+        session_count: totalsRow.session_count,
+        chart_points: chartRows,
         member_summaries,
       };
     },
@@ -830,7 +823,7 @@ export function registerIpcHandlers(): void {
         const enable = value === true || value === "true";
         const exePath = process.execPath;
         const startupFolder = path.join(app.getPath("home"), "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
-        const shortcutPath = path.join(startupFolder, "Faultier Tracker.lnk");
+        const shortcutPath = path.join(startupFolder, "KIOKU.lnk");
 
         if (enable) {
           createShortcut(exePath, shortcutPath);
@@ -979,19 +972,29 @@ export function registerIpcHandlers(): void {
       _e,
       requests: Array<{ id: number; isGroup: boolean }>,
     ): Promise<Record<string, string | null>> => {
-      const entries = await Promise.all(
-        requests.map(async (req) => {
-          const key = `${req.isGroup ? "g" : "a"}:${req.id}`;
-          try {
-            const icon = req.isGroup
-              ? await resolveGroupIcon(req.id)
-              : await resolveAppIcon(req.id);
-            return [key, icon] as const;
-          } catch {
-            return [key, null] as const;
-          }
-        }),
-      );
+      // Process in batches of 5 to avoid saturating the file system with
+      // simultaneous VBScript/PowerShell icon extraction processes.
+      const CONCURRENCY = 5;
+      const entries: Array<readonly [string, string | null]> = [];
+
+      for (let i = 0; i < requests.length; i += CONCURRENCY) {
+        const chunk = requests.slice(i, i + CONCURRENCY);
+        const chunkResults = await Promise.all(
+          chunk.map(async (req) => {
+            const key = `${req.isGroup ? "g" : "a"}:${req.id}`;
+            try {
+              const icon = req.isGroup
+                ? await resolveGroupIcon(req.id)
+                : await resolveAppIcon(req.id);
+              return [key, icon] as const;
+            } catch {
+              return [key, null] as const;
+            }
+          }),
+        );
+        entries.push(...chunkResults);
+      }
+
       return Object.fromEntries(entries);
     },
   );
