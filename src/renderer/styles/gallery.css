@@ -283,6 +283,25 @@
   opacity: 1;
 }
 
+/* Blur-up placeholder: tiny thumb rendered at full card size while full image loads */
+.app-card__thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(20px) brightness(0.6) saturate(1.2);
+  transform: scale(1.1); /* hide blur edge artifacts */
+  opacity: 1;
+  transition: opacity 180ms ease;
+  z-index: 0;
+}
+
+.app-card__thumb--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .app-card__placeholder {
   color: var(--color-text-muted);
   opacity: 0.6;

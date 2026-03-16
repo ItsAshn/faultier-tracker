@@ -744,18 +744,20 @@ export function registerIpcHandlers(): void {
       _e,
       requests: Array<{ id: number; isGroup: boolean }>,
     ): Promise<Record<string, string | null>> => {
-      const result: Record<string, string | null> = {};
-      for (const req of requests) {
-        const key = `${req.isGroup ? "g" : "a"}:${req.id}`;
-        try {
-          result[key] = req.isGroup
-            ? await resolveGroupIcon(req.id)
-            : await resolveAppIcon(req.id);
-        } catch {
-          result[key] = null;
-        }
-      }
-      return result;
+      const entries = await Promise.all(
+        requests.map(async (req) => {
+          const key = `${req.isGroup ? "g" : "a"}:${req.id}`;
+          try {
+            const icon = req.isGroup
+              ? await resolveGroupIcon(req.id)
+              : await resolveAppIcon(req.id);
+            return [key, icon] as const;
+          } catch {
+            return [key, null] as const;
+          }
+        }),
+      );
+      return Object.fromEntries(entries);
     },
   );
 

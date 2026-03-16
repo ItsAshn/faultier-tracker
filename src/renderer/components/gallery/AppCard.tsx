@@ -3,11 +3,40 @@ import { AppWindow, Cloud } from 'lucide-react'
 import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
 import { api } from '../../api/bridge'
 
-// ── Module-level icon batch queue ────────────────────────────────────────────
-// Collects icon requests from all visible cards within a 50ms window and fires
+// ── Persistent session-storage cache ─────────────────────────────────────────
+// Survives React unmount/remount (navigation back to gallery) but is cleared
+// when the Electron window closes. Falls back gracefully if sessionStorage is
+// unavailable (sandboxed contexts, quota full, etc.).
+
+const SESSION_PREFIX = 'ic:'
+
+function ssGet(key: string): string | null | undefined {
+  try {
+    const raw = sessionStorage.getItem(SESSION_PREFIX + key)
+    if (raw === null) return undefined         // key not present
+    if (raw === '\x00') return null            // stored null sentinel
+    return raw
+  } catch {
+    return undefined
+  }
+}
+
+function ssSet(key: string, value: string | null): void {
+  try {
+    sessionStorage.setItem(SESSION_PREFIX + key, value === null ? '\x00' : value)
+  } catch {
+    // Quota exceeded — in-memory cache still works
+  }
+}
+
+function ssDel(key: string): void {
+  try { sessionStorage.removeItem(SESSION_PREFIX + key) } catch { /* ignore */ }
+}
+
+// ── Module-level in-memory icon batch queue ───────────────────────────────────
+// Collects icon requests from all visible cards within a 30ms window and fires
 // a single IPC call instead of one call per card.
-// Cache persists for the lifetime of the renderer process — images already
-// fetched from disk/SteamGridDB are never re-fetched unless explicitly busted.
+// In-memory cache is warmed from sessionStorage on first miss.
 const _iconCache = new Map<string, string | null>()
 const _pending = new Map<string, Array<(icon: string | null) => void>>()
 let _batchTimer: ReturnType<typeof setTimeout> | null = null
@@ -16,20 +45,49 @@ let _batchTimer: ReturnType<typeof setTimeout> | null = null
 export function bustIconCache(id: number, isGroup: boolean): void {
   const key = `${isGroup ? 'g' : 'a'}:${id}`
   _iconCache.delete(key)
+  ssDel(key)
 }
 
 // Clear entire icon cache — used when auto-fetch artwork update fires.
 export function clearIconCache(): void {
+  // Remove only our prefixed keys from sessionStorage
+  try {
+    const toRemove: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i)
+      if (k && k.startsWith(SESSION_PREFIX)) toRemove.push(k)
+    }
+    toRemove.forEach((k) => sessionStorage.removeItem(k))
+  } catch { /* ignore */ }
   _iconCache.clear()
 }
 
-function requestIcon(id: number, isGroup: boolean, bust = false): Promise<string | null> {
+// Read from in-memory cache, falling back to sessionStorage.
+// Returns undefined when key is completely absent (IPC fetch required).
+function readCache(key: string): string | null | undefined {
+  if (_iconCache.has(key)) return _iconCache.get(key)!
+  const ss = ssGet(key)
+  if (ss !== undefined) {
+    _iconCache.set(key, ss)   // warm in-memory layer
+    return ss
+  }
+  return undefined
+}
+
+function writeCache(key: string, value: string | null): void {
+  _iconCache.set(key, value)
+  ssSet(key, value)
+}
+
+function requestIcon(id: number, isGroup: boolean): Promise<string | null> {
   const key = `${isGroup ? 'g' : 'a'}:${id}`
-  if (!bust && _iconCache.has(key)) return Promise.resolve(_iconCache.get(key)!)
+  const cached = readCache(key)
+  if (cached !== undefined) return Promise.resolve(cached)
   return new Promise((resolve) => {
     if (!_pending.has(key)) _pending.set(key, [])
     _pending.get(key)!.push(resolve)
     if (_batchTimer) clearTimeout(_batchTimer)
+    // 30ms debounce — tight enough for fast scrolls, wide enough to batch a full viewport
     _batchTimer = setTimeout(async () => {
       _batchTimer = null
       const keys = [..._pending.keys()]
@@ -40,16 +98,51 @@ function requestIcon(id: number, isGroup: boolean, bust = false): Promise<string
         const results = await api.getIconBatch(reqs)
         for (const [k, resolvers] of captured) {
           const icon = results[k] ?? null
-          _iconCache.set(k, icon)
+          writeCache(k, icon)
           resolvers.forEach((r) => r(icon))
         }
       } catch {
         for (const [k, resolvers] of captured) {
-          _iconCache.set(k, null)
+          writeCache(k, null)
           resolvers.forEach((r) => r(null))
         }
       }
-    }, 50)
+    }, 30)
+  })
+}
+
+// ── Blur-up thumb generation ──────────────────────────────────────────────────
+// Downscales the full data URL to a 12×18 px canvas and re-encodes it as a
+// low-quality JPEG (~300–500 bytes). This tiny image is rendered at full card
+// size with CSS blur, giving a coloured wash instantly while the full image
+// decodes in the browser. The thumb is module-level cached (never regenerated
+// for the same source URL).
+
+const _thumbCache = new Map<string, string>()
+
+function makeTinyThumb(dataUrl: string): Promise<string> {
+  const hit = _thumbCache.get(dataUrl)
+  if (hit !== undefined) return Promise.resolve(hit)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      try {
+        const W = 12, H = 18
+        const canvas = document.createElement('canvas')
+        canvas.width = W
+        canvas.height = H
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { resolve(dataUrl); return }
+        ctx.drawImage(img, 0, 0, W, H)
+        const thumb = canvas.toDataURL('image/jpeg', 0.3)
+        _thumbCache.set(dataUrl, thumb)
+        resolve(thumb)
+      } catch {
+        resolve(dataUrl)
+      }
+    }
+    img.onerror = () => resolve(dataUrl)
+    img.src = dataUrl
   })
 }
 
@@ -70,20 +163,23 @@ interface AppCardProps {
 }
 
 export default function AppCard({ item, isGroup, memberCount, summary, onClick }: AppCardProps): JSX.Element {
-  // Three states: null = not yet loaded, string = loaded, undefined = in-flight
+  // Three states: undefined = IPC in-flight, null = resolved no image, string = data URL
   const [iconSrc, setIconSrc] = useState<string | null | undefined>(() => {
-    // If already in cache, use it immediately — no IPC round-trip needed
     const key = `${isGroup ? 'g' : 'a'}:${item.id}`
-    if (_iconCache.has(key)) return _iconCache.get(key) ?? null
-    return undefined
+    const cached = readCache(key)
+    return cached !== undefined ? cached : undefined
   })
+  // Tiny blurred placeholder (blur-up): set as soon as full src arrives, hidden after onLoad
+  const [thumbSrc, setThumbSrc] = useState<string | null>(null)
+  // True only after the full <img> fires onLoad — triggers the opacity-1 class
   const [imgVisible, setImgVisible] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
+  // ── Lazy load: request icon when card enters 400px pre-load zone ─────────────
   useEffect(() => {
-    // Already resolved from cache in initial state — nothing to do
     const key = `${isGroup ? 'g' : 'a'}:${item.id}`
-    if (_iconCache.has(key)) return
+    // Already resolved (from memory or sessionStorage) — skip observer setup
+    if (readCache(key) !== undefined) return
 
     const el = cardRef.current
     if (!el) return
@@ -97,16 +193,24 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
             .catch(() => setIconSrc(null))
         }
       },
-      { rootMargin: '300px' }
+      // 400px pre-load zone — icons start loading well before cards reach the viewport
+      { rootMargin: '400px' }
     )
 
     observer.observe(el)
     return () => observer.disconnect()
   }, [item.id, isGroup])
 
-  // Reset fade-in state when the image source changes
+  // ── Blur-up: generate tiny thumb as soon as full src is known ────────────────
   useEffect(() => {
-    if (iconSrc) setImgVisible(false)
+    if (!iconSrc) {
+      setThumbSrc(null)
+      setImgVisible(false)
+      return
+    }
+    // Reset so the fade-in re-triggers if the src changes (e.g. custom image update)
+    setImgVisible(false)
+    makeTinyThumb(iconSrc).then(setThumbSrc).catch(() => {})
   }, [iconSrc])
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
@@ -114,7 +218,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   const hasTime = activeMs > 0
   const isSteamGame = !isGroup && (item as AppRecord).exe_name?.startsWith('steam:')
 
-  // iconSrc === undefined means "in-flight" — show skeleton shimmer
+  // iconSrc === undefined means IPC is in-flight — show skeleton shimmer
   const isLoading = iconSrc === undefined
 
   return (
@@ -123,7 +227,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       className="app-card"
       onClick={onClick}
     >
-      {/* Blurred backdrop — fills the whole card */}
+      {/* Blurred ambient backdrop — fills the whole card */}
       <div className="app-card__backdrop">
         {iconSrc
           ? <img src={iconSrc} alt="" aria-hidden className="app-card__backdrop-img" />
@@ -135,12 +239,22 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
       <div className="app-card__art">
         {iconSrc
           ? (
-            <img
-              src={iconSrc}
-              alt={name}
-              className={`app-card__img${imgVisible ? ' app-card__img--visible' : ''}`}
-              onLoad={() => setImgVisible(true)}
-            />
+            <>
+              {/* Blur-up placeholder: tiny thumb at full size, blurred + fades out on load */}
+              <img
+                src={thumbSrc ?? iconSrc}
+                alt=""
+                aria-hidden
+                className={`app-card__thumb${imgVisible ? ' app-card__thumb--hidden' : ''}`}
+              />
+              {/* Full image: starts transparent, fades in after browser decode */}
+              <img
+                src={iconSrc}
+                alt={name}
+                className={`app-card__img${imgVisible ? ' app-card__img--visible' : ''}`}
+                onLoad={() => setImgVisible(true)}
+              />
+            </>
           )
           : isLoading
             ? <div className="app-card__skeleton" />

@@ -2,7 +2,7 @@
   "compilerOptions": {
     "composite": true,
     "module": "CommonJS",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "target": "ES2022",
     "lib": ["ES2022"],
     "strict": true,

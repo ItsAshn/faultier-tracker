@@ -46,7 +46,7 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
         get(...params: unknown[]) {
           const stmt = getStmt(sql);
           try {
-            stmt.bind(params);
+            stmt.bind(params as any[]);
             const row = stmt.step() ? stmt.getAsObject() : undefined;
             return row as any;
           } finally {
@@ -56,7 +56,7 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
         all(...params: unknown[]) {
           const stmt = getStmt(sql);
           try {
-            stmt.bind(params);
+            stmt.bind(params as any[]);
             const rows: unknown[] = [];
             while (stmt.step()) rows.push(stmt.getAsObject());
             return rows as any[];
@@ -66,7 +66,7 @@ function wrapDb(raw: SqlJsDatabase): DbCompat {
         },
         run(...params: unknown[]) {
           const stmt = getStmt(sql);
-          stmt.run(params);
+          stmt.run(params as any[]);
           const r = raw.exec("SELECT last_insert_rowid()");
           const lastInsertRowid = (r[0]?.values?.[0]?.[0] as number) ?? 0;
           return { lastInsertRowid };

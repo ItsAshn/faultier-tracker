@@ -67,7 +67,7 @@ export async function extractAndCacheIcon(appId: number, exePath: string): Promi
   }
 
   try {
-    const nativeImage = await app.getFileIcon(exePath, { size: 'jumbo' })
+    const nativeImage = await app.getFileIcon(exePath, { size: 'large' })
     if (nativeImage.isEmpty()) return null
 
     const png = nativeImage.toPNG()
