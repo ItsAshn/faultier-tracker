@@ -223,7 +223,7 @@ export default function Settings(): JSX.Element {
         <div className="settings-section">
           <div className="settings-card">
             <div className="settings-card__title">SteamGridDB Integration</div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--space-4)' }}>
+            <p className="artwork-description">
               Connect to <b>SteamGridDB</b> to search and import community artwork for any game or app.
               It's free — just create an account and generate an API key.
             </p>
@@ -231,18 +231,17 @@ export default function Settings(): JSX.Element {
               href="https://www.steamgriddb.com/profile/preferences/api"
               target="_blank"
               rel="noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginBottom: 'var(--space-4)', textDecoration: 'none' }}
+              className="artwork-api-link"
             >
               <ExternalLink size={13} /> Get your free API key
             </a>
-            <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
+            <div className="artwork-input-row">
               <input
                 className="input"
                 type="password"
                 placeholder={storedSgdbKey ? '••••••••••••••••' : 'Paste your API key here'}
                 value={sgdbKey}
                 onChange={(e) => { setSgdbKey(e.target.value); setSgdbKeySaved(false) }}
-                style={{ flex: 1 }}
               />
               <button
                 className="btn btn--primary"
@@ -252,23 +251,17 @@ export default function Settings(): JSX.Element {
                 Save
               </button>
             </div>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', marginTop: 'var(--space-2)' }}>
+            <p className="artwork-help">
               Note: fetching artwork for your entire library may take a moment — requests are spaced out to avoid overloading the API.
             </p>
             {sgdbKeySaved && (
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-accent)', marginTop: 'var(--space-2)' }}>
-                API key saved.
-              </p>
+              <p className="artwork-saved">API key saved.</p>
             )}
             {sgdbKeyError && (
-              <p style={{ fontSize: 'var(--text-sm)', color: '#ef4444', marginTop: 'var(--space-2)' }}>
-                {sgdbKeyError}
-              </p>
+              <p className="artwork-error">{sgdbKeyError}</p>
             )}
             {storedSgdbKey && !sgdbKeySaved && !sgdbKeyError && (
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-dim)', marginTop: 'var(--space-2)' }}>
-                A key is already configured. Paste a new one above to replace it.
-              </p>
+              <p className="artwork-existing">A key is already configured. Paste a new one above to replace it.</p>
             )}
           </div>
         </div>

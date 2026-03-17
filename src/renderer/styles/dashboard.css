@@ -752,7 +752,14 @@
   max-width: 220px;
   box-shadow: var(--shadow-md);
   z-index: 500;
-  pointer-events: none;
+  pointer-events: auto;
+}
+
+.chart-drilldown__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
 }
 
 .chart-drilldown__title {
@@ -761,7 +768,24 @@
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-2);
+}
+
+.chart-drilldown__close {
+  background: none;
+  border: none;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.chart-drilldown__close:hover {
+  color: var(--color-text);
 }
 
 .chart-drilldown__row {

@@ -4,6 +4,7 @@ import {
 } from 'recharts'
 import type { ChartDataPoint, SessionSummary, BucketApp } from '@shared/types'
 import { api } from '../../api/bridge'
+import { X } from 'lucide-react'
 
 const APP_COLORS = [
   '#f59e0b', '#81c784', '#fb923c', '#f06292',
@@ -236,7 +237,16 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
           className="chart-drilldown"
           style={{ position: 'fixed', left: drilldown.x, top: drilldown.y - 8, transform: 'translate(-50%, -100%)' }}
         >
-          <div className="chart-drilldown__title">{fmtLabel(drilldown.bucketDate)}</div>
+          <div className="chart-drilldown__header">
+            <span className="chart-drilldown__title">{fmtLabel(drilldown.bucketDate)}</span>
+            <button
+              className="chart-drilldown__close"
+              onClick={() => { setDrilldown(null); setActiveBucket(null) }}
+              title="Close"
+            >
+              <X size={12} />
+            </button>
+          </div>
           {drilldown.apps.length === 0 ? (
             <div className="chart-drilldown__empty">No data</div>
           ) : (

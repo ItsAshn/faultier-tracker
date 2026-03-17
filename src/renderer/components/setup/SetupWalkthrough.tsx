@@ -113,12 +113,12 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
         {/* Error message */}
         {error && (
           <div style={{ 
-            background: 'rgba(239, 68, 68, 0.1)', 
-            border: '1px solid #ef4444', 
+            background: 'rgba(239, 83, 80, 0.1)', 
+            border: '1px solid var(--color-danger)', 
             borderRadius: 'var(--radius-md)',
             padding: 'var(--space-3)',
             marginBottom: 'var(--space-4)',
-            color: '#ef4444',
+            color: 'var(--color-danger)',
             fontSize: 'var(--text-sm)'
           }}>
             {error}
@@ -195,7 +195,7 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
                   <div className="field">
                     <label className="field__label">Steam API Key</label>
                     <input
-                      type="text"
+                      type="password"
                       className="input"
                       value={steamApiKey}
                       onChange={(e) => setSteamApiKey(e.target.value)}
@@ -224,19 +224,31 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
                 </div>
 
                 <div className="setup-step__actions">
-                  <button
-                    className="btn btn--ghost"
-                    onClick={() => setStep('artwork')}
-                  >
-                    Skip
-                  </button>
-                  <button
-                    className="btn btn--primary"
-                    onClick={handleSteamImport}
-                    disabled={importing}
-                  >
-                    {importing ? 'Importing...' : (steamApiKey && steamId ? 'Import Steam Data' : 'Continue')}
-                  </button>
+                  {(steamApiKey && steamId) ? (
+                    <>
+                      <button
+                        className="btn btn--ghost"
+                        onClick={() => setStep('artwork')}
+                        disabled={importing}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        className="btn btn--primary"
+                        onClick={handleSteamImport}
+                        disabled={importing}
+                      >
+                        {importing ? 'Importing...' : 'Import Steam Data'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="btn btn--primary"
+                      onClick={() => setStep('artwork')}
+                    >
+                      Continue
+                    </button>
+                  )}
                 </div>
               </>
             )}

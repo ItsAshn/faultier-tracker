@@ -408,6 +408,15 @@ input[type='range']::-webkit-slider-thumb:hover {
   flex-shrink: 0;
 }
 
+.group-drag-hint {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-border);
+  font-style: italic;
+}
+
 /* ── Steam Import Form ─────────────────────────────────────────────────────── */
 
 .steam-import-form {
@@ -520,4 +529,61 @@ input[type='range']::-webkit-slider-thumb:hover {
 .mode-toggle__btn--active {
   background: var(--color-surface-3);
   color: var(--color-text);
+}
+
+/* ── Artwork / SteamGridDB tab ────────────────────────────────────────────── */
+
+.artwork-description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
+}
+
+.artwork-api-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  margin-bottom: var(--space-4);
+  text-decoration: none;
+}
+
+.artwork-api-link:hover {
+  text-decoration: underline;
+}
+
+.artwork-input-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.artwork-input-row .input {
+  flex: 1;
+}
+
+.artwork-help {
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+  margin-top: var(--space-2);
+}
+
+.artwork-saved {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  margin-top: var(--space-2);
+}
+
+.artwork-error {
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+  margin-top: var(--space-2);
+}
+
+.artwork-existing {
+  font-size: var(--text-sm);
+  color: var(--color-text-dim);
+  margin-top: var(--space-2);
 }

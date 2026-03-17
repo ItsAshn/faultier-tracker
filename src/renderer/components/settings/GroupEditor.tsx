@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, Trash2, RefreshCw } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import type { AppRecord, AppGroup } from '@shared/types'
+import ConfirmModal from '../ui/ConfirmModal'
 
 export default function GroupEditor(): JSX.Element {
   const apps = useAppStore((s) => s.apps)
@@ -16,6 +17,7 @@ export default function GroupEditor(): JSX.Element {
   const [reanalyzing, setReanalyzing] = useState(false)
   const [draggingAppId, setDraggingAppId] = useState<number | null>(null)
   const [dragOverGroupId, setDragOverGroupId] = useState<number | 'ungrouped' | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
 
   const appsInGroup = (gid: number | null): AppRecord[] =>
     apps.filter((a) => a.group_id === gid)
@@ -29,9 +31,9 @@ export default function GroupEditor(): JSX.Element {
   }
 
   async function handleDeleteGroup(id: number): Promise<void> {
-    if (!window.confirm('Delete this group? Apps will become ungrouped.')) return
     await deleteGroup(id)
     setSelectedGroupId(groups.find((g) => g.id !== id)?.id ?? null)
+    setConfirmDeleteId(null)
   }
 
   async function handleReanalyze(): Promise<void> {
@@ -90,7 +92,7 @@ export default function GroupEditor(): JSX.Element {
                 <button
                   className="btn--icon"
                   style={{ marginLeft: 'auto', padding: 2 }}
-                  onClick={(e) => { e.stopPropagation(); handleDeleteGroup(g.id) }}
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(g.id) }}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -131,6 +133,11 @@ export default function GroupEditor(): JSX.Element {
             {selectedGroup?.name ?? 'Ungrouped'} — drag apps to reassign
           </div>
           <div className="group-apps-panel__body">
+            {(selectedGroupId !== null ? groupApps : ungroupedApps).length > 0 && (
+              <div className="group-drag-hint">
+                Drag any row to a group on the left to reassign it.
+              </div>
+            )}
             {(selectedGroupId !== null ? groupApps : ungroupedApps).map((app) => (
               <div
                 key={app.id}
@@ -157,6 +164,16 @@ export default function GroupEditor(): JSX.Element {
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        open={confirmDeleteId !== null}
+        title="Delete group"
+        message="Delete this group? All apps in it will become ungrouped."
+        confirmLabel="Delete"
+        danger
+        onConfirm={() => confirmDeleteId !== null && handleDeleteGroup(confirmDeleteId)}
+        onCancel={() => setConfirmDeleteId(null)}
+      />
     </div>
   )
 }

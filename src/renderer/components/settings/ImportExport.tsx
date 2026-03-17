@@ -12,6 +12,7 @@ import { api } from "../../api/bridge";
 import type { ImportResult, SteamImportResult } from "@shared/types";
 import { useSessionStore } from "../../store/sessionStore";
 import { useAppStore } from "../../store/appStore";
+import ConfirmModal from "../ui/ConfirmModal";
 
 export default function ImportExport(): JSX.Element {
   const [exporting, setExporting] = useState(false);
@@ -21,6 +22,8 @@ export default function ImportExport(): JSX.Element {
   const [exportPath, setExportPath] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // Steam import state
   const [steamOpen, setSteamOpen] = useState(false);
@@ -61,12 +64,6 @@ export default function ImportExport(): JSX.Element {
   }
 
   async function handleClearAll(): Promise<void> {
-    if (
-      !window.confirm(
-        "This will permanently delete all tracked session data. Are you sure?",
-      )
-    )
-      return;
     setClearing(true);
     await api.clearAllSessions();
     setClearing(false);
@@ -76,12 +73,6 @@ export default function ImportExport(): JSX.Element {
   }
 
   async function handleResetAll(): Promise<void> {
-    if (
-      !window.confirm(
-        "This will permanently delete ALL data — sessions, apps, groups, and settings. The app will reset to factory defaults. Are you sure?",
-      )
-    )
-      return;
     setResetting(true);
     await api.resetAllData();
     await loadAll();
@@ -371,7 +362,7 @@ export default function ImportExport(): JSX.Element {
         </p>
         <button
           className="btn btn--danger"
-          onClick={handleClearAll}
+          onClick={() => setConfirmClear(true)}
           disabled={clearing}
         >
           <Trash2 size={14} />
@@ -390,13 +381,33 @@ export default function ImportExport(): JSX.Element {
         </p>
         <button
           className="btn btn--danger"
-          onClick={handleResetAll}
+          onClick={() => setConfirmReset(true)}
           disabled={resetting}
         >
           <Trash2 size={14} />
           {resetting ? "Resetting..." : "Reset all data"}
         </button>
       </div>
+
+      <ConfirmModal
+        open={confirmClear}
+        title="Clear all sessions"
+        message="This will permanently delete all tracked session data. App list and settings are kept. This cannot be undone."
+        confirmLabel="Clear sessions"
+        danger
+        onConfirm={() => { setConfirmClear(false); handleClearAll(); }}
+        onCancel={() => setConfirmClear(false)}
+      />
+
+      <ConfirmModal
+        open={confirmReset}
+        title="Reset all data"
+        message="This will permanently delete ALL data — sessions, apps, groups, and settings — and reset to factory defaults. This cannot be undone."
+        confirmLabel="Reset everything"
+        danger
+        onConfirm={() => { setConfirmReset(false); handleResetAll(); }}
+        onCancel={() => setConfirmReset(false)}
+      />
     </div>
   );
 }

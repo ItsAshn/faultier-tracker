@@ -278,7 +278,14 @@ export default function Gallery(): JSX.Element {
         {displayed.length === 0 ? (
           <div className="gallery-empty">
             <Images size={40} />
-            <span>No apps found</span>
+            {search.trim() ? (
+              <span>No apps match &ldquo;{search}&rdquo;</span>
+            ) : (
+              <>
+                <span>No apps yet</span>
+                <span className="gallery-empty__hint">Open any app or game and KIOKU will detect it automatically.</span>
+              </>
+            )}
           </div>
         ) : (
           displayed.map((item) => (

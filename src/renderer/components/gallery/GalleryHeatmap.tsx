@@ -314,6 +314,7 @@ export default function GalleryHeatmap({ onClose }: GalleryHeatmapProps): JSX.El
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [dayApps, setDayApps] = useState<BucketApp[]>([]);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+  const [dayLoading, setDayLoading] = useState(false);
 
   useEffect(() => {
     const oneYearAgo = Date.now() - 53 * 7 * 86_400_000;
@@ -327,9 +328,10 @@ export default function GalleryHeatmap({ onClose }: GalleryHeatmapProps): JSX.El
   const handleDayClick = useCallback((dateStr: string) => {
     if (dateStr > getISODateStr(new Date())) return;
     setSelectedDay(dateStr);
+    setDayLoading(true);
     const from = new Date(dateStr + 'T00:00:00').getTime();
     const to = from + 86_400_000 - 1;
-    api.getBucketApps(from, to).then(setDayApps).catch(() => setDayApps([]));
+    api.getBucketApps(from, to).then((apps) => { setDayApps(apps); setDayLoading(false); }).catch(() => { setDayApps([]); setDayLoading(false); });
   }, []);
 
   const weeks = buildGrid();
@@ -497,7 +499,9 @@ export default function GalleryHeatmap({ onClose }: GalleryHeatmapProps): JSX.El
               {selectedDay ? (
                 <>
                   <div style={styles.dayPanelTitle}>{formatDayLabel(selectedDay)}</div>
-                  {dayApps.length === 0 ? (
+                  {dayLoading ? (
+                    <div style={{ ...styles.dayPanelEmpty, fontStyle: 'italic' }}>Loading…</div>
+                  ) : dayApps.length === 0 ? (
                     <div style={styles.dayPanelEmpty}>No activity recorded</div>
                   ) : (
                     <div style={styles.appsList}>

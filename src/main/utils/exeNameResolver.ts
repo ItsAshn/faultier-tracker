@@ -1,16 +1,6 @@
-import { readFileSync } from "fs";
-import { resolve } from "path";
+import exeNames from '@shared/exeNames.json'
 
-// Load the exe names database
-let exeNames: Record<string, string> = {};
-
-try {
-  const jsonPath = resolve(__dirname, "../../shared/exeNames.json");
-  const jsonContent = readFileSync(jsonPath, "utf-8");
-  exeNames = JSON.parse(jsonContent);
-} catch (err) {
-  console.warn("[exeNameResolver] Could not load exeNames.json:", err);
-}
+const exeNamesMap: Record<string, string> = exeNames as Record<string, string>
 
 /**
  * Get a human-readable display name for an exe file.
@@ -20,8 +10,8 @@ export function getDisplayNameFromExe(exeName: string): string {
   const lowerExeName = exeName.toLowerCase();
   
   // 1. Check JSON database (priority)
-  if (exeNames[lowerExeName]) {
-    return exeNames[lowerExeName];
+  if (exeNamesMap[lowerExeName]) {
+    return exeNamesMap[lowerExeName]
   }
   
   // 2. Try to extract from file metadata (if we had access to Windows file properties)

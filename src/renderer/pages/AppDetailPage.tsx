@@ -182,9 +182,10 @@ export default function AppDetailPage(): JSX.Element {
         <button
           className="app-detail__hero-cog"
           onClick={() => setSettingsModalOpen(true)}
-          title="App settings"
+          title="Edit name and artwork"
         >
-          <Settings size={15} />
+          <Settings size={13} />
+          <span>Edit</span>
         </button>
         <div className="app-detail__hero-art">
           {iconSrc
@@ -247,7 +248,7 @@ export default function AppDetailPage(): JSX.Element {
       </div>
 
       {/* Stats */}
-      <div className="app-detail__stats">
+      <div className={`app-detail__stats${loading ? ' app-detail__stats--loading' : ''}`}>
         <div className="summary-card">
           <div className="summary-card__icon">
             <Activity size={16} />
@@ -269,8 +270,11 @@ export default function AppDetailPage(): JSX.Element {
       </div>
 
       {/* Chart */}
-      {rangeData && rangeData.chart_points.length > 0 && (
+      {!loading && rangeData && rangeData.chart_points.length > 0 && (
         <TimeBarChart data={rangeData.chart_points} />
+      )}
+      {loading && (
+        <div className="app-detail__chart-loading" />
       )}
       {!loading && rangeData && rangeData.chart_points.length === 0 && (
         <div className="app-detail__empty-chart">No activity in this period.</div>

@@ -216,9 +216,18 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
     if (cached == null) return null
     return _thumbCache.get(cached) ?? null
   })
-  // True only after the full <img> fires onLoad — triggers the opacity-1 class
-  const [imgVisible, setImgVisible] = useState(false)
+  // True only after the full <img> fires onLoad — triggers the opacity-1 class.
+  // Pre-set to true when iconSrc is already resolved from cache so the image
+  // doesn't get stuck invisible if onLoad fires before the blur-up effect runs.
+  const [imgVisible, setImgVisible] = useState<boolean>(() => {
+    const key = `${isGroup ? 'g' : 'a'}:${item.id}`
+    const cached = readCache(key)
+    return cached != null
+  })
   const cardRef = useRef<HTMLDivElement>(null)
+  // Tracks the previous iconSrc so the blur-up effect can skip resetting imgVisible
+  // on the initial render when the image is already resolved from cache.
+  const prevIconSrcRef = useRef<string | null | undefined>(iconSrc)
 
   // ── Lazy load: request icon when card enters 400px pre-load zone ─────────────
   useEffect(() => {
@@ -248,19 +257,27 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
 
   // ── Blur-up: generate tiny thumb as soon as full src is known ────────────────
   useEffect(() => {
+    const prev = prevIconSrcRef.current
+    prevIconSrcRef.current = iconSrc
+
     if (!iconSrc) {
       setThumbSrc(null)
       setImgVisible(false)
       return
     }
-    // Reset so the fade-in re-triggers if the src changes (e.g. custom image update)
-    setImgVisible(false)
+    // Only reset imgVisible (trigger fade-in) when the src has actually changed.
+    // If iconSrc was pre-populated from cache (prev === iconSrc on first run),
+    // the image is already visible — resetting here would hide it permanently.
+    if (iconSrc !== prev) {
+      setImgVisible(false)
+    }
     makeTinyThumb(iconSrc).then(setThumbSrc).catch(() => {})
   }, [iconSrc])
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary ? summary.active_ms : 0
   const hasTime = activeMs > 0
+  const isUntracked = !isGroup && !(item as AppRecord).is_tracked
   const isSteamGame = !isGroup && (item as AppRecord).exe_name?.startsWith('steam:')
 
   // iconSrc === undefined means IPC is in-flight — show skeleton shimmer
@@ -269,7 +286,7 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
   return (
     <div
       ref={cardRef}
-      className="app-card"
+      className={`app-card${isUntracked ? ' app-card--ignored' : ''}`}
       onClick={onClick}
     >
       {/* Blurred ambient backdrop — fills the whole card */}

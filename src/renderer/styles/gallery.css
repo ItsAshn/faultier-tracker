@@ -353,6 +353,13 @@
   grid-column: 1 / -1;
 }
 
+.gallery-empty__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  text-align: center;
+  max-width: 300px;
+}
+
 .gallery-empty svg {
   color: var(--color-text-muted);
   opacity: 0.8;
@@ -593,17 +600,4 @@
   font-size: var(--text-sm);
   min-width: 80px;
   flex: 1;
-}
-
-/* Gallery empty state */
-.gallery-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-12);
-  color: var(--color-text-muted);
-  gap: var(--space-3);
-  font-size: var(--text-sm);
-  grid-column: 1 / -1;
 }
