@@ -59,12 +59,20 @@ The application is safe. This warning appears for any installer without a paid c
 
 ### Linux
 
-**Arch Linux:**
+**Arch Linux (AUR - Recommended):**
+```bash
+yay -S kioku
+# or
+paru -S kioku
+```
+
+**Arch Linux (Manual):**
+Download from [Releases](https://github.com/ItsAshn/Kioku/releases):
 ```bash
 sudo pacman -U kioku-0.10.2.pacman
 ```
 
-**Other:** Use AppImage, .deb, or extract tar.gz. See [Releases](https://github.com/ItsAshn/Kioku/releases).
+**Other Distributions:** Use AppImage, .deb, or extract tar.gz from [Releases](https://github.com/ItsAshn/Kioku/releases).
 
 **Data location:** `~/.config/KIOKU/`
 
