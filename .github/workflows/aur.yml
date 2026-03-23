@@ -60,15 +60,21 @@ jobs:
 
       - name: Setup SSH for AUR
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur_key
-          chmod 600 ~/.ssh/aur_key
-          ssh-keyscan -t rsa aur.archlinux.org >> ~/.ssh/known_hosts
+          mkdir -p /root/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > /root/.ssh/aur_key
+          chmod 600 /root/.ssh/aur_key
+          ssh-keyscan -t rsa aur.archlinux.org > /root/.ssh/known_hosts
+          chmod 644 /root/.ssh/known_hosts
+          cat >> /root/.ssh/config << 'EOF'
+          Host aur.archlinux.org
+            IdentityFile /root/.ssh/aur_key
+            StrictHostKeyChecking yes
+          EOF
+          chmod 600 /root/.ssh/config
 
       - name: Clone AUR repository
         run: |
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o UserKnownHostsFile=~/.ssh/known_hosts" \
-            git clone "ssh://aur@aur.archlinux.org/kioku.git" /tmp/aur-repo
+          git clone "ssh://aur@aur.archlinux.org/kioku.git" /tmp/aur-repo
 
       - name: Update AUR repository
         env:
@@ -81,5 +87,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add PKGBUILD .SRCINFO
           git diff --cached --quiet || git commit -m "Update to ${VERSION}"
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o UserKnownHostsFile=~/.ssh/known_hosts" \
-            git push origin master
+          git push origin master
