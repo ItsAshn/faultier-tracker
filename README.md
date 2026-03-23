@@ -59,20 +59,34 @@ The application is safe. This warning appears for any installer without a paid c
 
 ### Linux
 
-**Arch Linux (AUR - Recommended):**
+**AppImage (Recommended for auto-updates):**
+Download from [Releases](https://github.com/ItsAshn/Kioku/releases). In-app updates work automatically.
+
+```bash
+chmod +x kioku-*.AppImage
+./kioku-*.AppImage
+```
+
+**Arch Linux (AUR):**
 ```bash
 yay -S kioku
 # or
 paru -S kioku
 ```
+Updates via system package manager (`yay -Syu`). No in-app auto-updates.
 
-**Arch Linux (Manual):**
-Download from [Releases](https://github.com/ItsAshn/Kioku/releases):
+**Arch Linux (Manual pacman):**
 ```bash
 sudo pacman -U kioku-0.10.4.pacman
 ```
 
-**Other Distributions:** Use AppImage, .deb, or extract tar.gz from [Releases](https://github.com/ItsAshn/Kioku/releases).
+**Other distributions:** Use `.deb` or extract `tar.gz` from [Releases](https://github.com/ItsAshn/Kioku/releases).
+
+| Format | In-app auto-update | Update method |
+|--------|-------------------|---------------|
+| AppImage | ✅ Yes | Automatic via GitHub |
+| AUR/pacman | ❌ No | System package manager |
+| .deb / tar.gz | ❌ No | Manual download |
 
 **Data location:** `~/.config/KIOKU/`
 

@@ -180,7 +180,7 @@ async loadAll() {
 
 ## Important Constraints
 
-- **Windows-only** — uses `get-windows`, icon extraction via VBScript/PowerShell
+- **Windows + Linux** — uses `get-windows` on Windows, native commands on Linux (X11/Wayland/Hyprland)
 - **No Node.js in renderer** — all Node/Electron access goes through `contextBridge`
 - **No ESLint/Prettier** — follow style rules manually; validate with `tsc --noEmit`
 - **Icons** are base64 data URLs — never file paths in the renderer
@@ -194,8 +194,11 @@ async loadAll() {
 git tag v1.2.3 && git push origin v1.2.3
 ```
 
-GitHub Actions (`.github/workflows/release.yml`) triggers on `v*.*.*` tags, builds the NSIS
-installer on `windows-latest`, and publishes to GitHub Releases. Use `/ship` for a guided flow.
+GitHub Actions (`.github/workflows/release.yml`) triggers on `v*.*.*` tags, builds Windows + Linux
+packages (AppImage, pacman, deb, tar.gz), and publishes to GitHub Releases. Use `/ship` for a guided flow.
+
+AUR updates are **automatic** — `.github/workflows/aur.yml` triggers after the release workflow completes
+and pushes updated PKGBUILD to the AUR. No manual intervention required.
 
 ### /ship Command
 
@@ -211,16 +214,11 @@ When user invokes `/ship`:
    - **aur/PKGBUILD**: Update pkgver field to new version
 6. Stage version changes: `git add README.md aur/PKGBUILD`
 7. Commit version bump: `git commit -m "Bump version to X.X.X"`
-
-**After release builds complete**, manually update AUR:
-```bash
-cd aur/
-./update-aur.sh  # Updates checksums and .SRCINFO
-git push aur master  # Push to AUR with your SSH key
-```
 8. Create tag: `git tag vX.X.X`
 9. Push commits: `git push origin main`
 10. Push tag: `git push origin vX.X.X`
+
+AUR is updated automatically by GitHub Actions after the release completes.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

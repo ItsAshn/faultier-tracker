@@ -1,0 +1,80 @@
+name: Update AUR
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+jobs:
+  update-aur:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Install required packages
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git curl openssh
+
+      - name: Get release version
+        id: version
+        run: |
+          cd /tmp
+          curl -sL "https://api.github.com/repos/ItsAshn/Kioku/releases/latest" > release.json
+          TAG=$(cat release.json | grep '"tag_name"' | cut -d'"' -f4)
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download pacman package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          URL="https://github.com/ItsAshn/Kioku/releases/download/v${VERSION}/kioku-${VERSION}.pacman"
+          curl -L -o /tmp/kioku.pacman "$URL"
+
+      - name: Update PKGBUILD
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          CHECKSUM=$(sha256sum /tmp/kioku.pacman | cut -d' ' -f1)
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" aur/PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${CHECKSUM}')/" aur/PKGBUILD
+          cat aur/PKGBUILD
+
+      - name: Generate .SRCINFO
+        run: |
+          cd aur
+          makepkg --printsrcinfo > .SRCINFO
+          cat .SRCINFO
+
+      - name: Setup SSH for AUR
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          ssh-keyscan -t rsa aur.archlinux.org >> ~/.ssh/known_hosts
+
+      - name: Clone AUR repository
+        run: |
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o UserKnownHostsFile=~/.ssh/known_hosts" \
+            git clone "ssh://aur@aur.archlinux.org/kioku.git" /tmp/aur-repo
+
+      - name: Update AUR repository
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd /tmp/aur-repo
+          cp "$GITHUB_WORKSPACE/aur/PKGBUILD" .
+          cp "$GITHUB_WORKSPACE/aur/.SRCINFO" .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add PKGBUILD .SRCINFO
+          git diff --cached --quiet || git commit -m "Update to ${VERSION}"
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o UserKnownHostsFile=~/.ssh/known_hosts" \
+            git push origin master

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Helper script to update AUR package after version bump
 # Run this after the GitHub release is complete
+# NOTE: This is now automated via .github/workflows/aur.yml
 
 set -e
 
@@ -30,16 +31,15 @@ echo "Generating .SRCINFO..."
 makepkg --printsrcinfo > .SRCINFO
 
 echo ""
-echo "✓ AUR package updated successfully!"
+echo "✓ AUR package updated locally!"
 echo ""
-echo "Next steps:"
-echo "  1. Review the changes:"
-echo "     git diff"
+echo "NOTE: AUR updates are now automated via GitHub Actions."
+echo "This script is kept for local testing purposes only."
 echo ""
-echo "  2. Commit and push to AUR:"
-echo "     git add ."
-echo "     git commit -m \"Update to $pkgver\""
-echo "     git push origin master"
-echo ""
-echo "Note: Make sure you have the AUR remote configured:"
-echo "  git remote add aur ssh://aur@aur.archlinux.org/kioku.git"
+echo "To push manually (if automation fails):"
+echo "  git clone ssh://aur@aur.archlinux.org/kioku.git /tmp/aur-kioku"
+echo "  cp PKGBUILD .SRCINFO /tmp/aur-kioku/"
+echo "  cd /tmp/aur-kioku"
+echo "  git add PKGBUILD .SRCINFO"
+echo "  git commit -m \"Update to $pkgver\""
+echo "  git push origin master"

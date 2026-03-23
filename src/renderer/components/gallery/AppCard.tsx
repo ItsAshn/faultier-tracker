@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { AppWindow, Cloud } from 'lucide-react'
 import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
 import { api } from '../../api/bridge'
@@ -225,9 +225,10 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
     return cached != null
   })
   const cardRef = useRef<HTMLDivElement>(null)
-  // Tracks the previous iconSrc so the blur-up effect can skip resetting imgVisible
-  // on the initial render when the image is already resolved from cache.
-  const prevIconSrcRef = useRef<string | null | undefined>(iconSrc)
+  const imgRef = useRef<HTMLImageElement>(null)
+  // Tracks if we've successfully shown the full image for this iconSrc.
+  // Prevents flicker and handles the case where onLoad doesn't fire for cached images.
+  const hasShownFullRef = useRef<boolean>(false)
 
   // ── Lazy load: request icon when card enters 400px pre-load zone ─────────────
   useEffect(() => {
@@ -255,24 +256,46 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
     return () => observer.disconnect()
   }, [item.id, isGroup])
 
-  // ── Blur-up: generate tiny thumb as soon as full src is known ────────────────
-  useEffect(() => {
-    const prev = prevIconSrcRef.current
-    prevIconSrcRef.current = iconSrc
-
+  // ── Blur-up: generate tiny thumb and manage visibility ──────────────────────────
+  // Key insight: we need to handle THREE scenarios:
+  // 1. Image freshly loaded from IPC: show blurred thumb, then fade in full image
+  // 2. Image already cached in memory: show immediately, no blur phase
+  // 3. Image src changed (e.g., user updated artwork): reset and re-fade
+  useLayoutEffect(() => {
     if (!iconSrc) {
       setThumbSrc(null)
       setImgVisible(false)
+      hasShownFullRef.current = false
       return
     }
-    // Only reset imgVisible (trigger fade-in) when the src has actually changed.
-    // If iconSrc was pre-populated from cache (prev === iconSrc on first run),
-    // the image is already visible — resetting here would hide it permanently.
-    if (iconSrc !== prev) {
+
+    // Generate the tiny blurred thumb for progressive loading
+    makeTinyThumb(iconSrc).then(setThumbSrc).catch(() => {})
+
+    // Check if this image was already shown (prevents flicker on re-renders)
+    if (hasShownFullRef.current) {
+      setImgVisible(true)
+      return
+    }
+
+    // Check if the <img> element already has the image loaded.
+    // This handles the case where `onLoad` doesn't fire for cached images.
+    const img = imgRef.current
+    if (img && img.complete && img.naturalWidth > 0) {
+      setImgVisible(true)
+      hasShownFullRef.current = true
+    } else {
+      // Image not yet loaded - start invisible, will fade in on onLoad
       setImgVisible(false)
     }
-    makeTinyThumb(iconSrc).then(setThumbSrc).catch(() => {})
   }, [iconSrc])
+
+  // ── Handle onLoad for the full image ────────────────────────────────────────────
+  // When the browser finishes decoding, mark as visible and record that we've shown it.
+  const handleImgLoad = (): void => {
+    setImgVisible(true)
+    hasShownFullRef.current = true
+  }
 
   const name = isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   const activeMs = summary ? summary.active_ms : 0
@@ -311,10 +334,11 @@ export default function AppCard({ item, isGroup, memberCount, summary, onClick }
               />
               {/* Full image: starts transparent, fades in after browser decode */}
               <img
+                ref={imgRef}
                 src={iconSrc}
                 alt={name}
                 className={`app-card__img${imgVisible ? ' app-card__img--visible' : ''}`}
-                onLoad={() => setImgVisible(true)}
+                onLoad={handleImgLoad}
               />
             </>
           )
