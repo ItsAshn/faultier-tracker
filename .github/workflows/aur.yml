@@ -18,7 +18,7 @@ jobs:
       - name: Install required packages
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git curl openssh
+          pacman -S --noconfirm git curl openssh sudo
           # Create non-root user for makepkg
           useradd -m -G wheel builder
           echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
