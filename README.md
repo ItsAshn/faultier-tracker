@@ -77,7 +77,7 @@ Updates via system package manager (`yay -Syu`). No in-app auto-updates.
 
 **Arch Linux (Manual pacman):**
 ```bash
-sudo pacman -U kioku-0.10.4.pacman
+sudo pacman -U kioku-0.10.5.pacman
 ```
 
 **Other distributions:** Use `.deb` or extract `tar.gz` from [Releases](https://github.com/ItsAshn/Kioku/releases).
