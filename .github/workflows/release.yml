@@ -10,7 +10,10 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -22,11 +25,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install setuptools (Python 3.12+ distutils fix)
-        run: pip install setuptools
-
       - name: Install dependencies
         run: npm ci
+
+      - name: Install setuptools (Windows only)
+        if: runner.os == 'Windows'
+        run: pip install setuptools
 
       - name: Build and publish
         env:

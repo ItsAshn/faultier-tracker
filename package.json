@@ -63,6 +63,24 @@
         "nsis"
       ],
       "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "tar.gz"
+      ],
+      "icon": "resources/icons",
+      "category": "Utility",
+      "maintainer": "ItsAshn",
+      "vendor": "ItsAshn",
+      "synopsis": "Application time tracker",
+      "description": "Track how much time you spend in each application",
+      "desktop": {
+        "Name": "KIOKU",
+        "Comment": "Application time tracker — know where your hours go",
+        "Categories": "Utility;Office;"
+      }
     }
   }
 }

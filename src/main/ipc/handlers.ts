@@ -1,5 +1,4 @@
 import { ipcMain, dialog, BrowserWindow, net, app } from "electron";
-import * as path from "path";
 import * as fs from "fs";
 import {
   getDb,
@@ -43,29 +42,11 @@ import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
 import { resetSessionState, endActiveSession } from "../tracking/sessionManager";
 import { persistDb } from "../db/client";
-import { execSync } from "child_process";
 import {
   refreshSteamLibraryIndex,
   lookupByInstallDirNorm,
   getAllAcfEntries,
 } from "../tracking/steamLibrary";
-
-function createShortcut(targetPath: string, shortcutPath: string): void {
-  const vbscript = `
-Set WshShell = CreateObject("WScript.Shell")
-Set shortcut = WshShell.CreateShortcut("${shortcutPath.replace(/\\/g, "\\\\")}")
-shortcut.TargetPath = "${targetPath.replace(/\\/g, "\\\\")}"
-shortcut.WorkingDirectory = "${path.dirname(targetPath).replace(/\\/g, "\\\\")}"
-shortcut.Save
-`;
-  const tempVbs = path.join(app.getPath("temp"), "create_shortcut.vbs");
-  fs.writeFileSync(tempVbs, vbscript);
-  try {
-    execSync(`cscript //Nologo "${tempVbs}"`, { windowsHide: true });
-  } finally {
-    try { fs.unlinkSync(tempVbs); } catch { /* ignore */ }
-  }
-}
 
 function mapApp(raw: {
   id: number;
@@ -821,17 +802,9 @@ export function registerIpcHandlers(): void {
       // Sync OS login item if startup setting changed (packaged app only)
       if (key === "launch_at_startup" && app.isPackaged) {
         const enable = value === true || value === "true";
-        const exePath = process.execPath;
-        const startupFolder = path.join(app.getPath("home"), "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup");
-        const shortcutPath = path.join(startupFolder, "KIOKU.lnk");
-
-        if (enable) {
-          createShortcut(exePath, shortcutPath);
-        } else {
-          try {
-            fs.unlinkSync(shortcutPath);
-          } catch { /* ignore if doesn't exist */ }
-        }
+        app.setLoginItemSettings({
+          openAtLogin: enable,
+        });
       }
     },
   );
