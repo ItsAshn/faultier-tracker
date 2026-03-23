@@ -6,6 +6,7 @@ export const CHANNELS = {
   APPS_UPDATE: "apps:update",
   APPS_SET_TRACKED: "apps:setTracked",
   APPS_SET_GROUP: "apps:setGroup",
+  APPS_SET_GROUP_BATCH: "apps:setGroupBatch",
 
   // Groups
   GROUPS_GET_ALL: "groups:getAll",
@@ -69,6 +70,9 @@ export const CHANNELS = {
   UPDATE_DOWNLOAD_PROGRESS: "update:downloadProgress",
   UPDATE_DOWNLOADED: "update:downloaded",
   UPDATE_ERROR: "update:error",
+
+  // System
+  SYSTEM_GET_INSTALL_TYPE: "system:getInstallType",
 } as const;
 
 export type ChannelKey = keyof typeof CHANNELS;

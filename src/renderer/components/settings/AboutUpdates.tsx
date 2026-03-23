@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react'
 import { RefreshCw, Download } from 'lucide-react'
 import { useUpdateStore } from '../../store/updateStore'
+import { api } from '../../api/bridge'
+import type { InstallTypeInfo } from '@shared/types'
 
 const APP_VERSION = (import.meta as any).env?.VITE_APP_VERSION ?? '0.1.0'
 
@@ -12,8 +15,15 @@ export default function AboutUpdates(): JSX.Element {
   const downloadUpdate = useUpdateStore((s) => s.downloadUpdate)
   const quitAndInstall = useUpdateStore((s) => s.quitAndInstall)
 
+  const [installType, setInstallType] = useState<InstallTypeInfo | null>(null)
+
+  useEffect(() => {
+    api.getInstallType().then(setInstallType).catch(() => {})
+  }, [])
+
   const isChecking = status === 'checking'
   const pct = Math.round(progress?.percent ?? 0)
+  const canAutoUpdate = installType?.canAutoUpdate ?? true
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -24,26 +34,28 @@ export default function AboutUpdates(): JSX.Element {
             Version {APP_VERSION}
           </div>
         </div>
-        <button
-          className="btn btn--ghost"
-          onClick={() => checkForUpdates()}
-          disabled={isChecking || status === 'downloading'}
-        >
-          <RefreshCw
-            size={13}
-            style={isChecking ? { animation: 'spin 1s linear infinite' } : undefined}
-          />
-          {isChecking ? 'Checking…' : 'Check for updates'}
-        </button>
+        {canAutoUpdate && (
+          <button
+            className="btn btn--ghost"
+            onClick={() => checkForUpdates()}
+            disabled={isChecking || status === 'downloading'}
+          >
+            <RefreshCw
+              size={13}
+              style={isChecking ? { animation: 'spin 1s linear infinite' } : undefined}
+            />
+            {isChecking ? 'Checking…' : 'Check for updates'}
+          </button>
+        )}
       </div>
 
-      {status === 'not-available' && (
+      {canAutoUpdate && status === 'not-available' && (
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)' }}>
           You are on the latest version.
         </div>
       )}
 
-      {status === 'available' && info && (
+      {canAutoUpdate && status === 'available' && info && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-sm)' }}>Version {info.version} is available.</span>
           <button className="btn btn--primary" onClick={() => downloadUpdate()}>
@@ -53,7 +65,7 @@ export default function AboutUpdates(): JSX.Element {
         </div>
       )}
 
-      {status === 'downloading' && (
+      {canAutoUpdate && status === 'downloading' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
             Downloading… {pct}%
@@ -64,7 +76,7 @@ export default function AboutUpdates(): JSX.Element {
         </div>
       )}
 
-      {status === 'downloaded' && info && (
+      {canAutoUpdate && status === 'downloaded' && info && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-success)' }}>
             Version {info.version} is ready to install.
@@ -75,7 +87,7 @@ export default function AboutUpdates(): JSX.Element {
         </div>
       )}
 
-      {status === 'error' && error && (
+      {canAutoUpdate && status === 'error' && error && (
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
           {error.startsWith('404')
             ? 'No releases have been published yet.'

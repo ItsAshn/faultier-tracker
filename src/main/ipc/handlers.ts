@@ -14,7 +14,7 @@ import {
   clearCustomImage,
   readFileAsDataUrl,
 } from "../icons/iconExtractor";
-import { reanalyzeGroups, invalidateGroupCache } from "../grouping/groupEngine";
+import { reanalyzeGroups } from "../grouping/groupEngine";
 import {
   exportData,
   exportDataCsv,
@@ -37,6 +37,7 @@ import type {
   SteamLinkSuggestion,
   ArtworkSearchResponse,
   WindowControlAction,
+  InstallTypeInfo,
 } from "@shared/types";
 import { getMainWindow } from "../window";
 import { startTracker, stopTracker } from "../tracking/tracker";
@@ -404,6 +405,22 @@ export function registerIpcHandlers(): void {
     },
   );
 
+  ipcMain.handle(
+    CHANNELS.APPS_SET_GROUP_BATCH,
+    (_e, appIds: number[], groupId: number | null): void => {
+      const db = getDb();
+      const updateMany = db.transaction(() => {
+        const stmt = db.prepare<[number | null, number]>(
+          "UPDATE apps SET group_id = ? WHERE id = ?",
+        );
+        for (const id of appIds) {
+          stmt.run(groupId, id);
+        }
+      });
+      updateMany();
+    },
+  );
+
   // ── Groups ────────────────────────────────────────────────────────────────
 
   ipcMain.handle(CHANNELS.GROUPS_GET_ALL, (): AppGroup[] => {
@@ -465,6 +482,18 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(CHANNELS.GROUPS_REANALYZE, async (): Promise<void> => {
     await reanalyzeGroups();
+  });
+
+  // ── System ─────────────────────────────────────────────────────────────────
+
+  ipcMain.handle(CHANNELS.SYSTEM_GET_INSTALL_TYPE, (): InstallTypeInfo => {
+    if (process.platform === "win32") {
+      return { canAutoUpdate: true, installType: "windows" };
+    }
+    if (process.env.APPIMAGE) {
+      return { canAutoUpdate: true, installType: "appimage" };
+    }
+    return { canAutoUpdate: false, installType: "system-package" };
   });
 
   // ── Sessions ──────────────────────────────────────────────────────────────

@@ -189,3 +189,8 @@ export interface MergeSteamResult {
   success: boolean
   error?: string
 }
+
+export interface InstallTypeInfo {
+  canAutoUpdate: boolean
+  installType: 'windows' | 'appimage' | 'system-package'
+}

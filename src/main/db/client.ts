@@ -126,7 +126,6 @@ export function resetDbData(): void {
   const db = getDb();
   db.exec(`
     DELETE FROM sessions;
-    DELETE FROM group_rules;
     DELETE FROM apps;
     DELETE FROM app_groups;
     DELETE FROM settings;

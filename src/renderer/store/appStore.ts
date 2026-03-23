@@ -14,6 +14,7 @@ interface AppStore {
   updateApp: (patch: Partial<AppRecord> & { id: number }) => Promise<void>
   setAppTracked: (id: number, tracked: boolean) => Promise<void>
   setAppGroup: (id: number, groupId: number | null) => Promise<void>
+  setAppGroupBatch: (appIds: number[], groupId: number | null) => Promise<void>
 
   createGroup: (name: string) => Promise<AppGroup>
   updateGroup: (patch: Partial<AppGroup> & { id: number }) => Promise<void>
@@ -89,6 +90,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
       await api.setAppGroup(id, groupId)
       set((s) => ({
         apps: s.apps.map((a) => (a.id === id ? { ...a, group_id: groupId } : a))
+      }))
+    } catch (err) {
+      set({ error: String(err) })
+    }
+  },
+
+  async setAppGroupBatch(appIds, groupId) {
+    try {
+      await api.setAppGroupBatch(appIds, groupId)
+      set((s) => ({
+        apps: s.apps.map((a) => (appIds.includes(a.id) ? { ...a, group_id: groupId } : a))
       }))
     } catch (err) {
       set({ error: String(err) })

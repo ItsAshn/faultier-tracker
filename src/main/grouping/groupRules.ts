@@ -62,3 +62,18 @@ export const VERSION_SUFFIX_PATTERNS: RegExp[] = [
   /\s+\(64[\-_]?bit\)$/i,
   /[\s\-_](installer|setup|portable)$/i,
 ]
+
+// Regex patterns for stripping Linux-specific suffixes from exe names
+// Applied after version suffixes during grouping normalization
+export const LINUX_SUFFIX_PATTERNS: RegExp[] = [
+  /-bin$/i,
+  /-stable$/i,
+  /-git$/i,
+  /-nightly$/i,
+  /-canary$/i,
+  /-dev$/i,
+  /-beta$/i,
+  /-alpha$/i,
+  /\.appimage$/i,
+  /\.flatpak$/i,
+]

@@ -18,6 +18,7 @@ import type {
   BucketApp,
   MergeSteamResult,
   SteamLinkSuggestion,
+  InstallTypeInfo,
 } from "@shared/types";
 
 // Typed API exposed to the renderer via contextBridge
@@ -34,6 +35,9 @@ const api = {
 
   setAppGroup: (id: number, groupId: number | null): Promise<void> =>
     ipcRenderer.invoke(CHANNELS.APPS_SET_GROUP, id, groupId),
+
+  setAppGroupBatch: (appIds: number[], groupId: number | null): Promise<void> =>
+    ipcRenderer.invoke(CHANNELS.APPS_SET_GROUP_BATCH, appIds, groupId),
 
   // Groups
   getGroups: (): Promise<AppGroup[]> =>
@@ -170,6 +174,10 @@ const api = {
   // Window
   windowControl: (action: WindowControlAction): void =>
     ipcRenderer.send(CHANNELS.WINDOW_CONTROL, action),
+
+  // System
+  getInstallType: (): Promise<InstallTypeInfo> =>
+    ipcRenderer.invoke(CHANNELS.SYSTEM_GET_INSTALL_TYPE),
 
   // Subscribe to push events from main
   onTick: (cb: (payload: TickPayload) => void): (() => void) => {

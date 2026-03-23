@@ -148,6 +148,7 @@ const stub: ApiType = {
   updateApp: () => Promise.resolve(),
   setAppTracked: () => Promise.resolve(true),
   setAppGroup: () => Promise.resolve(),
+  setAppGroupBatch: () => Promise.resolve(),
   getGroups: () => Promise.resolve(MOCK_GROUPS),
   createGroup: () => Promise.resolve(null as any),
   updateGroup: () => Promise.resolve(),
@@ -210,6 +211,8 @@ const stub: ApiType = {
   onUpdateDownloadProgress: () => () => {},
   onUpdateDownloaded: () => () => {},
   onUpdateError: () => () => {},
+  getInstallType: () =>
+    Promise.resolve({ canAutoUpdate: true, installType: "windows" }),
 };
 
 export const api: ApiType = window.api ?? stub;
