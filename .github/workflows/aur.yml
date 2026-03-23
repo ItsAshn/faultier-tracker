@@ -8,7 +8,8 @@ on:
 
 jobs:
   update-aur:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Run when triggered manually OR after successful release workflow
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest
