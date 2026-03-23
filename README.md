@@ -69,7 +69,7 @@ paru -S kioku
 **Arch Linux (Manual):**
 Download from [Releases](https://github.com/ItsAshn/Kioku/releases):
 ```bash
-sudo pacman -U kioku-0.10.3.pacman
+sudo pacman -U kioku-0.10.4.pacman
 ```
 
 **Other Distributions:** Use AppImage, .deb, or extract tar.gz from [Releases](https://github.com/ItsAshn/Kioku/releases).
