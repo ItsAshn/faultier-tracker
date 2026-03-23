@@ -32,6 +32,10 @@ jobs:
         if: runner.os == 'Windows'
         run: pip install setuptools
 
+      - name: Install bsdtar for pacman (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+
       - name: Build and publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
