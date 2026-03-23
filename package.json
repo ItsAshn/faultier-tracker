@@ -1,6 +1,6 @@
 {
   "name": "kioku",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Application time tracker — know where your hours go",
   "license": "UNLICENSED",
   "private": true,
@@ -68,19 +68,27 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "pacman",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "tar.gz",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "resources/icons",

@@ -61,7 +61,7 @@ The application is safe. This warning appears for any installer without a paid c
 
 **Arch Linux:**
 ```bash
-sudo pacman -U kioku-0.9.0.pacman
+sudo pacman -U kioku-0.10.0.pacman
 ```
 
 **Other:** Use AppImage, .deb, or extract tar.gz. See [Releases](https://github.com/ItsAshn/Kioku/releases).
