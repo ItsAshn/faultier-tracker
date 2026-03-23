@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=KIOKU
+Comment=Application time tracker — know where your hours go
+Exec=kioku %U
+Icon=kioku
+Type=Application
+Categories=Utility;Office;
+StartupWMClass=KIOKU
+Terminal=false
+MimeType=x-scheme-handler/kioku;

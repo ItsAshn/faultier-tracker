@@ -197,6 +197,22 @@ git tag v1.2.3 && git push origin v1.2.3
 GitHub Actions (`.github/workflows/release.yml`) triggers on `v*.*.*` tags, builds the NSIS
 installer on `windows-latest`, and publishes to GitHub Releases. Use `/ship` for a guided flow.
 
+### /ship Command
+
+When user invokes `/ship`:
+
+1. Run type-check: `npx tsc --noEmit`
+2. Stage all changes: `git add -A`
+3. Commit with message (if there are changes)
+4. Bump version: `npm version minor --no-git-tag-version` (or patch/major as appropriate)
+5. **Update README.md**: Replace old version in pacman command with new version
+   - Pattern: `kioku-X.X.X.pacman` → `kioku-{newVersion}.pacman`
+6. Stage README changes: `git add README.md`
+7. Commit version bump: `git commit -m "Bump version to X.X.X"`
+8. Create tag: `git tag vX.X.X`
+9. Push commits: `git push origin main`
+10. Push tag: `git push origin vX.X.X`
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 

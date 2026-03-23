@@ -123,7 +123,14 @@ export async function startTracker(): Promise<void> {
   // immediately even on first launch with existing installed games
   refreshSteamLibraryIndex();
 
-  await initActiveWin();
+  // Initialize active window detection with 10-second timeout safety net
+  const initPromise = initActiveWin();
+  const timeoutPromise = new Promise<void>((_, reject) =>
+    setTimeout(() => reject(new Error("initActiveWin timeout")), 10000)
+  );
+  await Promise.race([initPromise, timeoutPromise]).catch((err) => {
+    console.error("[Tracker] initActiveWin failed or timed out:", err);
+  });
 
   isRunning = true;
   await pollTick(); // fire immediately so renderer exits "Connecting…" on launch

@@ -116,7 +116,10 @@ app.whenReady().then(async () => {
     registerIpcHandlers();
     initUpdater();
 
-    await startTracker();
+    // Start tracker non-blocking to prevent hangs on unsupported platforms
+    startTracker().catch((err) => {
+      console.error("[Main] Tracker failed to start:", err);
+    });
   } catch (err) {
     dialog.showErrorBox(
       "KIOKU — Startup Error",

@@ -66,9 +66,22 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb",
-        "tar.gz"
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "pacman",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        },
+        {
+          "target": "tar.gz",
+          "arch": ["x64"]
+        }
       ],
       "icon": "resources/icons",
       "category": "Utility",
@@ -79,7 +92,11 @@
       "desktop": {
         "Name": "KIOKU",
         "Comment": "Application time tracker — know where your hours go",
-        "Categories": "Utility;Office;"
+        "Categories": "Utility;Office;",
+        "StartupWMClass": "KIOKU"
+      },
+      "appImage": {
+        "artifactName": "${productName}-${version}.${ext}"
       }
     }
   }

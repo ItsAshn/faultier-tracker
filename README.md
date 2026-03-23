@@ -2,7 +2,7 @@
 
 > **Know where your hours go.** KIOKU automatically monitors which applications you use and for how long — no manual timers, no input required.
 
-![Platform](https://img.shields.io/badge/platform-Windows-blue)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-blue)
 ![Electron](https://img.shields.io/badge/Electron-v33-47848F?logo=electron)
 ![React](https://img.shields.io/badge/React-v18-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-v5-3178C6?logo=typescript)
@@ -57,6 +57,17 @@ Because the installer is currently unsigned, Windows SmartScreen may show a *"Wi
 
 The application is safe. This warning appears for any installer without a paid code-signing certificate.
 
+### Linux
+
+**Arch Linux:**
+```bash
+sudo pacman -U kioku-0.9.0.pacman
+```
+
+**Other:** Use AppImage, .deb, or extract tar.gz. See [Releases](https://github.com/ItsAshn/Kioku/releases).
+
+**Data location:** `~/.config/KIOKU/`
+
 ---
 
 ## Development
@@ -93,7 +104,7 @@ npm run package    # Build + create Windows NSIS installer
 
 KIOKU reads the names and executable paths of running processes, and the title of your active window, every 5 seconds. This data is used solely to build your local usage history.
 
-- **All data is stored locally** in `%APPDATA%\KIOKU\data.db`.
+- **All data is stored locally** in `%APPDATA%\KIOKU\data.db` (Windows) or `~/.config/KIOKU/data.db` (Linux).
 - **No data is transmitted** to any external server except automatic update checks against GitHub Releases.
 - The app does **not** record keystrokes, clipboard content, screenshots, or any other personal data.
 
