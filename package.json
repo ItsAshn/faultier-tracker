@@ -2,6 +2,7 @@
   "name": "kioku",
   "version": "0.10.0",
   "description": "Application time tracker — know where your hours go",
+  "author": "ItsAshn",
   "license": "UNLICENSED",
   "private": true,
   "main": "./out/main/index.js",
@@ -102,9 +103,6 @@
         "Comment": "Application time tracker — know where your hours go",
         "Categories": "Utility;Office;",
         "StartupWMClass": "KIOKU"
-      },
-      "appImage": {
-        "artifactName": "${productName}-${version}.${ext}"
       }
     }
   }
