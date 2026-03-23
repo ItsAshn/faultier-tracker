@@ -13,5 +13,11 @@ source=("$pkgname-$pkgver.pacman::$url/releases/download/v$pkgver/kioku-$pkgver.
 sha256sums=('SKIP')
 
 package() {
-    tar -xJf "$srcdir/$pkgname-$pkgver.pacman" -C "$pkgdir"
+    # Extract to temp directory first
+    mkdir -p "$srcdir/extract"
+    tar -xJf "$srcdir/$pkgname-$pkgver.pacman" -C "$srcdir/extract"
+    
+    # Copy only application files (not metadata dotfiles)
+    cp -r "$srcdir/extract/opt" "$pkgdir/"
+    cp -r "$srcdir/extract/usr" "$pkgdir/"
 }
