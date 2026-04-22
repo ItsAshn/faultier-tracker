@@ -66,6 +66,7 @@
       "icon": "resources/icon.ico"
     },
     "linux": {
+      "artifactName": "${name}.${ext}",
       "target": [
         {
           "target": "AppImage",
