@@ -8,8 +8,8 @@ import { getIconUrl } from '../../utils/iconUrl'
 import { api } from '../../api/bridge'
 
 const APP_COLORS = [
-  '#e8e8e8', '#888888', '#bbbbbb', '#666666',
-  '#aaaaaa', '#999999', '#cccccc', '#777777'
+  '#f59e0b', '#81c784', '#fb923c', '#f06292',
+  '#4db6ac', '#ff8a65', '#a78bfa', '#90a4ae'
 ]
 
 function fmtMs(ms: number): string {
@@ -38,7 +38,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps): JSX.Element | 
     <div style={{
       background: 'var(--color-surface-2)',
       border: '1px solid var(--color-border)',
-      borderRadius: 0,
+      borderRadius: 'var(--radius-md)',
       padding: '8px 12px',
       fontSize: 'var(--text-xs)'
     }}>
@@ -86,7 +86,7 @@ function AppBreakdown({ appSummaries }: BreakdownProps): JSX.Element | null {
               alt=""
               width={20}
               height={20}
-              style={{ borderRadius: 0, objectFit: 'contain', flexShrink: 0 }}
+              style={{ borderRadius: 3, objectFit: 'contain', flexShrink: 0 }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
             />
             <span className="chart-breakdown__name" title={app.display_name}>{app.display_name}</span>
@@ -203,8 +203,8 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
           <Bar
             dataKey="active_ms"
             name="Focused"
-            fill="#e8e8e8"
-            radius={[0, 0, 0, 0]}
+            fill="#f59e0b"
+            radius={[3, 3, 0, 0]}
             maxBarSize={40}
             style={{ cursor: 'pointer' }}
             onClick={(barData: ChartDataPoint, index: number, e: React.MouseEvent) => handleBarClick(barData, index, e)}
@@ -212,7 +212,7 @@ export default function TimeBarChart({ data, appSummaries = [] }: Props): JSX.El
             {data.map((entry) => (
               <Cell
                 key={entry.date}
-                fill={activeBucket === entry.date ? '#ffffff' : '#e8e8e8'}
+                fill={activeBucket === entry.date ? '#fbbf24' : '#f59e0b'}
                 opacity={activeBucket && activeBucket !== entry.date ? 0.55 : 1}
               />
             ))}

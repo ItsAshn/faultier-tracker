@@ -9,20 +9,20 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: transparent;
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: 0.5rem 0.875rem;
   color: var(--color-text-muted);
   font-size: 0.8125rem;
   font-family: inherit;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
-  text-transform: lowercase;
 }
 
 .heatmap-accordion__toggle:hover {
   color: var(--color-text);
-  border-color: var(--color-text);
+  border-color: var(--color-border-hover);
 }
 
 .heatmap-accordion__body {
@@ -38,8 +38,9 @@
   flex-wrap: wrap;
   margin-top: 0.75rem;
   padding: 0.5rem 0.875rem;
-  background: transparent;
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   font-size: 0.8125rem;
 }
 
@@ -71,7 +72,7 @@
 }
 
 .heatmap-day-detail__row-time {
-  color: var(--color-text-muted);
+  color: var(--color-accent);
   font-variant-numeric: tabular-nums;
 }
 
@@ -119,18 +120,18 @@
 .gallery-toolbar__search .gallery-search__input {
   width: 100%;
   padding: var(--space-2) var(--space-3) var(--space-2) 40px;
-  background: transparent;
-  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   color: var(--color-text);
   outline: none;
   font-size: var(--text-sm);
-  font-family: inherit;
-  transition: border-color var(--transition-fast);
-  text-transform: lowercase;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .gallery-toolbar__search .gallery-search__input:focus {
-  border-color: var(--color-text);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-glow);
 }
 
 .gallery-toolbar__search .gallery-search__input::placeholder {
@@ -139,10 +140,11 @@
 
 .gallery-filter {
   display: flex;
-  gap: 0;
-  background: transparent;
+  gap: var(--space-1);
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
-  padding: 0;
+  border-radius: var(--radius-md);
+  padding: 3px;
 }
 
 .gallery-filter__btn {
@@ -150,29 +152,26 @@
   align-items: center;
   gap: var(--space-1);
   padding: var(--space-1) var(--space-3);
+  border-radius: calc(var(--radius-md) - 2px);
   font-size: var(--text-xs);
   font-weight: 500;
   color: var(--color-text-muted);
   background: transparent;
-  border: none;
-  border-right: 1px solid var(--color-border);
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-  text-transform: lowercase;
-}
-
-.gallery-filter__btn:last-child {
-  border-right: none;
+  transition: all var(--transition-fast);
 }
 
 .gallery-filter__btn:hover {
   color: var(--color-text);
-  background: var(--color-surface-2);
+  background: var(--color-surface-3);
 }
 
 .gallery-filter__btn--active {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-surface-3);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent-glow);
 }
 
 .gallery-toolbar__actions {
@@ -189,7 +188,8 @@
   width: 34px;
   height: 34px;
   padding: 0;
-  background: transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   color: var(--color-text-muted);
   cursor: pointer;
@@ -197,8 +197,9 @@
 }
 
 .gallery-toolbar__btn:hover {
+  background: var(--color-surface-3);
   color: var(--color-text);
-  border-color: var(--color-text);
+  border-color: var(--color-border-light);
 }
 
 /* ── App card grid ────────────────────────────────────────────────────────── */
@@ -210,22 +211,24 @@
   align-items: start;
 }
 
-/* ── App card (brutalist bordered) ───────────────────────────────────────── */
+/* ── App card (Steam-style) ───────────────────────────────────────────────── */
 
 .app-card {
   position: relative;
   aspect-ratio: 2 / 3;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  transition: border-color var(--transition-fast);
+  background: var(--color-surface-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 160ms ease, box-shadow 160ms ease;
   content-visibility: auto;
   contain-intrinsic-size: 220px 330px;
 }
 
 .app-card:hover {
-  border-color: var(--color-text);
+  transform: scale(1.03);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(245, 158, 11, 0.2);
   z-index: 1;
 }
 
@@ -237,7 +240,7 @@
   filter: saturate(0.5) brightness(0.8);
 }
 
-/* Background art that fills the whole card */
+/* Blurred background art that fills the whole card */
 .app-card__backdrop {
   position: absolute;
   inset: 0;
@@ -248,17 +251,17 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: brightness(0.25) saturate(0.8);
-  transform: scale(1.05);
+  filter: blur(18px) brightness(0.35) saturate(1.4);
+  transform: scale(1.15); /* hide blur edge artifacts */
 }
 
 .app-card__backdrop-fallback {
   width: 100%;
   height: 100%;
-  background: var(--color-surface-2);
+  background: linear-gradient(135deg, var(--color-surface-3) 0%, var(--color-surface) 100%);
 }
 
-/* Centered artwork */
+/* Sharp centered icon/art */
 .app-card__art {
   position: absolute;
   inset: 0;
@@ -273,6 +276,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.7));
   opacity: 0;
   transition: opacity 220ms ease;
 }
@@ -281,15 +285,15 @@
   opacity: 1;
 }
 
-/* Blur-up placeholder */
+/* Blur-up placeholder: tiny thumb rendered at full card size while full image loads */
 .app-card__thumb {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(20px) brightness(0.4) saturate(0.8);
-  transform: scale(1.1);
+  filter: blur(20px) brightness(0.6) saturate(1.2);
+  transform: scale(1.1); /* hide blur edge artifacts */
   opacity: 1;
   transition: opacity 180ms ease;
   z-index: 0;
@@ -308,7 +312,7 @@
   justify-content: center;
 }
 
-/* Skeleton shimmer shown while image loads */
+/* Skeleton shimmer shown while the image IPC call is in-flight */
 @keyframes card-shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -363,7 +367,7 @@
   opacity: 0.8;
 }
 
-/* Info overlay at the bottom */
+/* Gradient overlay + info at the bottom */
 .app-card__overlay {
   position: absolute;
   bottom: 0;
@@ -372,8 +376,8 @@
   z-index: 2;
   padding: 28px var(--space-3) var(--space-3);
   background: linear-gradient(to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.5) 60%,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.65) 50%,
     transparent 100%
   );
   display: flex;
@@ -383,13 +387,13 @@
 
 .app-card__name {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
   letter-spacing: 0.01em;
-  text-transform: lowercase;
 }
 
 .app-card__overlay-meta {
@@ -401,8 +405,9 @@
 .app-card__time {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-active);
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
 }
 
 .app-card__count {
@@ -410,23 +415,25 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* Time badge — top left corner, bordered */
+/* Time badge — top left corner, always visible */
 .app-card__time-badge {
   position: absolute;
   top: var(--space-2);
   left: var(--space-2);
   z-index: 3;
   padding: 3px 8px;
+  border-radius: var(--radius-full);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
-  background: rgba(0, 0, 0, 0.75);
-  color: var(--color-text);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--color-accent);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  backdrop-filter: blur(4px);
+  text-shadow: none;
   display: flex;
   align-items: center;
-  text-transform: lowercase;
 }
 
 /* Steam icon inside time badge */
@@ -434,7 +441,7 @@
   display: inline-flex;
   align-items: center;
   margin-left: 4px;
-  color: #66c0f4;
+  color: #66c0f4; /* Steam blue */
 }
 
 /* Tracking badge — top right corner */
@@ -444,10 +451,11 @@
   right: var(--space-2);
   z-index: 3;
   padding: 2px 8px;
+  border-radius: var(--radius-full);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  text-transform: lowercase;
+  text-transform: uppercase;
   border: 1px solid transparent;
   cursor: pointer;
   opacity: 0;
@@ -458,8 +466,8 @@
 }
 
 .app-card__track-btn--on {
-  color: var(--color-success);
-  border-color: var(--color-success);
+  color: var(--color-active);
+  border-color: var(--color-active);
 }
 
 .app-card:hover .app-card__track-btn {
@@ -480,6 +488,7 @@
 .editor-image-preview {
   width: 80px;
   height: 80px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface-2);
   border: 2px dashed var(--color-border);
   display: flex;
@@ -492,7 +501,7 @@
 }
 
 .editor-image-preview:hover {
-  border-color: var(--color-text);
+  border-color: var(--color-accent);
 }
 
 .editor-image-preview img {
@@ -522,7 +531,7 @@
 
 .url-fetch__error {
   font-size: var(--text-xs);
-  color: var(--color-danger);
+  color: var(--color-danger, #e05c5c);
 }
 
 .url-fetch__btns {
@@ -545,15 +554,17 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-2);
-  background: transparent;
-  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   min-height: 40px;
   cursor: text;
   transition: border-color var(--transition-fast);
 }
 
 .tags-input:focus-within {
-  border-color: var(--color-text);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-glow);
 }
 
 .tags-input__tag {
@@ -561,12 +572,11 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  background: var(--color-text);
-  color: var(--color-bg);
-  border: 1px solid var(--color-text);
+  background: var(--color-accent-glow);
+  color: var(--color-accent);
+  border-radius: var(--radius-full);
   font-size: var(--text-xs);
   font-weight: 500;
-  text-transform: lowercase;
 }
 
 .tags-input__tag-remove {

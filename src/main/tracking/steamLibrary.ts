@@ -207,7 +207,7 @@ export function refreshSteamLibraryIndex(): void {
 
     _installDirIndex = newInstallDir;
     _appIdIndex = newAppId;
-    _installBuilt = true;
+    _indexBuilt = true;
   } catch (err) {
     console.error("[SteamLibrary] Failed to build index:", err);
     // On unexpected error keep whatever index we had before (or empty)

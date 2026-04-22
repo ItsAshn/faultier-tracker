@@ -53,12 +53,11 @@ function ErrorBoundary({ children }: { children: React.ReactNode }): JSX.Element
               }}
               style={{
                 padding: '0.5rem 1rem',
-                background: 'var(--color-text)',
-                color: 'var(--color-bg)',
-                border: '2px solid var(--color-text)',
-                cursor: 'pointer',
-                textTransform: 'lowercase',
-                fontFamily: 'inherit',
+                background: 'var(--color-accent)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
               }}
             >
               Restart App

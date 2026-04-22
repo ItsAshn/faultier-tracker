@@ -179,7 +179,7 @@ export default function ImportExport(): JSX.Element {
       <div
         style={{
           border: "1px solid var(--color-border)",
-          borderRadius: 0,
+          borderRadius: "var(--radius-md)",
           overflow: "hidden",
         }}
       >

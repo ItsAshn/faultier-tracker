@@ -11,7 +11,7 @@
 
 .titlebar {
   height: 40px;
-  background: var(--color-bg);
+  background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
@@ -30,10 +30,9 @@
 
 .titlebar__logo-text {
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 700;
   color: var(--color-text);
   letter-spacing: 0.3px;
-  text-transform: lowercase;
 }
 
 .titlebar__spacer {
@@ -52,31 +51,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
   cursor: pointer;
   background: transparent;
-  border: 1px solid transparent;
+  border: none;
 }
 
 .titlebar__control:hover {
+  background: var(--color-surface-2);
   color: var(--color-text);
-  border-color: var(--color-border);
 }
 
 .titlebar__control--close:hover {
   background: var(--color-danger);
   color: #fff;
-  border-color: var(--color-danger);
 }
 
 .titlebar__control--update {
-  color: var(--color-success);
+  color: var(--color-accent);
 }
 
 .titlebar__control--update:hover {
-  border-color: var(--color-success);
-  color: var(--color-success);
+  background: var(--color-accent-glow);
+  color: var(--color-accent);
 }
 
 .titlebar__control--update-ready {
@@ -84,7 +83,7 @@
 }
 
 .titlebar__control--update-ready:hover {
-  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
   color: var(--color-success);
 }
 
@@ -129,7 +128,6 @@
   font-size: var(--text-xl);
   font-weight: 700;
   color: var(--color-text);
-  text-transform: lowercase;
 }
 
 /* ── Update banner ────────────────────────────────────────────────────────── */
@@ -145,9 +143,9 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.update-banner--available   { background: var(--color-accent-glow); color: var(--color-text); }
+.update-banner--available   { background: var(--color-accent-glow); color: var(--color-accent); }
 .update-banner--downloading { background: var(--color-surface-2);   color: var(--color-text-muted); }
-.update-banner--downloaded  { background: rgba(76, 175, 145, 0.08); color: var(--color-success); }
+.update-banner--downloaded  { background: rgba(76, 175, 145, 0.15); color: var(--color-success); }
 
 .update-banner span { flex: 1; }
 
@@ -155,12 +153,14 @@
   width: 120px;
   height: 4px;
   background: var(--color-border);
+  border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .update-banner__bar-fill {
   height: 100%;
-  background: var(--color-text);
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
   transition: width 200ms ease;
 }
 
@@ -179,10 +179,11 @@
 }
 
 .loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-text);
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-surface-3);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
