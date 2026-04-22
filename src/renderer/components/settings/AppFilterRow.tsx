@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
 import type { AppRecord } from '@shared/types'
-import { api } from '../../api/bridge'
 import { useAppStore } from '../../store/appStore'
+import { getIconUrl } from '../../utils/iconUrl'
 
 interface Props {
   app: AppRecord
@@ -9,18 +8,11 @@ interface Props {
 
 export default function AppFilterRow({ app }: Props): JSX.Element {
   const setAppTracked = useAppStore((s) => s.setAppTracked)
-  const [iconSrc, setIconSrc] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.getIconForApp(app.id).then(setIconSrc).catch(() => {})
-  }, [app.id])
+  const iconUrl = getIconUrl('app', app.id)
 
   return (
     <div className="filter-row">
-      {iconSrc
-        ? <img className="filter-row__icon" src={iconSrc} alt="" />
-        : <div className="filter-row__icon-placeholder" />
-      }
+      <img className="filter-row__icon" src={iconUrl} alt="" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
       <div className="filter-row__info">
         <div className="filter-row__name">{app.display_name}</div>
         {app.exe_path && (

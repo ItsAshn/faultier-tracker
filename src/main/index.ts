@@ -1,4 +1,6 @@
-import { app, BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog, protocol } from "electron";
+import { join } from "path";
+import { is } from "@electron-toolkit/utils";
 import { openDb, closeDb, getSetting, wasDbCorrupted } from "./db/client";
 import { createWindow, setQuitting } from "./window";
 import { createTray, destroyTray } from "./tray";
@@ -11,6 +13,7 @@ import {
 import { initUpdater } from "./updater";
 import { autoFetchSteamArtwork } from "./artwork/autoFetch";
 import { importFromSteam, refreshSteamPlaytimes } from "./importExport/steamImport";
+import { registerIconProtocol } from "./protocol";
 
 // Steam auto-refresh timer
 let steamRefreshTimer: NodeJS.Timeout | null = null;
@@ -53,12 +56,23 @@ function startSteamRefreshTimer(): void {
   }
 }
 
+// Use a separate userData directory in dev mode so the dev instance
+// doesn't conflict with a running production instance (different lock, different DB)
+if (is.dev) {
+  app.setPath('userData', join(app.getPath('userData'), '-dev'))
+}
+
 // Prevent multiple instances
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
   process.exit(0);
 }
+
+// Register kioku:// as a privileged scheme before app.whenReady()
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'kioku', privileges: { standard: false, secure: true, supportFetchAPI: true, corsEnabled: false } },
+]);
 
 app.on("second-instance", () => {
   // Focus the existing window when user tries to open a second instance
@@ -114,6 +128,7 @@ app.whenReady().then(async () => {
 
     createTray(win);
     registerIpcHandlers();
+    registerIconProtocol();
     initUpdater();
 
     // Start tracker non-blocking to prevent hangs on unsupported platforms
@@ -160,11 +175,21 @@ app.on("activate", () => {
   }
 });
 
-// Global exception handlers to prevent silent crashes
+// Crash-rate circuit breaker: only relaunch in production, and cap at 3 crashes per minute
+const recentCrashes: number[] = [];
+const MAX_CRASHES = 3;
+const CRASH_WINDOW_MS = 60_000;
+
 process.on("uncaughtException", (err) => {
   console.error("[Main] Uncaught exception:", err);
-  // Relaunch before quitting so the app self-heals instead of just dying.
-  app.relaunch();
+  const now = Date.now();
+  recentCrashes.push(now);
+  while (recentCrashes.length && recentCrashes[0] < now - CRASH_WINDOW_MS) {
+    recentCrashes.shift();
+  }
+  if (app.isPackaged && recentCrashes.length < MAX_CRASHES) {
+    app.relaunch();
+  }
   app.quit();
 });
 

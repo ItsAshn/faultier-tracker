@@ -107,17 +107,6 @@ const api = {
     ipcRenderer.invoke(CHANNELS.SETTINGS_SET, key, value),
 
   // Icons
-  getIconForApp: (appId: number): Promise<string | null> =>
-    ipcRenderer.invoke(CHANNELS.ICONS_GET_FOR_APP, appId),
-
-  getIconForGroup: (groupId: number): Promise<string | null> =>
-    ipcRenderer.invoke(CHANNELS.ICONS_GET_FOR_GROUP, groupId),
-
-  getIconBatch: (
-    requests: Array<{ id: number; isGroup: boolean }>,
-  ): Promise<Record<string, string | null>> =>
-    ipcRenderer.invoke(CHANNELS.ICONS_GET_BATCH, requests),
-
   setCustomIcon: (
     id: number,
     base64: string,
@@ -125,7 +114,7 @@ const api = {
   ): Promise<string> =>
     ipcRenderer.invoke(CHANNELS.ICONS_SET_CUSTOM, id, base64, isGroup),
 
-  clearCustomIcon: (id: number, isGroup?: boolean): Promise<void> =>
+  clearCustomIcon: (id: number, isGroup?: boolean): Promise<string> =>
     ipcRenderer.invoke(CHANNELS.ICONS_CLEAR_CUSTOM, id, isGroup),
 
   fetchIconFromUrl: (

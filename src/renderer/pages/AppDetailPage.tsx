@@ -11,7 +11,7 @@ import TimeBarChart from '../components/dashboard/TimeBarChart'
 import DetailHeatmap from '../components/detail/DetailHeatmap'
 import ImageUploader from '../components/gallery/ImageUploader'
 import ArtworkSearchModal from '../components/gallery/ArtworkSearchModal'
-import { bustIconCache } from '../components/gallery/AppCard'
+import { getIconUrl, bumpIconVersion } from '../utils/iconUrl'
 
 type Preset = 'today' | 'week' | 'month' | 'all'
 
@@ -68,8 +68,16 @@ export default function AppDetailPage(): JSX.Element {
   const [rangeData, setRangeData] = useState<AppRangeSummary | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Hero icon
+  // Hero icon — use protocol URL for automatic loading and caching
+  const iconUrl = getIconUrl(isGroup ? 'group' : 'app', numId)
+  const [iconVersion, setIconVersion] = useState(0)
   const [iconSrc, setIconSrc] = useState<string | null>(null)
+  const [iconError, setIconError] = useState(false)
+
+  useEffect(() => {
+    setIconSrc(`kioku://icon/${isGroup ? 'group' : 'app'}/${numId}?v=${iconVersion}`)
+    setIconError(false)
+  }, [numId, isGroup, iconVersion])
 
   // Edit section
   const [settingsModalOpen, setSettingsModalOpen] = useState(false)
@@ -91,17 +99,6 @@ export default function AppDetailPage(): JSX.Element {
       setGroupId(a.group_id)
     }
   }, [item?.id])
-
-  // Load icon — always fetch through IPC so we get a data URL, not a raw FS path
-  useEffect(() => {
-    if (!item) return
-    const loader = isGroup
-      ? () => api.getIconForGroup(numId)
-      : () => api.getIconForApp(numId)
-    loader().then(setIconSrc).catch((err) => {
-      console.error('[AppDetail] icon load failed:', err)
-    })
-  }, [numId, isGroup, item?.custom_image_path, item?.icon_cache_path])
 
   // Load range data
   useEffect(() => {
@@ -174,9 +171,9 @@ export default function AppDetailPage(): JSX.Element {
 
       {/* Hero */}
       <div className="app-detail__hero">
-        {iconSrc && (
+        {iconSrc && !iconError && (
           <div className="app-detail__hero-backdrop">
-            <img src={iconSrc} alt="" aria-hidden />
+            <img src={iconSrc} alt="" aria-hidden onError={() => setIconError(true)} />
           </div>
         )}
         <button
@@ -188,8 +185,8 @@ export default function AppDetailPage(): JSX.Element {
           <span>Edit</span>
         </button>
         <div className="app-detail__hero-art">
-          {iconSrc
-            ? <img src={iconSrc} alt={name} />
+          {iconSrc && !iconError
+            ? <img src={iconSrc} alt={name} onError={() => setIconError(true)} />
             : <div className="app-detail__hero-art-placeholder"><AppWindow size={40} /></div>
           }
         </div>
@@ -296,13 +293,13 @@ export default function AppDetailPage(): JSX.Element {
             </div>
 
             <div className="app-detail__settings-body">
-              <ImageUploader
+<ImageUploader
                 id={numId}
                 isGroup={isGroup}
-                currentSrc={iconSrc}
-                onUpdated={(url) => {
-                  bustIconCache(numId, isGroup)
-                  setIconSrc(url)
+                currentSrc={iconSrc && !iconError ? iconSrc : null}
+                onUpdated={() => {
+                  bumpIconVersion()
+                  setIconVersion((v) => v + 1)
                 }}
                 onSearchOnline={() => setArtworkModalOpen(true)}
               />
@@ -348,9 +345,9 @@ export default function AppDetailPage(): JSX.Element {
           displayName={name}
           isGroup={isGroup}
           onClose={() => setArtworkModalOpen(false)}
-          onApply={(url) => {
-            bustIconCache(numId, isGroup)
-            setIconSrc(url)
+          onApply={() => {
+            bumpIconVersion()
+            setIconVersion((v) => v + 1)
             setArtworkModalOpen(false)
           }}
         />

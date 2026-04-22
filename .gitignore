@@ -12,6 +12,7 @@ npm-debug.log*
 # OS files
 .DS_Store
 Thumbs.db
+nul
 
 # Editor
 .vscode/settings.json

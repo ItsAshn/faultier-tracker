@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Monitor, ArrowRight } from 'lucide-react'
 import type { SessionSummary } from '@shared/types'
-import { api } from '../../api/bridge'
+import { getIconUrl } from '../../utils/iconUrl'
 
 function fmtMs(ms: number): string {
   if (ms < 60_000) return '<1m'
@@ -31,27 +31,10 @@ interface Props {
 
 export default function TopAppsLeaderboard({ summaries, period, onPeriodChange, loading }: Props): JSX.Element {
   const navigate = useNavigate()
-  const [icons, setIcons] = useState<Map<number, string>>(new Map())
 
   // Only the top N apps by active_ms (summaries arrive pre-sorted from handlers.ts)
   const topApps = useMemo(() => summaries.slice(0, TOP_N), [summaries])
   const maxMs = topApps[0]?.active_ms ?? 0
-
-  // Stable key — only refetch icons when the top-N app IDs change
-  const topIds = useMemo(() => topApps.map((a) => a.app_id).join(','), [topApps])
-
-  useEffect(() => {
-    if (topApps.length === 0) { setIcons(new Map()); return }
-    const reqs = topApps.map((app) => ({ id: app.app_id, isGroup: false }))
-    api.getIconBatch(reqs).then((results) => {
-      const m = new Map<number, string>()
-      for (const app of topApps) {
-        const icon = results[`a:${app.app_id}`]
-        if (icon) m.set(app.app_id, icon)
-      }
-      setIcons(m)
-    }).catch(() => {})
-  }, [topIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="leaderboard">
@@ -92,7 +75,6 @@ export default function TopAppsLeaderboard({ summaries, period, onPeriodChange, 
       ) : (
         <div className="leaderboard__rows">
           {topApps.map((app, i) => {
-            const icon = icons.get(app.app_id) ?? null
             const barPct = maxMs > 0 ? (app.active_ms / maxMs) * 100 : 0
             return (
               <button
@@ -103,10 +85,8 @@ export default function TopAppsLeaderboard({ summaries, period, onPeriodChange, 
               >
                 <span className="leaderboard__rank">{i + 1}</span>
                 <div className="leaderboard__icon">
-                  {icon
-                    ? <img src={icon} alt="" className="leaderboard__icon-img" />
-                    : <div className="leaderboard__icon-placeholder"><Monitor size={16} /></div>
-                  }
+                  <img src={getIconUrl('app', app.app_id)} alt="" className="leaderboard__icon-img" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  <div className="leaderboard__icon-placeholder"><Monitor size={16} /></div>
                 </div>
                 <span className="leaderboard__name">{app.display_name}</span>
                 <div className="leaderboard__bar-wrap">

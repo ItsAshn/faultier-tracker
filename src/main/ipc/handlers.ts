@@ -9,10 +9,9 @@ import {
   isDbOpen,
 } from "../db/client";
 import {
-  extractAndCacheIcon,
   saveCustomImage,
   clearCustomImage,
-  readFileAsDataUrl,
+  downscaleBuffer,
 } from "../icons/iconExtractor";
 import { reanalyzeGroups } from "../grouping/groupEngine";
 import {
@@ -840,166 +839,9 @@ export function registerIpcHandlers(): void {
 
   // ── Icons ─────────────────────────────────────────────────────────────────
 
-  // ── Shared icon resolution helpers ───────────────────────────────────────
-
-  async function resolveAppIcon(appId: number): Promise<string | null> {
-    const db = getDb();
-    const row = db
-      .prepare<
-        [number],
-        {
-          exe_path: string | null;
-          icon_cache_path: string | null;
-          custom_image_path: string | null;
-        }
-      >("SELECT exe_path, icon_cache_path, custom_image_path FROM apps WHERE id = ?")
-      .get(appId);
-    if (!row) {
-      console.warn(`[Icon] resolveAppIcon: no app found for id=${appId}`);
-      return null;
-    }
-
-    const customDataUrl = readFileAsDataUrl(row.custom_image_path);
-    if (customDataUrl) {
-      console.log(`[Icon] app ${appId}: returning custom image (${row.custom_image_path})`);
-      return customDataUrl;
-    }
-
-    const cachedDataUrl = readFileAsDataUrl(row.icon_cache_path);
-    if (cachedDataUrl) {
-      console.log(`[Icon] app ${appId}: returning cached icon (${row.icon_cache_path})`);
-      return cachedDataUrl;
-    }
-
-    if (row.exe_path) {
-      console.log(`[Icon] app ${appId}: extracting icon from exe (${row.exe_path})`);
-      const fsPath = await extractAndCacheIcon(appId, row.exe_path);
-      // DB may have been closed while we awaited the icon extraction
-      if (!isDbOpen()) {
-        console.warn(`[Icon] app ${appId}: DB closed during icon extraction, skipping cache write`);
-        return fsPath ? readFileAsDataUrl(fsPath) : null;
-      }
-      if (fsPath) {
-        db.prepare<[string, number]>(
-          "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
-        ).run(fsPath, appId);
-        console.log(`[Icon] app ${appId}: icon extracted and cached at ${fsPath}`);
-        return readFileAsDataUrl(fsPath);
-      }
-      console.warn(`[Icon] app ${appId}: icon extraction failed for exe=${row.exe_path}`);
-    } else {
-      console.log(`[Icon] app ${appId}: no exe_path, no icon available`);
-    }
-    return null;
+  function iconUrl(type: 'app' | 'group', id: number): string {
+    return `kioku://icon/${type}/${id}?v=${Date.now()}`
   }
-
-  async function resolveGroupIcon(groupId: number): Promise<string | null> {
-    const db = getDb();
-    const group = db
-      .prepare<
-        [number],
-        { icon_cache_path: string | null; custom_image_path: string | null }
-      >("SELECT icon_cache_path, custom_image_path FROM app_groups WHERE id = ?")
-      .get(groupId);
-    if (!group) {
-      console.warn(`[Icon] resolveGroupIcon: no group found for id=${groupId}`);
-      return null;
-    }
-
-    const customDataUrl = readFileAsDataUrl(group.custom_image_path);
-    if (customDataUrl) {
-      console.log(`[Icon] group ${groupId}: returning custom image`);
-      return customDataUrl;
-    }
-
-    const cachedDataUrl = readFileAsDataUrl(group.icon_cache_path);
-    if (cachedDataUrl) {
-      console.log(`[Icon] group ${groupId}: returning cached icon`);
-      return cachedDataUrl;
-    }
-
-    const member = db
-      .prepare<
-        [number],
-        { id: number; exe_path: string | null; icon_cache_path: string | null }
-      >("SELECT id, exe_path, icon_cache_path FROM apps WHERE group_id = ? AND exe_path IS NOT NULL LIMIT 1")
-      .get(groupId);
-
-    if (member) {
-      const memberDataUrl = readFileAsDataUrl(member.icon_cache_path);
-      if (memberDataUrl) {
-        console.log(`[Icon] group ${groupId}: returning member app ${member.id} cached icon`);
-        return memberDataUrl;
-      }
-
-      if (member.exe_path) {
-        console.log(`[Icon] group ${groupId}: extracting icon from member app ${member.id} (${member.exe_path})`);
-        const fsPath = await extractAndCacheIcon(member.id, member.exe_path);
-        // DB may have been closed while we awaited the icon extraction
-        if (!isDbOpen()) {
-          console.warn(`[Icon] group ${groupId}: DB closed during icon extraction, skipping cache write`);
-          return fsPath ? readFileAsDataUrl(fsPath) : null;
-        }
-        if (fsPath) {
-          db.prepare<[string, number]>(
-            "UPDATE apps SET icon_cache_path = ? WHERE id = ?",
-          ).run(fsPath, member.id);
-          db.prepare<[string, number]>(
-            "UPDATE app_groups SET icon_cache_path = ? WHERE id = ?",
-          ).run(fsPath, groupId);
-          console.log(`[Icon] group ${groupId}: icon extracted and cached at ${fsPath}`);
-          return readFileAsDataUrl(fsPath);
-        }
-        console.warn(`[Icon] group ${groupId}: icon extraction failed for member ${member.id}`);
-      }
-    } else {
-      console.log(`[Icon] group ${groupId}: no member with exe_path found, no icon available`);
-    }
-    return null;
-  }
-
-  ipcMain.handle(
-    CHANNELS.ICONS_GET_FOR_APP,
-    (_e, appId: number): Promise<string | null> => resolveAppIcon(appId),
-  );
-
-  ipcMain.handle(
-    CHANNELS.ICONS_GET_FOR_GROUP,
-    (_e, groupId: number): Promise<string | null> => resolveGroupIcon(groupId),
-  );
-
-  ipcMain.handle(
-    CHANNELS.ICONS_GET_BATCH,
-    async (
-      _e,
-      requests: Array<{ id: number; isGroup: boolean }>,
-    ): Promise<Record<string, string | null>> => {
-      // Process in batches of 5 to avoid saturating the file system with
-      // simultaneous VBScript/PowerShell icon extraction processes.
-      const CONCURRENCY = 5;
-      const entries: Array<readonly [string, string | null]> = [];
-
-      for (let i = 0; i < requests.length; i += CONCURRENCY) {
-        const chunk = requests.slice(i, i + CONCURRENCY);
-        const chunkResults = await Promise.all(
-          chunk.map(async (req) => {
-            const key = `${req.isGroup ? "g" : "a"}:${req.id}`;
-            try {
-              const icon = req.isGroup
-                ? await resolveGroupIcon(req.id)
-                : await resolveAppIcon(req.id);
-              return [key, icon] as const;
-            } catch {
-              return [key, null] as const;
-            }
-          }),
-        );
-        entries.push(...chunkResults);
-      }
-
-      return Object.fromEntries(entries);
-    },
-  );
 
   ipcMain.handle(
     CHANNELS.ICONS_SET_CUSTOM,
@@ -1010,7 +852,7 @@ export function registerIpcHandlers(): void {
       isGroup = false,
     ): Promise<string> => {
       const db = getDb();
-      const fsPath = saveCustomImage(id, base64);
+      const fsPath = saveCustomImage(id, base64, base64.includes('image/jpeg') ? 'jpg' : 'png');
       if (isGroup) {
         db.prepare<[string, number]>(
           "UPDATE app_groups SET custom_image_path = ? WHERE id = ?",
@@ -1020,8 +862,7 @@ export function registerIpcHandlers(): void {
           "UPDATE apps SET custom_image_path = ? WHERE id = ?",
         ).run(fsPath, id);
       }
-      // Return the original base64 — no need to re-read the file we just wrote
-      return base64;
+      return iconUrl(isGroup ? 'group' : 'app', id);
     },
   );
 
@@ -1095,9 +936,8 @@ export function registerIpcHandlers(): void {
             console.error(`[Icons] fetchUrl empty response body for url=${imgUrl}`);
             return null;
           }
-          const base64 = `data:${mime};base64,${buf.toString("base64")}`;
 
-          const fsPath = saveCustomImage(id, base64, ext);
+          const fsPath = saveCustomImage(id, `data:${mime};base64,${buf.toString('base64')}`, ext);
           console.log(`[Icons] fetchUrl saved to ${fsPath} (${buf.byteLength} bytes, ${mime})`);
 
           if (isGroup) {
@@ -1109,7 +949,7 @@ export function registerIpcHandlers(): void {
               "UPDATE apps SET custom_image_path = ? WHERE id = ?",
             ).run(fsPath, id);
           }
-          return base64;
+          return iconUrl(isGroup ? 'group' : 'app', id);
         } catch (err) {
           console.error(`[Icons] fetchUrl attempt ${attempt} threw:`, err);
           if (attempt < MAX_ATTEMPTS) {
@@ -1125,7 +965,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(
     CHANNELS.ICONS_CLEAR_CUSTOM,
-    (_e, id: number, isGroup = false): void => {
+    (_e, id: number, isGroup = false): string => {
       const db = getDb();
       clearCustomImage(id);
       if (isGroup) {
@@ -1137,6 +977,7 @@ export function registerIpcHandlers(): void {
           "UPDATE apps SET custom_image_path = NULL WHERE id = ?",
         ).run(id);
       }
+      return iconUrl(isGroup ? 'group' : 'app', id);
     },
   );
 

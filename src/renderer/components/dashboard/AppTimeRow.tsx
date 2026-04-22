@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { AppRecord, AppGroup, SessionSummary } from '@shared/types'
-import { api } from '../../api/bridge'
 import { useAppStore } from '../../store/appStore'
+import { getIconUrl } from '../../utils/iconUrl'
 
 function fmtMs(ms: number): string {
   if (ms < 60_000) return '< 1m'
@@ -18,16 +18,12 @@ interface AppIconProps {
 }
 
 function AppIcon({ appId, size = 40 }: AppIconProps): JSX.Element {
-  const [src, setSrc] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.getIconForApp(appId).then(setSrc).catch(() => {})
-  }, [appId])
-
-  if (src) {
-    return <img className="time-row__icon" src={src} alt="" width={size} height={size} />
+  const [error, setError] = useState(false)
+  const url = getIconUrl('app', appId)
+  if (error) {
+    return <div className="time-row__icon-placeholder" style={{ width: size, height: size }}>□</div>
   }
-  return <div className="time-row__icon-placeholder" style={{ width: size, height: size }}>□</div>
+  return <img className="time-row__icon" src={url} alt="" width={size} height={size} onError={() => setError(true)} />
 }
 
 interface RowProps {
@@ -70,13 +66,10 @@ interface GroupRowProps {
 
 export function GroupTimeRow({ group, summaries, apps }: GroupRowProps): JSX.Element {
   const [expanded, setExpanded] = useState(false)
-  const [iconSrc, setIconSrc] = useState<string | null>(null)
+  const [iconError, setIconError] = useState(false)
+  const iconUrl = getIconUrl('group', group.id)
 
   const totalActive = summaries.reduce((acc, s) => acc + s.active_ms, 0)
-
-  useEffect(() => {
-    api.getIconForGroup(group.id).then(setIconSrc).catch(() => {})
-  }, [group.id])
 
   return (
     <>
@@ -85,8 +78,8 @@ export function GroupTimeRow({ group, summaries, apps }: GroupRowProps): JSX.Ele
         onClick={() => summaries.length > 1 && setExpanded((v) => !v)}
       >
         <div className="time-row__app">
-          {iconSrc
-            ? <img className="time-row__icon" src={iconSrc} alt="" />
+          {!iconError
+            ? <img className="time-row__icon" src={iconUrl} alt="" onError={() => setIconError(true)} />
             : <div className="time-row__icon-placeholder">□</div>
           }
           <span className="time-row__name">{group.name}</span>

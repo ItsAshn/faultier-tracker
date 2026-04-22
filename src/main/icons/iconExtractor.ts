@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, nativeImage } from 'electron'
 import { fileURLToPath } from 'url'
 import path from 'path'
 import fs from 'fs'
@@ -15,7 +15,7 @@ function ensureDirs(): void {
  * Converts a stored path (either a legacy "file://…" URL or a plain FS path)
  * to a proper filesystem path, or null if the file doesn't exist.
  */
-function toFsPath(stored: string | null): string | null {
+export function toFsPath(stored: string | null): string | null {
   if (!stored) return null
   if (stored.startsWith('file:')) {
     try {
@@ -55,8 +55,6 @@ export function readFileAsDataUrl(stored: string | null): string | null {
 /**
  * Extracts and caches the icon for an app exe.
  * Returns the plain filesystem path of the cached PNG, or null on failure.
- * (Callers must convert to a data URL via readFileAsDataUrl before sending
- * to the renderer.)
  */
 export async function extractAndCacheIcon(appId: number, exePath: string): Promise<string | null> {
   ensureDirs()
@@ -79,30 +77,6 @@ export async function extractAndCacheIcon(appId: number, exePath: string): Promi
 }
 
 /**
- * Saves a user-supplied base64 image for an app.
- * Returns the plain filesystem path of the saved file.
- */
-export function saveCustomImage(appId: number, base64Data: string, ext = 'png'): string {
-  ensureDirs()
-
-  const filePath = path.join(USER_IMAGE_DIR, `${appId}.${ext}`)
-  const data = base64Data.replace(/^data:[^;]+;base64,/, '')
-  fs.writeFileSync(filePath, Buffer.from(data, 'base64'))
-  return filePath
-}
-
-/**
- * Removes the custom image for an app.
- */
-export function clearCustomImage(appId: number): void {
-  ensureDirs()
-  for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'gif']) {
-    const p = path.join(USER_IMAGE_DIR, `${appId}.${ext}`)
-    if (fs.existsSync(p)) fs.unlinkSync(p)
-  }
-}
-
-/**
  * Resolves the best icon filesystem path for an app.
  * Returns null if nothing is cached yet.
  */
@@ -114,4 +88,55 @@ export function resolveIconPath(customImagePath: string | null, iconCachePath: s
   if (cached && fs.existsSync(cached)) return cached
 
   return null
+}
+
+const MAX_DIMENSION = 600
+
+/**
+ * Downscales an image buffer if either dimension exceeds MAX_DIMENSION.
+ * Returns the (possibly downscaled) buffer encoded in the specified format.
+ * If the buffer cannot be decoded or is already small enough, returns the
+ * re-encoded buffer (normalised to ext format).
+ */
+export function downscaleBuffer(buf: Buffer, ext: string): Buffer {
+  const img = nativeImage.createFromBuffer(buf)
+  if (img.isEmpty()) return buf
+
+  const { width, height } = img.getSize()
+  if (width <= MAX_DIMENSION && height <= MAX_DIMENSION) {
+    if (ext === 'jpg' || ext === 'jpeg') return img.toJPEG(85)
+    return img.toPNG()
+  }
+
+  const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height)
+  const resized = img.resize({
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+    quality: 'best',
+  })
+
+  if (ext === 'jpg' || ext === 'jpeg') return resized.toJPEG(85)
+  return resized.toPNG()
+}
+
+/**
+ * Saves a user-supplied base64 image for an app, downscaling if necessary.
+ * Returns the filesystem path of the saved file.
+ */
+export function saveCustomImage(appId: number, base64Data: string, ext = 'png'): string {
+  ensureDirs()
+
+  const filePath = path.join(USER_IMAGE_DIR, `${appId}.${ext}`)
+  const raw = Buffer.from(base64Data.replace(/^data:[^;]+;base64,/, ''), 'base64')
+  const processed = downscaleBuffer(raw, ext)
+  fs.writeFileSync(filePath, processed)
+  return filePath
+}
+
+export function clearCustomImage(appId: number): void {
+  ensureDirs()
+  for (const ext of ['png', 'jpg', 'jpeg', 'webp', 'gif']) {
+    const p = path.join(USER_IMAGE_DIR, `${appId}.${ext}`)
+    if (fs.existsSync(p)) fs.unlinkSync(p)
+  }
 }

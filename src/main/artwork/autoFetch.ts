@@ -61,8 +61,14 @@ export async function autoFetchArtwork(): Promise<void> {
       }
       const ext = extMap[mime] ?? 'png'
       const buf = Buffer.from(await res.arrayBuffer())
+      if (buf.byteLength === 0) {
+        console.warn(`[AutoFetch] "${row.display_name}": empty response body`)
+        continue
+      }
+
+      const saveExt = (ext === 'jpg' || ext === 'jpeg') ? 'jpg' : 'png'
       const base64 = `data:${mime};base64,${buf.toString('base64')}`
-      const fsPath = saveCustomImage(row.id, base64, ext)
+      const fsPath = saveCustomImage(row.id, base64, saveExt)
 
       // DB may have been closed while we awaited the network fetch
       if (!isDbOpen()) {

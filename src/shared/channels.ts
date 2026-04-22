@@ -28,9 +28,6 @@ export const CHANNELS = {
   SETTINGS_SET: "settings:set",
 
   // Icons
-  ICONS_GET_FOR_APP: "icons:getForApp",
-  ICONS_GET_FOR_GROUP: "icons:getForGroup",
-  ICONS_GET_BATCH: "icons:getBatch",
   ICONS_SET_CUSTOM: "icons:setCustom",
   ICONS_CLEAR_CUSTOM: "icons:clearCustom",
   ICONS_FETCH_URL: "icons:fetchUrl",

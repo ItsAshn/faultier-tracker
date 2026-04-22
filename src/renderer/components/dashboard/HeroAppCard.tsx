@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Trophy } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { RangeSummary } from '@shared/types'
-import { api } from '../../api/bridge'
 import type { GridPeriod } from './TopAppsLeaderboard'
+import { getIconUrl } from '../../utils/iconUrl'
 
 function fmtMs(ms: number): string {
   if (ms < 60_000) return '<1m'
@@ -34,12 +34,8 @@ interface Props {
 export default function HeroAppCard({ summary, loading, period }: Props): JSX.Element {
   const navigate = useNavigate()
   const topApp = summary?.top_app?.active_ms ? summary.top_app : null
-  const [icon, setIcon] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!topApp) { setIcon(null); return }
-    api.getIconForApp(topApp.app_id).then(setIcon).catch(() => {})
-  }, [topApp?.app_id])
+  const iconUrl = topApp ? getIconUrl('app', topApp.app_id) : null
+  const [iconError, setIconError] = useState(false)
 
   const daysActive = summary?.chart_points.filter((p) => p.active_ms > 0).length ?? 0
 
@@ -77,8 +73,8 @@ export default function HeroAppCard({ summary, loading, period }: Props): JSX.El
       </div>
       <div className="hero-card__body">
         <div className="hero-card__icon-wrap">
-          {icon
-            ? <img src={icon} alt={topApp.display_name} className="hero-card__icon" />
+          {iconUrl && !iconError
+            ? <img src={iconUrl} alt={topApp.display_name} className="hero-card__icon" onError={() => setIconError(true)} />
             : <div className="hero-card__icon-placeholder"><Trophy size={48} /></div>
           }
         </div>

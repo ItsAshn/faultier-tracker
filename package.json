@@ -99,5 +99,13 @@
         "StartupWMClass": "KIOKU"
       }
     }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "better-sqlite3",
+      "esbuild",
+      "get-windows"
+    ]
   }
 }

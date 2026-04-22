@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
-import { X } from 'lucide-react'
+import { useState } from 'react'
+import { Upload, Link, X, Loader, Globe } from 'lucide-react'
 import type { AppRecord, AppGroup } from '@shared/types'
 import { useAppStore } from '../../store/appStore'
 import ImageUploader from './ImageUploader'
 import ArtworkSearchModal from './ArtworkSearchModal'
-import { api } from '../../api/bridge'
+import { getIconUrl } from '../../utils/iconUrl'
 
 interface Props {
   item: AppRecord | AppGroup
@@ -19,18 +19,9 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
   const [displayName, setDisplayName] = useState(
     isGroup ? (item as AppGroup).name : (item as AppRecord).display_name
   )
-  const [iconSrc, setIconSrc] = useState<string | null>(item.custom_image_path)
+  const iconUrl = getIconUrl(isGroup ? 'group' : 'app', item.id)
+  const [iconError, setIconError] = useState(false)
   const [artworkModalOpen, setArtworkModalOpen] = useState(false)
-
-  useEffect(() => {
-    if (!item.custom_image_path) {
-      if (isGroup) {
-        api.getIconForGroup(item.id).then(setIconSrc).catch(() => {})
-      } else {
-        api.getIconForApp(item.id).then(setIconSrc).catch(() => {})
-      }
-    }
-  }, [item.id])
 
   async function handleSave(): Promise<void> {
     if (isGroup) {
@@ -52,8 +43,8 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
         <ImageUploader
           id={item.id}
           isGroup={isGroup}
-          currentSrc={iconSrc}
-          onUpdated={(url) => setIconSrc(url)}
+          currentSrc={iconError ? null : iconUrl}
+          onUpdated={() => {}}
           onSearchOnline={() => setArtworkModalOpen(true)}
         />
 
@@ -79,7 +70,7 @@ export default function AppCardEditor({ item, isGroup, onClose }: Props): JSX.El
           displayName={isGroup ? (item as AppGroup).name : (item as AppRecord).display_name}
           isGroup={isGroup}
           onClose={() => setArtworkModalOpen(false)}
-          onApply={(url) => setIconSrc(url)}
+          onApply={() => setArtworkModalOpen(false)}
         />
       )}
     </div>
