@@ -88,7 +88,8 @@ export function registerIconProtocol(): void {
   protocol.handle('kioku', async (request) => {
     try {
       const url = new URL(request.url)
-      const parts = url.pathname.split('/').filter(Boolean)
+      const fullPath = url.host ? `/${url.host}${url.pathname}` : url.pathname
+      const parts = fullPath.split('/').filter(Boolean)
 
       if (parts.length < 3 || parts[0] !== 'icon') {
         return new Response('Not found', { status: 404 })
