@@ -39,7 +39,7 @@ import type {
   InstallTypeInfo,
 } from "@shared/types";
 import { getMainWindow } from "../window";
-import { startTracker, stopTracker } from "../tracking/tracker";
+import { startTracker, stopTracker, invalidateSteamAppsCache } from "../tracking/tracker";
 import { resetSessionState, endActiveSession } from "../tracking/sessionManager";
 import { persistDb } from "../db/client";
 import {
@@ -149,10 +149,6 @@ export function mergeSteamExeDuplicate(
       db.prepare<[number], void>("DELETE FROM apps WHERE id = ?").run(exeAppId);
     })();
 
-    console.log(
-      `[Merge] Merged exe app id=${exeAppId} (${exeRow.exe_name}) → steam app id=${steamAppId} (${steamRow.exe_name} "${steamRow.display_name}")`,
-    );
-
     // Fire-and-forget: refresh Steam playtime so the merged data is accurate
     const apiKey = getSetting("steam_api_key") as string | null;
     const steamId = getSetting("steam_id") as string | null;
@@ -162,6 +158,7 @@ export function mergeSteamExeDuplicate(
       );
     }
 
+    invalidateSteamAppsCache();
     return { success: true };
   } catch (err) {
     console.error("[Merge] Failed to merge Steam exe duplicate:", err);
@@ -246,9 +243,6 @@ export async function runStartupSteamDuplicateScan(): Promise<void> {
         .get(`steam:${acfEntry.appId}`);
 
       if (steamRow) {
-        console.log(
-          `[StartupScan] Auto-merging "${cand.exe_name}" → "${steamRow.display_name}" (ACF exact match, appid=${acfEntry.appId})`,
-        );
         mergeSteamExeDuplicate(cand.id, steamRow.id);
         // Notify renderer to reload apps
         BrowserWindow.getAllWindows().forEach((win) => {
@@ -308,10 +302,6 @@ export async function runStartupSteamDuplicateScan(): Promise<void> {
       exeApp: mapApp(exeRow as Parameters<typeof mapApp>[0]),
       candidates: candidateRows.map((r) => mapApp(r as Parameters<typeof mapApp>[0])),
     };
-
-    console.log(
-      `[StartupScan] Suggesting link for "${cand.exe_name}" → candidates: ${top3.map((c) => c.display_name).join(", ")}`,
-    );
 
     // Push to all renderer windows
     BrowserWindow.getAllWindows().forEach((win) => {
@@ -383,7 +373,6 @@ export function registerIpcHandlers(): void {
         // so time stops accruing — don't wait for the next poll tick.
         if (!tracked) {
           const now = Date.now();
-          console.log(`[IPC] APPS_SET_TRACKED: app id=${id} disabled — closing open sessions`);
           endActiveSession(now);
         }
         return true;
@@ -751,7 +740,6 @@ export function registerIpcHandlers(): void {
     CHANNELS.SESSIONS_GET_DAILY_TOTALS,
     (_e, from: number, to: number): DayTotal[] => {
       const db = getDb();
-      console.log(`[IPC] getDailyTotals from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
       const now = Date.now();
       const rows = db
         .prepare<[number, number, number, number, number, number], { date: string; active_ms: number }>(
@@ -765,7 +753,6 @@ export function registerIpcHandlers(): void {
            ORDER BY date`,
         )
         .all(from, now, to, from, to, from);
-      console.log(`[IPC] getDailyTotals -> ${rows.length} day(s) returned`);
       return rows;
     },
   );
@@ -774,7 +761,6 @@ export function registerIpcHandlers(): void {
     CHANNELS.SESSIONS_GET_BUCKET_APPS,
     (_e, from: number, to: number): BucketApp[] => {
       const db = getDb();
-      console.log(`[IPC] getBucketApps from=${new Date(from).toISOString()} to=${new Date(to).toISOString()}`);
       const now = Date.now();
       const rows = db
         .prepare<
@@ -794,14 +780,12 @@ export function registerIpcHandlers(): void {
            LIMIT 5`,
         )
         .all(now, to, from, to, from);
-      console.log(`[IPC] getBucketApps -> ${rows.length} app(s):`, rows.map(r => `${r.display_name}=${Math.round(r.active_ms/60000)}m`).join(', '));
       return rows;
     },
   );
 
   ipcMain.handle(CHANNELS.SESSIONS_CLEAR_ALL, (): void => {
     const db = getDb();
-    console.log('[IPC] SESSIONS_CLEAR_ALL: deleting all sessions from database');
     db.prepare("DELETE FROM sessions").run();
     // Discard stale in-memory sessions so the tracker starts fresh next tick
     resetSessionState();
@@ -811,7 +795,6 @@ export function registerIpcHandlers(): void {
     BrowserWindow.getAllWindows().forEach((win) => {
       if (!win.isDestroyed()) win.webContents.send(CHANNELS.DATA_CLEARED);
     });
-    console.log('[IPC] SESSIONS_CLEAR_ALL: complete');
   });
 
   // ── Settings ──────────────────────────────────────────────────────────────
@@ -885,7 +868,6 @@ export function registerIpcHandlers(): void {
 
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         try {
-          console.log(`[Icons] fetchUrl attempt ${attempt}/${MAX_ATTEMPTS} id=${id} url=${imgUrl}`);
           const res = await net.fetch(imgUrl, { headers });
 
           if (res.status === 429) {
@@ -938,7 +920,6 @@ export function registerIpcHandlers(): void {
           }
 
           const fsPath = saveCustomImage(id, `data:${mime};base64,${buf.toString('base64')}`, ext);
-          console.log(`[Icons] fetchUrl saved to ${fsPath} (${buf.byteLength} bytes, ${mime})`);
 
           if (isGroup) {
             db.prepare<[string, number]>(
@@ -1015,6 +996,7 @@ export function registerIpcHandlers(): void {
     async (_e, apiKey: string, steamId: string) => {
       const result = await importFromSteam(apiKey, steamId);
       if (result.gamesImported > 0) {
+        invalidateSteamAppsCache();
         // Fire-and-forget background artwork fetch for newly imported games
         autoFetchSteamArtwork().catch(console.error);
         // Run duplicate scan so any existing exe rows for these new steam: games
@@ -1033,6 +1015,7 @@ export function registerIpcHandlers(): void {
     }
     try {
       const result = await refreshSteamPlaytimes(apiKey, steamId);
+      invalidateSteamAppsCache();
       // After a Steam refresh, run the duplicate scan in case new games were
       // added that now match previously unresolved exe rows
       runStartupSteamDuplicateScan().catch(console.error);
@@ -1062,12 +1045,12 @@ export function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.DATA_RESET_ALL, async (): Promise<void> => {
-    console.log('[IPC] DATA_RESET_ALL: stopping tracker, resetting all data, restarting tracker');
     stopTracker();
     // Clear in-memory session state BEFORE wiping the DB so closeAllSessions
     // (called inside stopTracker path) doesn't try to UPDATE now-gone rows
     resetSessionState();
     resetDbData();
+    invalidateSteamAppsCache();
     // Flush the freshly-seeded empty DB to disk immediately
     persistDb();
     await startTracker();
@@ -1075,7 +1058,6 @@ export function registerIpcHandlers(): void {
     BrowserWindow.getAllWindows().forEach((win) => {
       if (!win.isDestroyed()) win.webContents.send(CHANNELS.DATA_CLEARED);
     });
-    console.log('[IPC] DATA_RESET_ALL: complete');
   });
 
   // ── Window control ────────────────────────────────────────────────────────

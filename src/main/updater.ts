@@ -43,6 +43,12 @@ export function initUpdater(): void {
   autoUpdater.on('error', (err) => {
     // electron-updater error messages can include full HTTP headers — take only the first line
     const clean = err.message.split('\n')[0].trim()
+    // On Linux, "can't find latest.yml" is expected when no new release exists —
+    // treat it as "no update available" rather than surfacing an error to the user.
+    if (/latest(-linux)?\.yml/i.test(clean)) {
+      getMainWindow()?.webContents.send(CHANNELS.UPDATE_NOT_AVAILABLE)
+      return
+    }
     getMainWindow()?.webContents.send(CHANNELS.UPDATE_ERROR, clean)
   })
 

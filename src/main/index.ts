@@ -24,14 +24,11 @@ async function refreshSteamData(): Promise<void> {
   const steamId = getSetting("steam_id") as string | null;
   
   if (!apiKey || !steamId) {
-    console.log("[SteamRefresh] skipping — no credentials configured");
-    return;
+    return
   }
 
-  console.log("[SteamRefresh] refreshing Steam playtimes...");
   try {
     const result = await refreshSteamPlaytimes(apiKey, steamId);
-    console.log(`[SteamRefresh] updated ${result.updated} games, added ${Math.round(result.totalDeltaMs / 60000)}m of playtime`);
   } catch (err) {
     console.error("[SteamRefresh] failed:", err);
   }
@@ -48,7 +45,6 @@ function startSteamRefreshTimer(): void {
   const steamId = getSetting("steam_id") as string | null;
   
   if (apiKey && steamId) {
-    console.log("[SteamRefresh] starting auto-refresh timer (every 6 hours)");
     // Initial refresh on startup
     refreshSteamData();
     // Set up interval

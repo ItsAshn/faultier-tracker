@@ -115,7 +115,7 @@ export default function SetupWalkthrough({ onComplete }: Props): JSX.Element {
           <div style={{ 
             background: 'rgba(239, 83, 80, 0.1)', 
             border: '1px solid var(--color-danger)', 
-            borderRadius: 'var(--radius-md)',
+            borderRadius: 0,
             padding: 'var(--space-3)',
             marginBottom: 'var(--space-4)',
             color: 'var(--color-danger)',

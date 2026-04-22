@@ -102,7 +102,6 @@ export function openDb(): DbCompat {
   runMigrations(_db);
   seedDefaults(_db);
 
-  console.log("[DB] Opened:", _dbPath);
   return _db;
 }
 
@@ -119,7 +118,6 @@ export function closeDb(): void {
   if (db) {
     try { db.close(); } catch { /* ignore */ }
   }
-  console.log("[DB] Closed");
 }
 
 export function resetDbData(): void {
@@ -132,7 +130,7 @@ export function resetDbData(): void {
   `);
   _settingsCache = null;
   seedDefaults(db);
-  console.log("[DB] Reset complete");
+}
 }
 
 // ─── Settings helpers ──────────────────────────────────────────────────────

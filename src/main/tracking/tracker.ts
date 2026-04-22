@@ -17,6 +17,33 @@ import {
   lookupByInstallDirNorm,
 } from "./steamLibrary";
 
+// ── Steam app cache for fuzzy Levenshtein fallback ────────────────────────────
+// Avoids querying the DB for ALL steam: apps on every tick. Refreshed on startup
+// and whenever the Steam library index is rebuilt (rare).
+let _steamAppsCache: { id: number; exe_name: string; display_name: string; display_name_norm: string }[] | null = null;
+
+function refreshSteamAppsCache(): void {
+  const db = getDb();
+  const rows = db
+    .prepare<
+      [],
+      { id: number; exe_name: string; display_name: string }
+    >(
+      "SELECT id, exe_name, display_name FROM apps WHERE exe_name LIKE 'steam:%' AND is_steam_import = 1",
+    )
+    .all();
+  const normalize = (s: string): string =>
+    s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  _steamAppsCache = rows.map((r) => ({
+    ...r,
+    display_name_norm: normalize(r.display_name),
+  }));
+}
+
+export function invalidateSteamAppsCache(): void {
+  _steamAppsCache = null;
+}
+
 // Convert a raw DB row to a renderer-safe AppRecord (mirrors mapApp in handlers.ts)
 function toAppRecord(raw: RawApp): AppRecord {
   return {
@@ -71,32 +98,22 @@ function findSteamAppForExePath(
       )
       .get(`steam:${acfEntry.appId}`);
     if (steamRow) {
-      console.log(
-        `[Tracker] ACF match: folder "${steamMatch[1]}" → appid=${acfEntry.appId} "${steamRow.display_name}"`,
-      );
       return steamRow;
     }
   }
 
-  // ── 2. Fuzzy Levenshtein fallback ─────────────────────────────────────────
-  const steamApps = db
-    .prepare<
-      [],
-      { id: number; exe_name: string; display_name: string }
-    >(
-      "SELECT id, exe_name, display_name FROM apps WHERE exe_name LIKE 'steam:%' AND is_steam_import = 1",
-    )
-    .all();
+  // ── 2. Fuzzy Levenshtein fallback (uses cached list) ──────────────────────
+  if (!_steamAppsCache) refreshSteamAppsCache();
+  const steamApps = _steamAppsCache!;
 
   let best: { id: number; exe_name: string; display_name: string; dist: number } | null = null;
 
   for (const app of steamApps) {
-    const appNorm = normalize(app.display_name);
-    const maxLen = Math.max(folderNorm.length, appNorm.length);
+    const maxLen = Math.max(folderNorm.length, app.display_name_norm.length);
     if (maxLen === 0) continue;
-    const dist = distance(folderNorm, appNorm) / maxLen;
+    const dist = distance(folderNorm, app.display_name_norm) / maxLen;
     if (dist <= 0.1 && (!best || dist < best.dist)) {
-      best = { ...app, dist };
+      best = { id: app.id, exe_name: app.exe_name, display_name: app.display_name, dist };
     }
   }
 
@@ -122,6 +139,7 @@ export async function startTracker(): Promise<void> {
   // Build Steam manifest index before the first poll so suppression works
   // immediately even on first launch with existing installed games
   refreshSteamLibraryIndex();
+  refreshSteamAppsCache();
 
   // Initialize active window detection with 10-second timeout safety net
   const initPromise = initActiveWin();
@@ -135,8 +153,7 @@ export async function startTracker(): Promise<void> {
   isRunning = true;
   await pollTick(); // fire immediately so renderer exits "Connecting…" on launch
   schedulePoll();
-  console.log("[Tracker] Started");
-}
+  }
 
 export function stopTracker(): void {
   isRunning = false;
@@ -145,7 +162,6 @@ export function stopTracker(): void {
     pollTimer = null;
   }
   lastSeenWrittenAt.clear();
-  console.log("[Tracker] Stopped");
 }
 
 function schedulePoll(): void {
@@ -183,8 +199,6 @@ async function pollTick(): Promise<void> {
 
     const activeApp = await getActiveApp();
 
-    console.log(`[Tracker] tick — idle=${isIdle} (${idleSecs}s) activeApp=${activeApp?.exeName ?? 'none'} pid=${activeApp?.pid ?? '-'}`);
-
     const db = getDb();
 
     // ── Active window ────────────────────────────────────────────────
@@ -217,9 +231,6 @@ async function pollTick(): Promise<void> {
         if (activeApp.exePath) {
           const steamEntry = findSteamAppForExePath(activeApp.exePath);
           if (steamEntry) {
-            console.log(
-              `[Tracker] Suppressing exe "${activeApp.exeName}" — already imported as Steam game "${steamEntry.display_name}" (${steamEntry.exe_name})`,
-            );
             endActiveSession(now);
             // Touch last_seen on the steam entry so it stays "recently seen"
             db.prepare<[number, number], void>(
@@ -237,7 +248,6 @@ async function pollTick(): Promise<void> {
         }
 
         const displayName = getDisplayNameFromExe(activeApp.exeName);
-        console.log(`[Tracker] active window new app: ${activeApp.exeName} -> "${displayName}"`);
         // All new apps start tracked by default (is_tracked=1)
         appId = upsertApp(
           activeApp.exeName,
@@ -286,7 +296,6 @@ async function pollTick(): Promise<void> {
       const isSteamGame = appRow && appRow.exe_name?.startsWith('steam:');
       
       if (isSteamGame && appRow) {
-        console.log(`[Tracker] Steam game active, using API time only: ${appRow.exe_name}`);
         endActiveSession(now);
         // Continue to update last_seen and other metadata
         db.prepare<[number, number], void>(
@@ -321,7 +330,6 @@ async function pollTick(): Promise<void> {
         // the path AND the app has no group yet, re-run group resolution so
         // Steam library path matching can kick in.
         if (activeApp.exePath && !appRow.exe_path) {
-          console.log(`[Tracker] updating exe_path for app id=${appId}: ${activeApp.exePath}`);
           db.prepare<[string, number], void>(
             "UPDATE apps SET exe_path = ? WHERE id = ?",
           ).run(activeApp.exePath, appId);
@@ -332,9 +340,6 @@ async function pollTick(): Promise<void> {
           if (appRow.is_tracked !== 0) {
             const steamEntry = findSteamAppForExePath(activeApp.exePath);
             if (steamEntry && steamEntry.id !== appId) {
-              console.log(
-                `[Tracker] Deferred suppression: reassigning exe "${activeApp.exeName}" → Steam game "${steamEntry.display_name}"`,
-              );
               // Reassign all sessions to the steam entry and delete this exe row.
               // Use a transaction so we never leave sessions pointing at a dead row.
               db.transaction(() => {
@@ -367,7 +372,6 @@ async function pollTick(): Promise<void> {
       } else {
         // Active window is untracked or we're idle — close any open active session
         // so it doesn't leak time onto the previously focused app.
-        console.log(`[Tracker] active window ${activeApp.exeName} not ticked: is_tracked=${appRow?.is_tracked} isIdle=${isIdle} — ending active session`);
         endActiveSession(now);
       }
     } else {

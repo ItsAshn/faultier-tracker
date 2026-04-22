@@ -18,7 +18,6 @@ const migrations: Migration[] = [
       db.exec(`
         ALTER TABLE apps ADD COLUMN linked_steam_app_id INTEGER REFERENCES apps(id) ON DELETE SET NULL;
       `);
-      console.log('[DB] Migration v9: Added linked_steam_app_id column');
     },
   },
   {
@@ -43,7 +42,6 @@ const migrations: Migration[] = [
         )
         WHERE is_steam_import = 1;
       `);
-      console.log('[DB] Migration v8: Added Steam tracking columns');
     },
   },
   {
@@ -338,7 +336,6 @@ export function runMigrations(db: DbCompat): void {
         "INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)",
       ).run(migration.version);
     })();
-    console.log(`[DB] Ran migration v${migration.version}`);
   }
 }
 

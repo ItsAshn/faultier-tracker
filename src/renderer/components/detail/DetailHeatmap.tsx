@@ -11,7 +11,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     background: 'var(--color-surface)',
     border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
+    borderRadius: 0,
     padding: 'var(--space-5)',
     marginTop: 'var(--space-4)',
   },
@@ -67,7 +67,7 @@ const styles: Record<string, React.CSSProperties> = {
   cell: {
     width: '11px',
     height: '11px',
-    borderRadius: '2px',
+    borderRadius: 0,
     cursor: 'pointer',
     transition: 'opacity 80ms ease, transform 80ms ease',
   },
@@ -76,34 +76,34 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--color-border)',
   },
   cellL1: {
-    background: 'rgba(245, 158, 11, 0.25)',
+    background: 'rgba(232, 232, 232, 0.15)',
   },
   cellL2: {
-    background: 'rgba(245, 158, 11, 0.50)',
+    background: 'rgba(232, 232, 232, 0.30)',
   },
   cellL3: {
-    background: 'rgba(245, 158, 11, 0.75)',
+    background: 'rgba(232, 232, 232, 0.55)',
   },
   cellL4: {
-    background: 'var(--color-accent)',
+    background: 'var(--color-text)',
   },
   cellFuture: {
     opacity: 0.15,
     cursor: 'default',
   },
   cellToday: {
-    outline: '1.5px solid var(--color-accent)',
+    outline: '2px solid var(--color-text)',
     outlineOffset: '1px',
   },
   cellHover: {
     transform: 'scale(1.3)',
     opacity: 1,
   },
-  tooltip: {
+tooltip: {
     position: 'fixed',
-    background: 'var(--color-surface-2)',
-    border: '1px solid var(--color-border-light)',
-    borderRadius: 'var(--radius-sm)',
+    background: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 0,
     padding: '4px 8px',
     fontSize: '11px',
     pointerEvents: 'none',
@@ -112,7 +112,6 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '2px',
     whiteSpace: 'nowrap',
-    boxShadow: 'var(--shadow-sm)',
   },
   tooltipDate: {
     color: 'var(--color-text-muted)',

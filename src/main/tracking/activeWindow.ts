@@ -24,10 +24,8 @@ let _platform: 'windows' | 'linux-wayland-hyprland' | 'linux-wayland-generic' | 
 function detectPlatform(): void {
   if (process.platform === 'win32') {
     _platform = 'windows'
-    console.log('[Tracker] Platform detected: Windows')
   } else if (process.platform === 'darwin') {
     _platform = 'macos'
-    console.log('[Tracker] Platform detected: macOS')
   } else if (process.platform === 'linux') {
     // Check for Wayland
     const waylandDisplay = process.env.WAYLAND_DISPLAY
@@ -37,18 +35,14 @@ function detectPlatform(): void {
       // Check for specific compositors
       if (isHyprland()) {
         _platform = 'linux-wayland-hyprland'
-        console.log('[Tracker] Platform detected: Linux (Wayland - Hyprland)')
       } else {
         _platform = 'linux-wayland-generic'
-        console.log('[Tracker] Platform detected: Linux (Wayland - Generic)')
       }
     } else {
       _platform = 'linux-x11'
-      console.log('[Tracker] Platform detected: Linux (X11)')
     }
   } else {
     _platform = 'unsupported'
-    console.log('[Tracker] Platform detected: Unsupported -', process.platform)
   }
 }
 
@@ -231,7 +225,6 @@ async function initWindows(): Promise<void> {
     
     const mod = await Promise.race([importPromise, timeoutPromise])
     _activeWindow = (mod.activeWindow ?? (mod as any).default) as ActiveWindowFn
-    console.log('[Tracker] get-windows loaded successfully')
   } catch (err) {
     console.error('[Tracker] get-windows FAILED to load — active window tracking disabled. Error:', err)
     _activeWindow = null
@@ -248,17 +241,14 @@ export async function initActiveWin(): Promise<void> {
       
     case 'linux-wayland-hyprland':
       _activeWindow = getHyprlandActiveWindow
-      console.log('[Tracker] Using Hyprland native detection')
       break
       
     case 'linux-wayland-generic':
       _activeWindow = getGenericWaylandActiveWindow
-      console.log('[Tracker] Using generic Wayland detection')
       break
       
     case 'linux-x11':
       _activeWindow = getX11ActiveWindow
-      console.log('[Tracker] Using X11 detection')
       break
       
     case 'macos':
@@ -267,7 +257,6 @@ export async function initActiveWin(): Promise<void> {
       break
       
     default:
-      console.log('[Tracker] Active window tracking not supported on this platform')
       _activeWindow = null
   }
 }
@@ -281,20 +270,17 @@ export interface ActiveAppInfo {
 
 export async function getActiveApp(): Promise<ActiveAppInfo | null> {
   if (!_activeWindow) {
-    console.log('[Tracker] getActiveApp: _activeWindow is null, returning null')
     return null
   }
   try {
     const result = await _activeWindow()
     if (!result) {
-      console.log('[Tracker] getActiveApp: result is undefined/null')
       return null
     }
     const rawPath = result.owner.path ?? ''
     const exeName = rawPath
       ? rawPath.split(/[\\/]/).pop() ?? result.owner.name
       : result.owner.name
-    console.log('[Tracker] getActiveApp: found', exeName, 'pid=', result.owner.processId, 'title=', result.title.substring(0, 50))
     return {
       exeName: exeName.toLowerCase(),
       exePath: rawPath || null,

@@ -153,7 +153,7 @@ export default function ArtworkSearchModal({
                   position: 'relative',
                   background: 'var(--color-surface-2)',
                   border: '2px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
+                  borderRadius: 0,
                   overflow: 'hidden',
                   cursor: applying !== null ? 'wait' : 'pointer',
                   padding: 0,
@@ -161,7 +161,7 @@ export default function ArtworkSearchModal({
                   transition: 'border-color 120ms ease, transform 120ms ease',
                 }}
                 onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-accent)'
+                  ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-text)'
                   ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.03)'
                 }}
                 onMouseLeave={(e) => {

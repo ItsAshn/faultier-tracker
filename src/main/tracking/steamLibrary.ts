@@ -193,7 +193,6 @@ export function refreshSteamLibraryIndex(): void {
   try {
     const steamPath = getSteamInstallPath();
     if (!steamPath) {
-      console.log("[SteamLibrary] Steam not found in registry — index empty");
       _installDirIndex = newInstallDir;
       _appIdIndex = newAppId;
       _indexBuilt = true;
@@ -201,7 +200,6 @@ export function refreshSteamLibraryIndex(): void {
     }
 
     const roots = discoverLibraryRoots(steamPath);
-    console.log(`[SteamLibrary] Found ${roots.length} library root(s):`, roots);
 
     for (const root of roots) {
       indexLibraryRoot(root, newInstallDir, newAppId);
@@ -209,11 +207,7 @@ export function refreshSteamLibraryIndex(): void {
 
     _installDirIndex = newInstallDir;
     _appIdIndex = newAppId;
-    _indexBuilt = true;
-
-    console.log(
-      `[SteamLibrary] Index built: ${newInstallDir.size} game(s) indexed`,
-    );
+    _installBuilt = true;
   } catch (err) {
     console.error("[SteamLibrary] Failed to build index:", err);
     // On unexpected error keep whatever index we had before (or empty)

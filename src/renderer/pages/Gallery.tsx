@@ -207,9 +207,6 @@ export default function Gallery(): JSX.Element {
       await loadAll();
       loadRange();
       fetchSummary(true);
-      if (result.updated === 0) {
-        console.log('[Gallery] Steam refresh: no new playtime detected');
-      }
     } catch (err) {
       console.error('[Gallery] Steam refresh failed:', err);
     } finally {

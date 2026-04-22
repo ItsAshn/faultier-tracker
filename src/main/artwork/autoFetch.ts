@@ -7,7 +7,6 @@ import { CHANNELS } from '@shared/channels'
 export async function autoFetchArtwork(): Promise<void> {
   const apiKey = getSetting('steamgriddb_api_key') as string | null
   if (!apiKey) {
-    console.log('[AutoFetch] skipping artwork fetch — no steamgriddb_api_key configured')
     return
   }
 
@@ -21,21 +20,16 @@ export async function autoFetchArtwork(): Promise<void> {
     .all()
 
   if (!rows.length) {
-    console.log('[AutoFetch] no apps without artwork found')
     return
   }
-
-  console.log(`[AutoFetch] fetching artwork for ${rows.length} app(s)`)
 
   let anyFetched = false
 
   for (const row of rows) {
     try {
-      console.log(`[AutoFetch] searching SteamGridDB for "${row.display_name}"...`)
       const results = await searchSteamGridDB(row.display_name, apiKey, 'grids')
-      
+
       if (!results.length) {
-        console.log(`[AutoFetch] "${row.display_name}": no results found`)
         continue
       }
 
@@ -46,7 +40,6 @@ export async function autoFetchArtwork(): Promise<void> {
         continue
       }
 
-      console.log(`[AutoFetch] "${row.display_name}": downloading ${pick.url}`)
       const res = await net.fetch(pick.url)
       if (!res.ok) {
         console.warn(`[AutoFetch] "${row.display_name}": image download failed (HTTP ${res.status})`)
@@ -81,7 +74,6 @@ export async function autoFetchArtwork(): Promise<void> {
       ).run(fsPath, row.id)
 
       anyFetched = true
-      console.log(`[AutoFetch] saved artwork for "${row.display_name}"`)
     } catch (err) {
       console.warn(`[AutoFetch] failed for "${row.display_name}":`, err)
     }
@@ -94,7 +86,6 @@ export async function autoFetchArtwork(): Promise<void> {
     BrowserWindow.getAllWindows().forEach((win) => {
       if (!win.isDestroyed()) win.webContents.send(CHANNELS.APPS_ARTWORK_UPDATED)
     })
-    console.log('[AutoFetch] artwork update complete')
   }
 }
 
