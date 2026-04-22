@@ -195,10 +195,7 @@ git tag v1.2.3 && git push origin v1.2.3
 ```
 
 GitHub Actions (`.github/workflows/release.yml`) triggers on `v*.*.*` tags, builds Windows + Linux
-packages (AppImage, pacman, deb, tar.gz), and publishes to GitHub Releases. Use `/ship` for a guided flow.
-
-AUR updates are **automatic** — `.github/workflows/aur.yml` triggers after the release workflow completes
-and pushes updated PKGBUILD to the AUR. No manual intervention required.
+packages (AppImage, deb, tar.gz), and publishes to GitHub Releases. Use `/ship` for a guided flow.
 
 ### /ship Command
 
@@ -209,16 +206,14 @@ When user invokes `/ship`:
 3. Commit with message (if there are changes)
 4. Bump version: `npm version minor --no-git-tag-version` (or patch/major as appropriate)
 5. **Update version references**:
-   - **README.md**: Replace old version in pacman command with new version
-     - Pattern: `kioku-X.X.X.pacman` → `kioku-{newVersion}.pacman`
-   - **aur/PKGBUILD**: Update pkgver field to new version
-6. Stage version changes: `git add README.md aur/PKGBUILD`
+   - No additional version references to update
+6. Stage version changes: `git add README.md`
 7. Commit version bump: `git commit -m "Bump version to X.X.X"`
 8. Create tag: `git tag vX.X.X`
 9. Push commits: `git push origin main`
 10. Push tag: `git push origin vX.X.X`
 
-AUR is updated automatically by GitHub Actions after the release completes.
+Only AppImage, deb, and tar.gz packages are built for Linux.
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

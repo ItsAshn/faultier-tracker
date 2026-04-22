@@ -6,7 +6,7 @@ import { CHANNELS } from '@shared/channels'
 export function initUpdater(): void {
   if (!app.isPackaged) return
 
-  // Skip for system-managed packages (AUR, pacman, deb, etc.) — updates are
+  // Skip for system-managed packages (deb, etc.) — updates are
   // handled by the system package manager, not electron-updater.
   if (process.platform === "linux" && !process.env.APPIMAGE) return
 
