@@ -131,7 +131,6 @@ export function resetDbData(): void {
   _settingsCache = null;
   seedDefaults(db);
 }
-}
 
 // ─── Settings helpers ──────────────────────────────────────────────────────
 
